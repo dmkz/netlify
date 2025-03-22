@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Парсер боёв HeroesWM</title>
+  <title>Парсер боёв HeroesWM с модификацией текста</title>
   <style>
     body {
       font-family: sans-serif;
@@ -12,6 +12,7 @@
       width: 100%;
       padding: 8px;
       margin-bottom: 10px;
+      font-family: monospace;
     }
     button {
       padding: 8px 16px;
@@ -30,23 +31,28 @@
 <body>
   <h1>Парсер боёв HeroesWM</h1>
   <p>Вставьте текст с записями боёв (любого формата):</p>
-  <textarea id="inputText" rows="12" placeholder="Например:
+  <textarea id="inputText" rows="15" placeholder="Например:
 73)https://www.heroeswm.ru/war.php?warid=1547755596&show=NHKOVn6B
 15498, разбой
-74)https://my.lordswm.com/warlog.php?warid=1547758771&show=NoD0xiiZ
-15498, гном"></textarea>
+74)https://www.heroeswm.ru/war.php?warid=1547758771&show=NoD0xiiZ
+15498, гном
+75)https://www.heroeswm.ru/war.php?warid=1547783719&show=N_2QVSFV
+15498,эльф
+76)https://www.heroeswm.ru/war.php?warid=1547785334&show=Nwha8Hw_
+13284, вар"></textarea>
   <br>
   <button id="processBtn">Обработать!</button>
   
-  <h2>Результаты</h2>
+  <h2>Модифицированный текст</h2>
   <pre id="result"></pre>
   
   <script>
-    // Функция для обработки одного URL боя
+    // Функция для обработки одного URL боя:
+    // Извлекает параметры, делает запрос к прокси-функции и возвращает объект с найденной подстрокой и исходным URL.
     async function processBattle(urlStr) {
       let urlObj;
       try {
-        // Извлекаем URL из строки – ищем шаблон, где домен и путь могут быть разными
+        // Ищем URL, удовлетворяющий нужному шаблону
         const urlMatch = urlStr.match(/https?:\/\/(?:www\.)?(heroeswm\.ru|my\.lordswm\.com|lordswm\.com)\/(?:war\.php|warlog\.php)\?\S*/i);
         if (!urlMatch) throw new Error("URL не найден");
         urlObj = new URL(urlMatch[0]);
@@ -61,8 +67,7 @@
         return { error: "Отсутствуют параметры warid/show_for_all", url: urlStr };
       }
       
-      // Формируем URL запроса к прокси‑функции
-      // Прокси функция всегда обращается к https://www.heroeswm.ru/battle.php
+      // Формируем URL запроса к прокси-функции (обращаемся к battle.php)
       const proxyUrl = `/.netlify/functions/parse-battle?warid=${encodeURIComponent(warid)}&show_for_all=${encodeURIComponent(show_for_all)}`;
       
       try {
@@ -87,15 +92,15 @@
         if (!extracted) {
           extracted = "слив";
         }
-        return { result: extracted, url: urlStr };
+        return { result: extracted, url: urlMatch[0] };
       } catch (error) {
         return { error: error.toString(), url: urlStr };
       }
     }
     
     document.getElementById('processBtn').addEventListener('click', async function() {
-      const inputText = document.getElementById('inputText').value.trim();
-      if (!inputText) {
+      const inputText = document.getElementById('inputText').value;
+      if (!inputText.trim()) {
          alert('Пожалуйста, введите текст');
          return;
       }
@@ -103,31 +108,39 @@
       const resultElem = document.getElementById('result');
       resultElem.textContent = "Обработка...\n";
       
-      // Разбиваем весь ввод на строки
+      // Разбиваем исходный текст на строки
       const lines = inputText.split(/\r?\n/);
       
-      // Массив для результатов
+      // Будущий массив строк результата
       let outputLines = [];
       
-      // Для каждой строки ищем URL, удовлетворяющий нужному шаблону
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-        if (!trimmedLine) continue;
-        
-        // Ищем URL, который начинается с http/https и содержит один из нужных доменов и нужный путь
+      // Проходим по каждой строке
+      for (let line of lines) {
+        // Ищем в строке URL, удовлетворяющий нужному шаблону
         const regex = /https?:\/\/(?:www\.)?(heroeswm\.ru|my\.lordswm\.com|lordswm\.com)\/(?:war\.php|warlog\.php)\?\S*/i;
-        if (regex.test(trimmedLine)) {
-          resultElem.textContent += `Обработка: ${trimmedLine}\n`;
-          const battleResult = await processBattle(trimmedLine);
+        const match = line.match(regex);
+        
+        if (match) {
+          // Если URL найден, обрабатываем его
+          const originalUrl = match[0];
+          resultElem.textContent += `Обработка: ${originalUrl}\n`;
+          const battleResult = await processBattle(originalUrl);
+          
+          let insertText = "";
           if (battleResult.error) {
-            outputLines.push(`${battleResult.error}, ${battleResult.url}`);
+            insertText = battleResult.error;
           } else {
-            outputLines.push(`${battleResult.result}, ${battleResult.url}`);
+            insertText = battleResult.result;
           }
+          // Заменяем найденный URL в строке так, чтобы перед ним был наш insertText с запятой
+          // Например, превращаем "73)https://..." в "73) insertText, https://..."
+          line = line.replace(originalUrl, `${insertText}, ${originalUrl}`);
         }
+        // Добавляем обработанную строку в результат
+        outputLines.push(line);
       }
       
-      // Выводим итоговый результат
+      // Выводим итоговый текст
       resultElem.textContent = outputLines.join("\n");
     });
   </script>
