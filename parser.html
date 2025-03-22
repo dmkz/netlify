@@ -66,4 +66,24 @@
       
       // Формируем URL запроса к нашей прокси-функции
       // Если вы развернули прокси на своем домене, замените базовый URL на свой
-      const proxyUrl = `/.netlify/functions/parse-battle?warid=${encodeURIComponent(warid)}
+      const proxyUrl = `/.netlify/functions/parse-battle?warid=${encodeURIComponent(warid)}&show_for_all=${encodeURIComponent(show_for_all)}`;
+      
+      // Отображаем результат запроса
+      const resultElem = document.getElementById('result');
+      resultElem.textContent = 'Загрузка...';
+      
+      try {
+        const response = await fetch(proxyUrl);
+        if (!response.ok) {
+          resultElem.textContent = `Ошибка: ${response.status} ${response.statusText}`;
+          return;
+        }
+        const html = await response.text();
+        resultElem.textContent = html;
+      } catch (error) {
+        resultElem.textContent = 'Ошибка запроса: ' + error.toString();
+      }
+    });
+  </script>
+</body>
+</html>
