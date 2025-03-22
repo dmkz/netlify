@@ -1,9 +1,10 @@
 // netlify/functions/parse-battle.js
-const fetch = require('node-fetch'); // Если ваша среда не поддерживает fetch natively
-
 exports.handler = async (event, context) => {
+  // Динамически импортируем node-fetch и получаем его дефолтный экспорт
+  const { default: fetch } = await import('node-fetch');
+
   // Получаем параметры запроса (warid и show) из query string
-  const { warid, show } = event.queryStringParameters;
+  const { warid, show } = event.queryStringParameters || {};
   if (!warid) {
     return {
       statusCode: 400,
@@ -36,6 +37,7 @@ exports.handler = async (event, context) => {
       body: html,
     };
   } catch (error) {
+    console.error("Error:", error);
     return {
       statusCode: 500,
       body: error.toString(),
