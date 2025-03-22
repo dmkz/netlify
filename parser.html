@@ -37,9 +37,7 @@
 74)https://www.heroeswm.ru/war.php?warid=1547758771&show=NoD0xiiZ
 15498, гном
 75)https://www.heroeswm.ru/war.php?warid=1547783719&show=N_2QVSFV
-15498,эльф
-76)https://www.heroeswm.ru/war.php?warid=1547785334&show=Nwha8Hw_
-13284, вар"></textarea>
+15498,эльф"></textarea>
   <br>
   <button id="processBtn">Обработать!</button>
   
@@ -51,11 +49,13 @@
     // Извлекает параметры, делает запрос к прокси-функции и возвращает объект с найденной подстрокой и исходным URL.
     async function processBattle(urlStr) {
       let urlObj;
+      let extractedUrl = ""; // Сохраним найденный URL
       try {
         // Ищем URL, удовлетворяющий нужному шаблону
         const urlMatch = urlStr.match(/https?:\/\/(?:www\.)?(heroeswm\.ru|my\.lordswm\.com|lordswm\.com)\/(?:war\.php|warlog\.php)\?\S*/i);
         if (!urlMatch) throw new Error("URL не найден");
-        urlObj = new URL(urlMatch[0]);
+        extractedUrl = urlMatch[0];
+        urlObj = new URL(extractedUrl);
       } catch (e) {
         return { error: "Неверный формат URL", url: urlStr };
       }
@@ -64,7 +64,7 @@
       const warid = urlObj.searchParams.get('warid');
       let show_for_all = urlObj.searchParams.get('show_for_all') || urlObj.searchParams.get('show');
       if (!warid || !show_for_all) {
-        return { error: "Отсутствуют параметры warid/show_for_all", url: urlStr };
+        return { error: "Отсутствуют параметры warid/show_for_all", url: extractedUrl };
       }
       
       // Формируем URL запроса к прокси-функции (обращаемся к battle.php)
@@ -73,7 +73,7 @@
       try {
         const response = await fetch(proxyUrl);
         if (!response.ok) {
-          return { error: `Ошибка запроса: ${response.status} ${response.statusText}`, url: urlStr };
+          return { error: `Ошибка запроса: ${response.status} ${response.statusText}`, url: extractedUrl };
         }
         const html = await response.text();
         
@@ -92,9 +92,9 @@
         if (!extracted) {
           extracted = "слив";
         }
-        return { result: extracted, url: urlMatch[0] };
+        return { result: extracted, url: extractedUrl };
       } catch (error) {
-        return { error: error.toString(), url: urlStr };
+        return { error: error.toString(), url: extractedUrl };
       }
     }
     
