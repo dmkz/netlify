@@ -2,64 +2,68 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>HeroesWM Battle Result Extractor</title>
+  <title>Парсер боя HeroesWM</title>
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; }
-    iframe { width: 100%; height: 100%; border: none; }
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    input[type="text"] {
+      width: 80%;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 8px 16px;
+    }
+    pre {
+      background-color: #f4f4f4;
+      padding: 15px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      border: 1px solid #ccc;
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
-  <!-- Вставляем страницу боя в iframe -->
-  <iframe id="warFrame" src="/.netlify/functions/parse-battle?warid=1546342792&show=NeOttY_q"></iframe>
+  <h1>Парсер боя HeroesWM</h1>
+  <p>Введите ссылку на бой:</p>
+  <input type="text" id="battleLink" placeholder="https://www.heroeswm.ru/...?..." />
+  <br>
+  <button id="loadBtn">Загрузить!</button>
+  
+  <h2>Результат</h2>
+  <pre id="result"></pre>
   
   <script>
-    // Функция ожидания, пока условие не станет истинным или не истечёт таймаут
-    function waitFor(conditionFn, timeout = 30000, interval = 10000) {
-      return new Promise((resolve, reject) => {
-        const start = Date.now();
-        const timer = setInterval(() => {
-          try {
-            if (conditionFn()) {
-              clearInterval(timer);
-              resolve();
-            } else if (Date.now() - start > timeout) {
-              clearInterval(timer);
-              reject(new Error("Timeout waiting for condition"));
-            }
-          } catch (e) {
-            // Если возникла ошибка доступа (например, из-за same origin policy), можно её обработать здесь
-            console.error(e);
-          }
-        }, interval);
-      });
-    }
-    
-    // Когда iframe загрузится, начинаем работу
-    document.getElementById('warFrame').addEventListener('load', async function() {
-      try {
-        // Попытка доступа к документу внутри iframe (будет работать только при разрешённом доступе)
-        const warDoc = this.contentDocument || this.contentWindow.document;
-        
-        // Ждем, пока кнопка с id "confirm_ins" станет видимой
-        await waitFor(() => {
-          const btn = warDoc.getElementById('confirm_ins');
-          return btn && getComputedStyle(btn).display !== 'none';
-        });
-        const btn = warDoc.getElementById('confirm_ins');
-        console.log("Кнопка обнаружена и стала видимой. Нажимаем её.");
-        btn.click();
-        
-        // Ждем, пока элемент с результатом боя заполнится текстом.
-        await waitFor(() => {
-          const resultElem = warDoc.getElementById('finalresult_text');
-          return resultElem && resultElem.innerText.trim().length > 0;
-        });
-        const resultElem = warDoc.getElementById('finalresult_text');
-        console.log("Результат боя:", resultElem.innerText);
-      } catch (e) {
-        console.error("Ошибка:", e);
+    document.getElementById('loadBtn').addEventListener('click', async function() {
+      const battleLink = document.getElementById('battleLink').value.trim();
+      if (!battleLink) {
+        alert('Пожалуйста, введите ссылку');
+        return;
       }
-    });
-  </script>
-</body>
-</html>
+      
+      // Создаем объект URL для удобного парсинга параметров
+      let url;
+      try {
+        url = new URL(battleLink);
+      } catch(e) {
+        alert('Неверный формат ссылки');
+        return;
+      }
+      
+      // Извлекаем параметры warid и show (или show_for_all)
+      const params = url.searchParams;
+      const warid = params.get('warid');
+      let show_for_all = params.get('show_for_all') || params.get('show');
+      
+      if (!warid || !show_for_all) {
+        alert('Невозможно найти необходимые параметры "warid" и "show_for_all" (или "show") в ссылке.');
+        return;
+      }
+      
+      // Формируем URL запроса к нашей прокси-функции
+      // Если вы развернули прокси на своем домене, замените базовый URL на свой
+      const proxyUrl = `/.netlify/functions/parse-battle?warid=${encodeURIComponent(warid)}
