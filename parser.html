@@ -2,19 +2,20 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Парсер боя HeroesWM</title>
+  <title>Парсер боёв HeroesWM</title>
   <style>
     body {
       font-family: sans-serif;
       padding: 20px;
     }
-    input[type="text"] {
-      width: 80%;
+    textarea {
+      width: 100%;
       padding: 8px;
       margin-bottom: 10px;
     }
     button {
       padding: 8px 16px;
+      margin-bottom: 20px;
     }
     pre {
       background-color: #f4f4f4;
@@ -23,65 +24,82 @@
       white-space: pre-wrap;
       word-wrap: break-word;
       border: 1px solid #ccc;
-      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>Парсер боя HeroesWM</h1>
-  <p>Введите ссылку на бой:</p>
-  <input type="text" id="battleLink" placeholder="https://www.heroeswm.ru/...?..." />
+  <h1>Парсер боёв HeroesWM</h1>
+  <p>Вставьте ссылки на бои (по одной в строке):</p>
+  <textarea id="battleLinks" rows="10" placeholder="https://www.heroeswm.ru/...?..."></textarea>
   <br>
   <button id="loadBtn">Загрузить!</button>
   
-  <h2>Результат</h2>
+  <h2>Результаты</h2>
   <pre id="result"></pre>
   
   <script>
     document.getElementById('loadBtn').addEventListener('click', async function() {
-      const battleLink = document.getElementById('battleLink').value.trim();
-      if (!battleLink) {
-        alert('Пожалуйста, введите ссылку');
-        return;
+      const inputText = document.getElementById('battleLinks').value.trim();
+      if (!inputText) {
+         alert('Пожалуйста, введите хотя бы одну ссылку');
+         return;
       }
       
-      // Создаем объект URL для удобного парсинга параметров
-      let url;
-      try {
-        url = new URL(battleLink);
-      } catch(e) {
-        alert('Неверный формат ссылки');
-        return;
-      }
-      
-      // Извлекаем параметры warid и show (или show_for_all)
-      const params = url.searchParams;
-      const warid = params.get('warid');
-      let show_for_all = params.get('show_for_all') || params.get('show');
-      
-      if (!warid || !show_for_all) {
-        alert('Невозможно найти необходимые параметры "warid" и "show_for_all" (или "show") в ссылке.');
-        return;
-      }
-      
-      // Формируем URL запроса к нашей прокси-функции
-      // Если вы развернули прокси на своем домене, замените базовый URL на свой
-      const proxyUrl = `/.netlify/functions/parse-battle?warid=${encodeURIComponent(warid)}&show_for_all=${encodeURIComponent(show_for_all)}`;
-      
-      // Отображаем результат запроса
+      // Разбиваем ссылки по строкам и фильтруем пустые
+      const links = inputText.split(/\r?\n/).map(line => line.trim()).filter(line => line !== "");
       const resultElem = document.getElementById('result');
-      resultElem.textContent = 'Загрузка...';
+      resultElem.textContent = "Загрузка...\n";
       
-      try {
-        const response = await fetch(proxyUrl);
-        if (!response.ok) {
-          resultElem.textContent = `Ошибка: ${response.status} ${response.statusText}`;
-          return;
-        }
-        const html = await response.text();
-        resultElem.textContent = html;
-      } catch (error) {
-        resultElem.textContent = 'Ошибка запроса: ' + error.toString();
+      // Последовательно обрабатываем каждую ссылку
+      for (const link of links) {
+         let url;
+         try {
+           url = new URL(link);
+         } catch(e) {
+           resultElem.textContent += `Неверный формат ссылки: ${link}\n`;
+           continue;
+         }
+         
+         // Извлекаем параметры warid и show_for_all (или show)
+         const warid = url.searchParams.get('warid');
+         let show_for_all = url.searchParams.get('show_for_all') || url.searchParams.get('show');
+         if (!warid || !show_for_all) {
+           resultElem.textContent += `Отсутствуют параметры warid/show_for_all в ссылке: ${link}\n`;
+           continue;
+         }
+         
+         // Формируем URL для запроса к прокси-функции
+         // Если ваша функция доступна по другому пути, измените базовый URL
+         const proxyUrl = `/.netlify/functions/parse-battle?warid=${encodeURIComponent(warid)}&show_for_all=${encodeURIComponent(show_for_all)}`;
+         
+         try {
+           const response = await fetch(proxyUrl);
+           if (!response.ok) {
+             resultElem.textContent += `Ошибка запроса для ${link}: ${response.status} ${response.statusText}\n`;
+             continue;
+           }
+           
+           const html = await response.text();
+           // Ищем подстроку между "К вам присоединились новые отряды: " и "<br />"
+           const startStr = "К вам присоединились новые отряды: ";
+           const endStr = "<br />";
+           const startIndex = html.indexOf(startStr);
+           let extracted = "";
+           if (startIndex !== -1) {
+             const substringStart = startIndex + startStr.length;
+             const endIndex = html.indexOf(endStr, substringStart);
+             if (endIndex !== -1) {
+               extracted = html.substring(substringStart, endIndex).trim();
+             }
+           }
+           // Если подстрока не найдена, выводим "слив"
+           if (!extracted) {
+             extracted = "слив";
+           }
+           resultElem.textContent += `${extracted}, ${link}\n`;
+         } catch (error) {
+           resultElem.textContent += `Ошибка запроса для ${link}: ${error.toString()}\n`;
+         }
       }
     });
   </script>
