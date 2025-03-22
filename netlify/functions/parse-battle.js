@@ -26,7 +26,7 @@ exports.handler = async (event, context) => {
         body: `Error fetching ${url}`,
       };
     }
-    const html = await res.text();
+    let html = await res.text();
     html = html.replace(/(href|src)=["']\/(?!\/)/g, '$1="https://www.heroeswm.ru/');
     return {
       statusCode: 200,
