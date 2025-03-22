@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Парсер боёв</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      width: 100%;
+    }
+    .clear-btn {
+      width: 50%;
+      text-align: center;
+      background-color: #ff4d4d;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+    .clear-btn:hover {
+      background-color: #cc0000;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      cursor: pointer;
+      border-radius: 5px;
+      font-size: 14px;
+      transition: background-color 0.3s ease, transform 0.1s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    button:active {
+      transform: scale(0.95);
+    }
+    #toggleButton {
+      display: none;
+      background-color: #6c757d;
+    }
+    #toggleButton:hover {
+      background-color: #5a6268;
+    }
+    @media (max-width: 600px) {
+      .container {
+        flex-direction: column;
+      }
+      .half {
+        width: 100%;
+      }
+      textarea {
+        height: auto;
+      }
+    }
+    body {
+      font-family: Arial, sans-serif;
+      width: 100%;
+      margin: auto;
+      padding: 20px;
+      text-align: center;
+    }
+    textarea {
+      width: 100%;
+      /* Начальная высота – одна строка */
+      min-height: 2em;
+      resize: none;
+      overflow: hidden;
+    }
+    .options {
+      text-align: left;
+      margin-bottom: 10px;
+    }
+    .options label, .options select {
+      margin-bottom: 5px;
+    }
+    .container {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .half {
+      flex: 1;
+      min-width: 300px;
+    }
+    #result {
+      text-align: left;
+      white-space: pre-wrap;
+    }
+    .battle-block {
+      border: 1px solid #ccc;
+      padding: 4px;
+      margin-bottom: 2px;
+      border-radius: 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .battle-text {
+      margin: 0 0 2px 0;
+    }
+    #faq {
+      display: flex;
+      gap: 20px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    @media (max-width: 600px) {
+      #faq {
+        flex-direction: column;
+      }
+    }
+    .faq-item {
+      flex: 1 1 48%;
+      padding: 15px;
+      background: #fff;
+      border-radius: 10px;
+      border: 2px solid;
+      box-sizing: border-box;
+    }
+    .faq-item.green {
+      border-color: #4CAF50;
+      color: #4CAF50;
+    }
+    .faq-item.red {
+      border-color: #F44336;
+      color: #F44336;
+    }
+    .faq-item summary {
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .faq-item a {
+      color: inherit;
+      text-decoration: underline;
+    }
+    .faq-item p {
+      margin: 10px 0 0 0;
+      text-align: justify;
+    }
+    #result-header,
+    #bottom-actions {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      justify-content: flex-start;
+      margin: 10px 0;
+      gap: 10px;
+    }
+    @media (max-width: 600px) {
+      #result-header,
+      #bottom-actions {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+    #result-header button,
+    #result-header h3,
+    #bottom-actions button {
+      text-align: left;
+    }
+    .action-btn {
+      background-color: #007bff;
+      color: #fff;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .scroll-btn {
+      background-color: #4CAF50;
+    }
+    .action-btn:hover {
+      opacity: 0.9;
+    }
+    #resultTitle {
+      margin: 0;
+    }
+    #editorToggleContainer {
+      margin: 10px 0;
+    }
+    #battleInput, #filterInput {
+      height: 100px;
+      min-height: 100px;
+      resize: vertical;
+      overflow: auto;
+    }
+    /* Для текстовых полей внутри контейнера результата (редактор) */
+    #result textarea {
+      padding: 4px 6px 6px 6px;
+    }
+    #result textarea::placeholder {
+      overflow: hidden;
+    }
+    /* Для кнопки "Подняться наверх" (класс .scroll-btn) */
+    .scroll-btn {
+      background-color: #4CAF50; /* начальный зелёный */
+    }
+    .scroll-btn:hover {
+      background-color: #388E3C; /* тёмно-зелёный */
+    }
+
+    /* Для кнопки "Включить редактор" в выключенном состоянии */
+    .editor-off {
+      background-color: #9C27B0; /* фиолетовый */
+    }
+    .editor-off:hover {
+      background-color: #7B1FA2; /* тёмно-фиолетовый */
+    }
+
+    /* Для кнопки "Выключить редактор" (когда редактор включён) */
+    .editor-on {
+      background-color: #F44336; /* красный */
+    }
+    .editor-on:hover {
+      background-color: #D32F2F; /* тёмно-красный */
+    }
+  </style>
+</head>
+<body>
+  <h2>Парсер боёв</h2>
+
+  <div id="faq">
+    <details class="faq-item green">
+      <summary>Кто автор сайта?</summary>
+      <p>
+        Автор сайта — <a href="https://www.heroeswm.ru/pl_info.php?id=2829340" target="_blank" rel="noopener noreferrer">oxotnik102rus</a>. Если вы обнаружили ошибку или у вас есть идея для новой функции, напишите мне в личку.
+      </p>
+    </details>
+    <details class="faq-item red">
+      <summary>Ты украдешь мои бои?</summary>
+      <p>
+        Нет. Код работает исключительно на стороне клиента и не передает никакую информацию на сервер, поэтому я не украду ваши бои.
+      </p>
+      <p>
+        Код размещен с помощью <a href="https://pages.github.com/" target="_blank" rel="noopener noreferrer">GitHub Pages</a> — платформы, которая не поддерживает серверный код, что обеспечивает безопасность ваших данных.
+      </p>
+      <p>
+        Если у вас возникают сомнения, вы можете посмотреть исходный код сайта в браузере или по <a href="https://github.com/dmkz/dmkz.github.io" target="_blank" rel="noopener noreferrer">ссылке</a>.
+      </p>
+    </details>
+  </div>
+
+  <div id="inputContainer">
+    <div class="container">
+      <div class="half">
+        <h3>Входные данные (HTML)</h3>
+        <div class="input-group">
+          <textarea id="battleInput" placeholder="Вставьте HTML страницы с боями... 
+Можно вставить сразу несколько страниц. 
+Проще всего: откройте протокол боёв, нажмите CTRL+U, затем CTRL+A, CTRL+C и вставьте сюда (CTRL+V)."></textarea>
+          <button class="clear-btn" onclick="clearInput()">Очистить</button>
+        </div>
+      </div>
+      <div class="half">
+        <h3>Фильтр боёв</h3>
+        <textarea id="filterInput">Праздничные злодеи
+Вражеский отряд
+Стражи серебра
+Враждебный отряд
+Лесные грабители
+Пираты
+Враги племени Ярости
+Вражеский караван
+Вражеские стражи
+Хранители артефактов
+Враги портала
+Цель</textarea>
+      </div>
+    </div>
+    
+    <div class="options">
+      <label><input type="checkbox" id="doFilter" checked> Выбрать бои с ивента</label><br>
+      <label><input type="checkbox" id="onlyWins"> Показывать только победы</label><br>
+      <label><input type="checkbox" id="watchFromStart" checked> Указывать на начало боя</label><br>
+      <label><input type="checkbox" id="removeDate"> Удалить дату и время после сортировки</label><br>
+      <label>
+        <input type="checkbox" id="filterByDate">
+        Удалить бои до указанной даты
+      </label>
+      <input type="text" id="dateFilterInput" placeholder="ДД-ММ-ГГГГ ЧЧ:ММ">
+      <select id="dateFormatSelect">
+        <option value="DMY" selected>ДД-ММ-ГГ ЧЧ:ММ</option>
+        <option value="YMD">ГГ-ММ-ДД ЧЧ:ММ</option>
+      </select>
+      <br>
+      <label><input type="checkbox" id="removeMostCommon"> Удалить никнейм</label><br>
+      <label><input type="checkbox" id="removeEnemyNames"> Удалить наименование врагов с ивента</label><br>
+      <label><input type="checkbox" id="useLordswm"> Использовать my.lordswm.com вместо www.heroeswm.ru</label><br>
+      <label>
+        <input type="checkbox" id="numberBattles"> Пронумеровать бои
+      </label>
+      <label>
+        Начальный номер:
+        <input type="number" id="startNumber" value="1" min="1">
+      </label><br>
+      <label>
+        <input type="checkbox" id="sortAscending"> Прямой порядок сортировки
+      </label><br>
+      <label>
+        <input type="checkbox" id="includeAd" checked> Добавить ссылку на генератор
+      </label><br>
+    </div>
+    
+    <button onclick="processBattles()">Обработать</button>
+  </div>
+
+  <div id="result-header">
+    <button id="toggleButton" onclick="toggleInput()" style="display: none;">Развернуть настройки</button>
+    <!-- Переключатель режима редактора -->
+    <div id="editorToggleContainer">
+      <button id="editorToggleButton" onclick="toggleEditorMode()" class="editor-off" >Включить редактор</button>
+    </div>
+    <button id="copyButtonTop" class="action-btn" onclick="copyResult()">Скопировать результат</button>
+    <h3 id="resultTitle">Результат:</h3>
+  </div>
+
+  <div id="result"></div>
+
+  <div id="bottom-actions">
+    <button id="scrollTopButton" class="action-btn scroll-btn" onclick="scrollToTop()">Подняться наверх</button>
+    <button id="copyButtonBottom" class="action-btn" onclick="copyResult()">Скопировать результат</button>
+  </div>
+
+  <script>
+    var editorModeEnabled = false;
+    var processedBattles = [];
+    var editorData = { intro: "", descriptions: [], conclusion: "" };
+
+    // Автоизменение высоты текстового поля
+    function autoResize(textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = textarea.scrollHeight + 'px';
+    }
+    function attachAutoResize(el) {
+      el.setAttribute("rows", "1");
+      el.addEventListener("input", function() {
+        autoResize(el);
+      });
+      autoResize(el);
+    }
+
+    function scrollToTop() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  
+    function clearInput() {
+      document.getElementById("battleInput").value = "";
+    }
+    
+    function saveEditorData() {
+      // Считываем введение
+      const introField = document.getElementById("introField");
+      editorData.intro = introField ? introField.value : "";
+
+      // Считываем описания боёв
+      const battleBlocks = document.querySelectorAll(".battle-block");
+      editorData.descriptions = [];
+      battleBlocks.forEach(block => {
+        const descField = block.querySelector(".battle-description");
+        editorData.descriptions.push(descField ? descField.value : "");
+      });
+
+      // Считываем заключение
+      const conclusionField = document.getElementById("conclusionField");
+      editorData.conclusion = conclusionField ? conclusionField.value : "";
+
+      // Сохраняем весь объект в localStorage
+      saveState();
+    }
+
+    // Функция копирования результата без добавления служебных слов
+    function copyResult() {
+      let title = document.getElementById("resultTitle").textContent.trim();
+      let textToCopy = "";
+      if (editorModeEnabled) {
+        let parts = [];
+        let intro = document.getElementById("introField") ? document.getElementById("introField").value.trim() : "";
+        if (intro) parts.push(intro);
+        let battleBlocks = document.querySelectorAll(".battle-block");
+        battleBlocks.forEach(block => {
+          let battleText = block.querySelector(".battle-text").textContent.trim();
+          let battleDesc = block.querySelector(".battle-description").value.trim();
+          if (battleText) parts.push(battleText);
+          if (battleDesc) parts.push(battleDesc);
+        });
+        let conclusion = document.getElementById("conclusionField") ? document.getElementById("conclusionField").value.trim() : "";
+        if (conclusion) parts.push(conclusion);
+        // Если опция включена, добавляем текст ссылки
+        if (document.getElementById("includeAd").checked) {
+          let currentURL = window.location.href;
+          parts.push("Список боев сгенерирован здесь: " + currentURL);
+        }
+        textToCopy = title + "\n" + parts.join("\n");
+      } else {
+        textToCopy = title + "\n" + document.getElementById("result").textContent.trim();
+      }
+      
+      if (!textToCopy) {
+        alert("Результат пуст, нечего копировать!");
+        return;
+      }
+      
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        alert("Результат скопирован в буфер обмена!");
+      }).catch(err => {
+        console.error("Ошибка при копировании: ", err);
+        alert("Ошибка при копировании!");
+      });
+    }
+
+    function extractBattles(html, filters, doFilter, onlyWins, watchFromStart) {
+      html = cleanSpecialSymbols(html);
+      html = html.replace(/&nbsp;/g, ' ');
+      let playerCounts = {};
+      let battleMatches = [...html.matchAll(/href="warlog\.php\?warid=(\d+)(?:&show=([\w\-]+))?[^>]*>\s*(\d{2}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*<\/a>\s*:\s*([\s\S]*?)<!--\d+-->/gi)];
+      
+      let battles = [];
+      let useLordswm = document.getElementById('useLordswm').checked;
+      let removeDate = document.getElementById("removeDate").checked;
+      let removeMostCommon = document.getElementById("removeMostCommon").checked;
+      
+      for (let match of battleMatches) {
+        let warId = match[1];
+        let secretCode = match[2] || "";
+        let [day, month, year, time] = match[3].split(/[- ]/);
+        let formattedDateTime = `${year}-${month}-${day} ${time}`;
+        
+        if (document.getElementById("filterByDate").checked) {
+          let userDateStr = document.getElementById("dateFilterInput").value.trim();
+          if (userDateStr !== "") {
+            let parts = userDateStr.split(" ");
+            if (parts.length === 2) {
+              let datePart = parts[0];
+              let timePart = parts[1];
+              let format = document.getElementById("dateFormatSelect").value;
+              let fDay, fMonth, fYear;
+              if (format === "DMY") {
+                [fDay, fMonth, fYear] = datePart.split("-");
+              } else if (format === "YMD") {
+                [fYear, fMonth, fDay] = datePart.split("-");
+              }
+              let filterFormatted = `${fYear.slice(-2)}-${fMonth}-${fDay} ${timePart}`;
+              if (formattedDateTime < filterFormatted) {
+                continue;
+              }
+            }
+          }
+        }
+  
+        let participantsRaw = match[4].trim();
+        let sides = participantsRaw.split(/\s+vs\s+/g);
+        let sidesParsed = sides.map(side => extractPlayerNames(side));
+        for (let side of sidesParsed) {
+          for (let playerName of side) {
+            if (!playerCounts[playerName]) {
+              playerCounts[playerName] = 0;
+            }
+            playerCounts[playerName]++;
+          }
+        }
+        
+        let sidesStatus = sides.map(side => side.includes("<b>") ? "[win]" : "[lose]");
+  
+        let baseDomain = useLordswm ? "my.lordswm.com" : "www.heroeswm.ru";
+        let battleLink = `https://${baseDomain}/warlog.php?warid=${warId}`;
+        if (secretCode) battleLink += `&show=${secretCode}`;
+        if (watchFromStart) battleLink += "&amp;lt";
+  
+        let battleResult = `${formattedDateTime} ` +
+            sidesParsed.map((players, index) => `${players.join(", ")} ${sidesStatus[index]}`).join(" vs ") + ` ${battleLink}`;
+  
+        battles.push({ dateTime: formattedDateTime, battleResult });
+      }
+      
+      let maxCount = 0;
+      let mostCommonPlayer = "";
+      for (let player in playerCounts) {
+        if (playerCounts[player] > maxCount) {
+          maxCount = playerCounts[player];
+          mostCommonPlayer = player;
+        }
+      }
+      document.getElementById("resultTitle").textContent = mostCommonPlayer;
+      console.log("mostCommonPlayer", mostCommonPlayer);
+      
+      if (mostCommonPlayer) {
+        let basePlayerName = "";
+        for (let i = 0; i < mostCommonPlayer.length; i++) {
+          if (mostCommonPlayer[i] === "[") break;
+          basePlayerName += mostCommonPlayer[i];
+        }
+        let playerSearchName = basePlayerName;
+        
+        battles = battles.map(battle => {
+          let battleParts = battle.battleResult.split(" ");
+          if (battleParts.length < 3) return battle;
+          let dateTime = battleParts.slice(0, 2).join(" ");
+          let resultPart = battleParts.slice(2).join(" ");
+          let parts = resultPart.split(" vs ");
+          let playerResult = null;
+          let battleLink = "";
+          let newParts = [];
+          
+          for (let side of parts) {
+            side = side.trim();
+            let linkStart = side.indexOf("http");
+            if (linkStart !== -1) {
+              battleLink = side.slice(linkStart);
+              side = side.slice(0, linkStart).trim();
+            }
+            if (side.includes(playerSearchName)) {
+              playerResult = side.includes("[win]") ? "[win]" : "[lose]";
+              if (!removeMostCommon) {
+                side = side.replace(/\s*\[win\]|\s*\[lose\]/gi, "").trim();
+                newParts.push(side);
+              }
+            } else {
+              let cleanSide = side.replace(/\s*\[win\]|\s*\[lose\]/gi, "").trim();
+              newParts.push(cleanSide);
+            }
+          }
+          if (playerResult === null) return battle;
+          let separator = (removeMostCommon && newParts.length > 1) ? ", " : " vs ";
+          let newBattle = `${dateTime} ${playerResult} ${newParts.join(separator)} ${battleLink}`.trim();
+          return { ...battle, battleResult: newBattle };
+        });
+      }
+      
+      let sortAscending = document.getElementById("sortAscending").checked;
+      battles.sort((a, b) => sortAscending ? a.dateTime.localeCompare(b.dateTime) : b.dateTime.localeCompare(a.dateTime));
+      
+      if (doFilter && filters.length > 0) {
+        battles = battles.filter(battle =>
+          filters.some(filterText => battle.battleResult.includes(filterText))
+        );
+      }
+      
+      let numberBattles = document.getElementById("numberBattles").checked;
+      let startNumber = parseInt(document.getElementById("startNumber").value, 10) || 1;
+      if (numberBattles) {
+        let winCount = startNumber;
+        let maxWidth = (winCount + battles.length).toString().length;
+        let foundNumbering = false;
+        battles.sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+        for (let i = 0; i < battles.length; i++) {
+          if (battles[i].battleResult.includes("[win]")) {
+            let formattedNumber = winCount.toString().padStart(maxWidth, "0");
+            battles[i].battleResult = `(${formattedNumber}) ` + battles[i].battleResult;
+            winCount++;
+            foundNumbering = true;
+          } else if (battles[i].battleResult.includes("[lose]")) {
+            let minusString = "-".repeat(maxWidth);
+            battles[i].battleResult = `(${minusString}) ` + battles[i].battleResult;
+            foundNumbering = true;
+          }
+        }
+        if (!foundNumbering) {
+          console.error("❌ Ошибка: номера не были добавлены!");
+        } else {
+          console.log("✅ Номера успешно добавлены.");
+        }
+        if (!sortAscending) {
+          battles.reverse();
+        }
+      }
+  
+      if (removeDate) {
+        battles = battles.map(battle => {
+          let newResult = battle.battleResult;
+          if (newResult.startsWith("(")) {
+            newResult = newResult.replace(/^(\(\d+\)|\(-+\)) \d{2}-\d{2}-\d{2} \d{2}:\d{2} /, "$1 ");
+          } else {
+            newResult = newResult.replace(/^\d{2}-\d{2}-\d{2} \d{2}:\d{2} /, "");
+          }
+          return { ...battle, battleResult: newResult };
+        });
+      }
+      
+      battles = battles.map(battle => battle.battleResult);
+      battles = battles.map(battle => battle.replace(/,\s+vs/g, " vs").trim());
+      battles = battles.filter(battle => battle.trim().length > 0);
+          
+      battles = battles.map(battle => battle.replace("[win]", "[win!]"));
+      if (onlyWins) {
+        battles = battles.filter(battle => battle.includes("[win!]"));
+        battles = battles.map(battle => battle.replace("[win!]", "").replace(/\s{2,}/g, " ").trim());
+      }
+      
+      if (document.getElementById("removeEnemyNames").checked) {
+        battles = battles.map(battle => {
+          filters.forEach(filterText => {
+            if (filterText) {
+              let escapedFilter = escapeRegExp(filterText);
+              let regex = new RegExp(escapedFilter, "g");
+              battle = battle.replace(regex, "").replace(/\s{2,}/g, " ").trim();
+            }
+          });
+          return battle;
+        });
+      }
+      
+      if (document.getElementById("includeAd").checked) {
+        battles.push(`\nСписок боев сгенерирован здесь: ${window.location.href}`);
+      }
+      return battles;
+    }
+  
+    function extractPlayerNames(text) {
+      let cleanedText = text.replace(/<[^>]+>/g, '').trim();
+      let names = [];
+      let playerRegex = /([A-Za-zА-Яа-яЁё0-9\s\-_']+(?:\s*\(\d+\))?)(?:\[(\d+)\])?/g;
+      let match;
+      while ((match = playerRegex.exec(cleanedText)) !== null) {
+        let cleanedName = decodeHTMLEntities(match[1].trim());
+        if (match[2]) {
+          cleanedName += `[${match[2]}]`;
+        }
+        names.push(cleanedName);
+      }
+      return names.length > 0 ? names : ["Неизвестный"];
+    }
+    function cleanSpecialSymbols(html) {
+      return html.replace(/<[^>]+>(&[^;]+;|\s*)<\/[^>]+>/g, '');
+    }
+    function decodeHTMLEntities(text) {
+      let doc = new DOMParser().parseFromString(text, "text/html");
+      return doc.documentElement.textContent;
+    }
+  
+    function renderBattles(battles) {
+      let resultDiv = document.getElementById("result");
+      if (editorModeEnabled) {
+        // Убираем из массива генератор, если он присутствует
+        battles = battles.filter(battle => !battle.includes("Список боев сгенерирован здесь:"));
+        
+        resultDiv.innerHTML = "";
+        
+        // Отрисовка поля введения
+        let introField = document.createElement("textarea");
+        introField.id = "introField";
+        introField.placeholder = "Напишите введение...";
+        attachAutoResize(introField);
+        introField.addEventListener("input", saveEditorData);
+        resultDiv.appendChild(introField);
+        if (editorData.intro) {
+          introField.value = editorData.intro;
+          // Вызываем autoResize после добавления в DOM
+          setTimeout(() => autoResize(introField), 0);
+        }
+        
+        // Отрисовка каждого боя
+        battles.forEach((battle, index) => {
+          let battleBlock = document.createElement("div");
+          battleBlock.className = "battle-block";
+          let battleText = document.createElement("p");
+          battleText.className = "battle-text";
+          // Преобразуем URL в кликабельную ссылку
+          let urlRegex = /(https?:\/\/\S+)/;
+          let modifiedBattle = battle.replace(urlRegex, function(match) {
+            return `<a href="${match}" target="_blank">${match}</a>`;
+          });
+          battleText.innerHTML = modifiedBattle;
+          battleBlock.appendChild(battleText);
+          
+          let descField = document.createElement("textarea");
+          descField.className = "battle-description";
+          descField.placeholder = "Напишите описание боя...";
+          attachAutoResize(descField);
+          descField.addEventListener("input", saveEditorData);
+          battleBlock.appendChild(descField);
+          if (editorData.descriptions[index]) {
+            descField.value = editorData.descriptions[index];
+            setTimeout(() => autoResize(descField), 0);
+          }
+          resultDiv.appendChild(battleBlock);
+        });
+        
+        // Отрисовка поля заключения
+        let conclusionField = document.createElement("textarea");
+        conclusionField.id = "conclusionField";
+        conclusionField.placeholder = "Напишите заключение...";
+        attachAutoResize(conclusionField);
+        conclusionField.addEventListener("input", saveEditorData);
+        resultDiv.appendChild(conclusionField);
+        if (editorData.conclusion) {
+          conclusionField.value = editorData.conclusion;
+          setTimeout(() => autoResize(conclusionField), 0);
+        }
+        
+        
+        // Добавляем блок ссылки на генератор после поля заключения
+        if (document.getElementById("includeAd").checked) {
+          let adDiv = document.createElement("div");
+          adDiv.className = "ad-link";
+          adDiv.style.border = "1px solid #ccc";
+          adDiv.style.borderRadius = "5px";
+          adDiv.style.padding = "4px 6px";
+          adDiv.style.marginTop = "4px";
+
+          // Создаем текстовый узел с обычным текстом
+          let textBeforeLink = document.createTextNode("Список боев сгенерирован здесь: ");
+          adDiv.appendChild(textBeforeLink);
+
+          // Создаем кликабельную ссылку только для currentURL
+          let linkElement = document.createElement("a");
+          linkElement.href = window.location.href;
+          linkElement.target = "_blank"; // Опционально: открывать в новой вкладке
+          linkElement.textContent = window.location.href;
+          adDiv.appendChild(linkElement);
+
+          resultDiv.appendChild(adDiv);
+        }
+
+      } else {
+        resultDiv.innerHTML = "<pre>" + (battles.join("\n") || "Ничего не найдено") + "</pre>";
+      }
+    }
+  
+    function processBattles() {
+      // Сбрасываем данные редактора для новой обработки
+      editorData = { intro: "", descriptions: [], conclusion: "" };
+      let html = document.getElementById("battleInput").value;
+      let filters = document.getElementById("filterInput").value.split('\n').map(f => f.trim()).filter(f => f);
+      let doFilter = document.getElementById("doFilter").checked;
+      let onlyWins = document.getElementById("onlyWins").checked;
+      let watchFromStart = document.getElementById("watchFromStart").checked;
+  
+      let battles = extractBattles(html, filters, doFilter, onlyWins, watchFromStart);
+      processedBattles = battles;
+      renderBattles(battles);
+      
+      document.getElementById("inputContainer").style.display = "none";
+      document.getElementById("toggleButton").style.display = "block";
+      document.getElementById("toggleButton").textContent = "Развернуть настройки";
+      saveState(); // Сохраняем текущее состояние
+    }
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    function toggleInput() {
+      let inputContainer = document.getElementById("inputContainer");
+      let toggleButton = document.getElementById("toggleButton");
+  
+      if (toggleButton.textContent === "Развернуть настройки") {
+        inputContainer.style.display = "block";
+        toggleButton.textContent = "Скрыть настройки";
+      } else {
+        inputContainer.style.display = "none";
+        toggleButton.textContent = "Развернуть настройки";
+      }
+    }
+    function toggleEditorMode() {
+      // Сохранение состояния редактора (если нужно) перед переключением
+      if (editorModeEnabled) {
+        let introField = document.getElementById("introField");
+        let conclusionField = document.getElementById("conclusionField");
+        editorData.intro = introField ? introField.value : "";
+        editorData.conclusion = conclusionField ? conclusionField.value : "";
+        let battleBlocks = document.querySelectorAll(".battle-block");
+        editorData.descriptions = [];
+        battleBlocks.forEach(block => {
+          let descField = block.querySelector(".battle-description");
+          editorData.descriptions.push(descField ? descField.value : "");
+        });
+      }
+      
+      // Переключаем режим редактора
+      editorModeEnabled = !editorModeEnabled;
+      let btn = document.getElementById("editorToggleButton");
+      if (editorModeEnabled) {
+        btn.textContent = "Выключить редактор";
+        btn.classList.remove("editor-off");
+        btn.classList.add("editor-on");
+      } else {
+        btn.textContent = "Включить редактор";
+        btn.classList.remove("editor-on");
+        btn.classList.add("editor-off");
+      }
+      
+      if (processedBattles.length > 0) {
+        renderBattles(processedBattles);
+        saveState(); // Сохраняем состояние после переключения редактора
+      }
+    }
+
+    function saveOptions() {
+      let checkboxes = document.querySelectorAll(".options input[type='checkbox']");
+      checkboxes.forEach(checkbox => {
+        localStorage.setItem(checkbox.id, checkbox.checked);
+      });
+      let dateField = document.getElementById("dateFilterInput");
+      if (dateField) {
+        localStorage.setItem("dateFilterInput", dateField.value);
+      }
+      let startNumberField = document.getElementById("startNumber");
+      if (startNumberField) {
+        localStorage.setItem("startNumber", startNumberField.value);
+      }
+      let dateFormatSelect = document.getElementById("dateFormatSelect");
+      if (dateFormatSelect) {
+        localStorage.setItem("dateFormatSelect", dateFormatSelect.value);
+      }
+    }
+    function loadOptions() {
+      let checkboxes = document.querySelectorAll(".options input[type='checkbox']");
+      checkboxes.forEach(checkbox => {
+        let storedValue = localStorage.getItem(checkbox.id);
+        if (storedValue !== null) {
+          checkbox.checked = storedValue === "true";
+        }
+      });
+      let dateField = document.getElementById("dateFilterInput");
+      if (dateField) {
+        let storedDate = localStorage.getItem("dateFilterInput");
+        if (storedDate !== null) {
+          dateField.value = storedDate;
+        }
+      }
+      let startNumberField = document.getElementById("startNumber");
+      if (startNumberField) {
+        let storedStartNumber = localStorage.getItem("startNumber");
+        if (storedStartNumber !== null) {
+          startNumberField.value = storedStartNumber;
+        }
+      }
+      let dateFormatSelect = document.getElementById("dateFormatSelect");
+      if (dateFormatSelect) {
+        let storedFormat = localStorage.getItem("dateFormatSelect");
+        if (storedFormat !== null) {
+          dateFormatSelect.value = storedFormat;
+        }
+      }
+    }
+    function saveState() {
+      const state = {
+        resultHTML: document.getElementById("result").innerHTML,
+        editorModeEnabled: editorModeEnabled,
+        processedBattles: processedBattles,
+        editorData: editorData,
+        resultTitle: document.getElementById("resultTitle").textContent,
+        editorToggleButtonText: document.getElementById("editorToggleButton").textContent,
+        editorToggleButtonClass: document.getElementById("editorToggleButton").className
+      };
+      localStorage.setItem("savedState", JSON.stringify(state));
+    }
+    function loadState() {
+      const stateStr = localStorage.getItem("savedState");
+      if (stateStr) {
+        const state = JSON.parse(stateStr);
+        // Восстанавливаем сохранённое HTML-содержимое результата (для обычного режима)
+        document.getElementById("result").innerHTML = state.resultHTML;
+        editorModeEnabled = state.editorModeEnabled;
+        processedBattles = state.processedBattles;
+        editorData = state.editorData;
+        document.getElementById("resultTitle").textContent = state.resultTitle;
+        let btn = document.getElementById("editorToggleButton");
+        btn.textContent = state.editorToggleButtonText;
+        btn.className = state.editorToggleButtonClass;
+        
+        // Если редактор включён, заново отрисовываем бои, чтобы динамические поля (textarea) восстановились
+        if (editorModeEnabled && processedBattles.length > 0) {
+          renderBattles(processedBattles);
+        }
+      }
+    }
+
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadOptions();
+      loadState(); // Восстанавливаем сохранённое состояние
+      document.querySelectorAll(".options input[type='checkbox']").forEach(checkbox => {
+        checkbox.addEventListener("change", saveOptions);
+      });
+      let dateField = document.getElementById("dateFilterInput");
+      if (dateField) {
+        dateField.addEventListener("input", saveOptions);
+      }
+      let startNumberField = document.getElementById("startNumber");
+      if (startNumberField) {
+        startNumberField.addEventListener("input", saveOptions);
+      }
+      let dateFormatSelect = document.getElementById("dateFormatSelect");
+      if (dateFormatSelect) {
+        dateFormatSelect.addEventListener("change", saveOptions);
+      }
+    });
+  </script>
+</body>
+</html>
