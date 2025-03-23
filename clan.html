@@ -44,92 +44,134 @@
   <button id="processBtn">Обработать</button>
   <h2>Результаты:</h2>
   <div id="results"></div>
-<script>
-  // Функция для создания сворачиваемой секции
-  function createCollapsible(title, items) {
-    const container = document.createElement('div');
-    container.style.border = '1px solid #ccc';
-    container.style.marginBottom = '10px';
 
-    const header = document.createElement('h4');
-    header.style.cursor = 'pointer';
-    header.style.margin = '0';
-    header.style.padding = '5px';
-    header.style.backgroundColor = '#f0f0f0';
-    header.textContent = title + ' (' + items.length + ')';
-    container.appendChild(header);
+  <script>
+    console.log('clan.html loaded');
 
-    const list = document.createElement('ul');
-    list.style.listStyle = 'none';
-    list.style.margin = '0';
-    list.style.padding = '5px';
-    items.forEach(item => {
-      const li = document.createElement('li');
-      const a = document.createElement('a');
-      a.href = `https://www.heroeswm.ru/pl_info.php?id=${item.id}`;
-      a.target = '_blank';
-      a.textContent = `${item.id} - ${item.name}`;
-      li.appendChild(a);
-      list.appendChild(li);
-    });
-    container.appendChild(list);
+    // Функция для создания сворачиваемой секции
+    function createCollapsible(title, items) {
+      const container = document.createElement('div');
+      container.style.border = '1px solid #ccc';
+      container.style.marginBottom = '10px';
 
-    // По клику на заголовок скрываем/отображаем список
-    header.addEventListener('click', () => {
-      if (list.style.display === 'none') {
-        list.style.display = 'block';
-      } else {
-        list.style.display = 'none';
+      const header = document.createElement('h4');
+      header.style.cursor = 'pointer';
+      header.style.margin = '0';
+      header.style.padding = '5px';
+      header.style.backgroundColor = '#f0f0f0';
+      header.textContent = title + ' (' + items.length + ')';
+      container.appendChild(header);
+
+      const list = document.createElement('ul');
+      list.style.listStyle = 'none';
+      list.style.margin = '0';
+      list.style.padding = '5px';
+      items.forEach(item => {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = `https://www.heroeswm.ru/pl_info.php?id=${item.id}`;
+        a.target = '_blank';
+        a.textContent = `${item.id} - ${item.name}`;
+        li.appendChild(a);
+        list.appendChild(li);
+      });
+      container.appendChild(list);
+
+      // По клику на заголовок скрываем/отображаем список
+      header.addEventListener('click', () => {
+        list.style.display = list.style.display === 'none' ? 'block' : 'none';
+      });
+      return container;
+    }
+
+    // Функция для рендера результатов
+    function renderResults(data) {
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '';
+      data.forEach(clan => {
+        const clanContainer = document.createElement('div');
+        clanContainer.style.marginBottom = '20px';
+        const title = document.createElement('h3');
+        title.textContent = `Клан ${clan.techClanId} - ${clan.techClanName}`;
+        clanContainer.appendChild(title);
+
+        // Три колонки
+        const columns = document.createElement('div');
+        columns.style.display = 'flex';
+        columns.style.gap = '10px';
+
+        const colInvite = createCollapsible('Пригласить', clan.inviteList);
+        const colEnemy = createCollapsible('Ушёл во вражеские кланы', clan.enemyList);
+        const colClanless = createCollapsible('Без клана', clan.clanlessList);
+
+        columns.appendChild(colInvite);
+        columns.appendChild(colEnemy);
+        columns.appendChild(colClanless);
+
+        clanContainer.appendChild(columns);
+        resultsDiv.appendChild(clanContainer);
+      });
+    }
+
+    // Функции для сохранения и загрузки данных из localStorage
+    function saveField(id) {
+      const value = document.getElementById(id).value;
+      localStorage.setItem(id, value);
+    }
+    function loadField(id) {
+      const value = localStorage.getItem(id);
+      if (value !== null) {
+        document.getElementById(id).value = value;
+      }
+    }
+
+    // При загрузке страницы – загружаем сохранённые данные
+    window.addEventListener('load', () => {
+      console.log('Страница загружена, загружаем сохранённые данные');
+      ['techClans', 'battleClans', 'excludePlayers'].forEach(loadField);
+      const savedResults = localStorage.getItem('results');
+      if (savedResults) {
+        document.getElementById('results').innerHTML = savedResults;
       }
     });
-    return container;
-  }
 
-  // Пример обработки полученных данных (результат функции)
-  // Предположим, что data – массив объектов для каждого тех. клана
-  function renderResults(data) {
-    const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = '';
-    data.forEach(clan => {
-      const clanContainer = document.createElement('div');
-      clanContainer.style.marginBottom = '20px';
-      const title = document.createElement('h3');
-      title.textContent = `Клан ${clan.techClanId} - ${clan.techClanName}`;
-      clanContainer.appendChild(title);
-
-      // Три колонки
-      const columns = document.createElement('div');
-      columns.style.display = 'flex';
-      columns.style.gap = '10px';
-
-      const colInvite = createCollapsible('Пригласить', clan.inviteList);
-      const colEnemy = createCollapsible('Ушёл во вражеские кланы', clan.enemyList);
-      const colClanless = createCollapsible('Без клана', clan.clanlessList);
-
-      columns.appendChild(colInvite);
-      columns.appendChild(colEnemy);
-      columns.appendChild(colClanless);
-
-      clanContainer.appendChild(columns);
-      resultsDiv.appendChild(clanContainer);
+    // Сохраняем изменения при каждом вводе
+    ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => saveField(id));
     });
-  }
 
-  // Пример запроса к функции (ваш код может отличаться)
-  fetch('/.netlify/functions/process', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      techClanIds: document.getElementById('techClans').value,
-      battleClanIds: document.getElementById('battleClans').value,
-      excludePlayers: document.getElementById('excludePlayers').value
-    })
-  })
-  .then(response => response.json())
-  .then(data => {
-    renderResults(data);
-  })
-  .catch(error => console.error('Ошибка запроса:', error));
-</script>
+    // Обработка нажатия на кнопку
+    document.getElementById('processBtn').addEventListener('click', async () => {
+      console.log('Обработка началась');
+      const techClans = document.getElementById('techClans').value;
+      const battleClans = document.getElementById('battleClans').value;
+      const excludePlayers = document.getElementById('excludePlayers').value;
+
+      console.log('Отправляем данные:', { techClans, battleClans, excludePlayers });
+      
+      try {
+        const res = await fetch('/.netlify/functions/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            techClanIds: techClans,
+            battleClanIds: battleClans,
+            excludePlayers: excludePlayers
+          })
+        });
+        console.log('Ответ сервера:', res.status, res.statusText);
+        if (!res.ok) {
+          throw new Error(`Ошибка запроса: ${res.status} ${res.statusText}`);
+        }
+        const data = await res.json();
+        console.log('Полученные данные:', data);
+        renderResults(data);
+        localStorage.setItem('results', document.getElementById('results').innerHTML);
+      } catch (error) {
+        console.error('Ошибка при обработке запроса:', error);
+        document.getElementById('results').innerText = 'Ошибка: ' + error.message;
+      }
+    });
+  </script>
 </body>
 </html>
