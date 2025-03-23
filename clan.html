@@ -43,35 +43,93 @@
   </div>
   <button id="processBtn">Обработать</button>
   <h2>Результаты:</h2>
-  <pre id="result"></pre>
+  <div id="results"></div>
+<script>
+  // Функция для создания сворачиваемой секции
+  function createCollapsible(title, items) {
+    const container = document.createElement('div');
+    container.style.border = '1px solid #ccc';
+    container.style.marginBottom = '10px';
 
-  <script>
-  document.getElementById('processBtn').addEventListener('click', async () => {
-    const techClans = document.getElementById('techClans').value;
-    const battleClans = document.getElementById('battleClans').value;
-    const excludePlayers = document.getElementById('excludePlayers').value;
+    const header = document.createElement('h4');
+    header.style.cursor = 'pointer';
+    header.style.margin = '0';
+    header.style.padding = '5px';
+    header.style.backgroundColor = '#f0f0f0';
+    header.textContent = title + ' (' + items.length + ')';
+    container.appendChild(header);
 
-    console.log('Отправляем данные:', { techClans, battleClans, excludePlayers });
-    
-    try {
-      const res = await fetch('/.netlify/functions/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ techClanIds: techClans, battleClanIds: battleClans, excludePlayers })
-      });
+    const list = document.createElement('ul');
+    list.style.listStyle = 'none';
+    list.style.margin = '0';
+    list.style.padding = '5px';
+    items.forEach(item => {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = `https://www.heroeswm.ru/pl_info.php?id=${item.id}`;
+      a.target = '_blank';
+      a.textContent = `${item.id} - ${item.name}`;
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+    container.appendChild(list);
 
-      console.log('Ответ сервера:', res.status, res.statusText);
-      if (!res.ok) {
-        throw new Error(`Ошибка запроса: ${res.status} ${res.statusText}`);
+    // По клику на заголовок скрываем/отображаем список
+    header.addEventListener('click', () => {
+      if (list.style.display === 'none') {
+        list.style.display = 'block';
+      } else {
+        list.style.display = 'none';
       }
-      const data = await res.json();
-      console.log('Полученные данные:', data);
-      document.getElementById('result').innerText = JSON.stringify(data, null, 2);
-    } catch (error) {
-      console.error('Ошибка при обработке запроса:', error);
-      document.getElementById('result').innerText = 'Ошибка: ' + error.message;
-    }
-  });
+    });
+    return container;
+  }
+
+  // Пример обработки полученных данных (результат функции)
+  // Предположим, что data – массив объектов для каждого тех. клана
+  function renderResults(data) {
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = '';
+    data.forEach(clan => {
+      const clanContainer = document.createElement('div');
+      clanContainer.style.marginBottom = '20px';
+      const title = document.createElement('h3');
+      title.textContent = `Клан ${clan.techClanId} - ${clan.techClanName}`;
+      clanContainer.appendChild(title);
+
+      // Три колонки
+      const columns = document.createElement('div');
+      columns.style.display = 'flex';
+      columns.style.gap = '10px';
+
+      const colInvite = createCollapsible('Пригласить', clan.inviteList);
+      const colEnemy = createCollapsible('Ушёл во вражеские кланы', clan.enemyList);
+      const colClanless = createCollapsible('Без клана', clan.clanlessList);
+
+      columns.appendChild(colInvite);
+      columns.appendChild(colEnemy);
+      columns.appendChild(colClanless);
+
+      clanContainer.appendChild(columns);
+      resultsDiv.appendChild(clanContainer);
+    });
+  }
+
+  // Пример запроса к функции (ваш код может отличаться)
+  fetch('/.netlify/functions/process', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      techClanIds: document.getElementById('techClans').value,
+      battleClanIds: document.getElementById('battleClans').value,
+      excludePlayers: document.getElementById('excludePlayers').value
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    renderResults(data);
+  })
+  .catch(error => console.error('Ошибка запроса:', error));
 </script>
 </body>
 </html>

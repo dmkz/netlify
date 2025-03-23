@@ -12,9 +12,9 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Используем динамический импорт для node-fetch, так как он является ES Module
+    // Динамически импортируем node-fetch
     const { default: fetch } = await import('node-fetch');
-    
+
     // Парсим тело запроса
     const body = JSON.parse(event.body);
     console.log('Полученное тело запроса:', body);
@@ -26,7 +26,7 @@ exports.handler = async (event, context) => {
       excludePlayers.split('\n').map(s => s.trim()).filter(Boolean)
     );
     console.log('Технические кланы (IDs):', techIds);
-    console.log('Боевыe кланы (IDs):', battleIds);
+    console.log('Боевые кланы (IDs):', battleIds);
     console.log('Игроки для исключения:', Array.from(excludeSet));
 
     // Функция для получения информации о клане
@@ -39,7 +39,9 @@ exports.handler = async (event, context) => {
       }
       const html = await res.text();
       const $ = cheerio.load(html);
+      // Извлекаем название клана из первого <h1>
       let clanName = $('h1').first().text().trim();
+      // Предполагаем, что участники находятся в последней таблице
       const tables = $('table');
       const lastTable = tables.last();
       let members = [];
@@ -60,7 +62,36 @@ exports.handler = async (event, context) => {
       return { clanId, clanName, members };
     }
 
-    // Получаем информацию для технических и боевых кланов
+    // Функция для проверки личной страницы игрока и классификации:
+    // Если на странице есть ссылка на clan_info.php, значит игрок в каком-либо клане (enemy);
+    // если нет – значит, он без клана (clanless).
+    async function classifyPlayer(player) {
+      const url = `https://www.heroeswm.ru/pl_info.php?id=${player.id}`;
+      console.log(`Проверка игрока ${player.id} по URL: ${url}`);
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          console.error(`Ошибка получения страницы игрока ${player.id}: статус ${res.status}`);
+          return { ...player, classification: "unknown" };
+        }
+        const html = await res.text();
+        const $ = cheerio.load(html);
+        // Предположим, что если в первой таблице есть ссылка с clan_info.php, то игрок в клане
+        const clanLink = $('table').first().find('a[href*="clan_info.php?id="]').first();
+        if (clanLink.length > 0) {
+          console.log(`Игрок ${player.id} классифицирован как enemy`);
+          return { ...player, classification: "enemy" };
+        } else {
+          console.log(`Игрок ${player.id} классифицирован как clanless`);
+          return { ...player, classification: "clanless" };
+        }
+      } catch (err) {
+        console.error(`Ошибка при проверке игрока ${player.id}:`, err);
+        return { ...player, classification: "unknown" };
+      }
+    }
+
+    // Получаем данные для технических и боевых кланов
     const techClans = await Promise.all(techIds.map(id => fetchClan(id)));
     const battleClans = await Promise.all(battleIds.map(id => fetchClan(id)));
     console.log('Получено технических кланов:', techClans.length);
@@ -75,11 +106,21 @@ exports.handler = async (event, context) => {
     });
 
     // Для каждого технического клана формируем списки:
-    // 1. Исключения — участники, присутствующие в техническом клане, но отсутствующие в боевых.
-    // 2. Приглашения — участники, присутствующие в боевых, но отсутствующие в данном техническом клане.
-    const results = techClans.map(techClan => {
+    const results = await Promise.all(techClans.map(async techClan => {
+      // ids участников технического клана
       const techMemberIds = new Set(techClan.members.map(m => m.id));
-      const excludeList = techClan.members.filter(member => !battleMembers.has(member.id));
+
+      // rawExcludeList — игроки, которые числятся в тех. клане, но не встречаются в боевых кланах (по данным ввода)
+      const rawExcludeList = techClan.members.filter(member => !battleMembers.has(member.id));
+
+      // Для каждого такого игрока определяем, в каком он состоянии:
+      const classified = await Promise.all(rawExcludeList.map(player => classifyPlayer(player)));
+
+      // Разделяем на enemy и clanless
+      const enemyList = classified.filter(p => p.classification === 'enemy');
+      const clanlessList = classified.filter(p => p.classification === 'clanless');
+
+      // inviteList — игроки, которые присутствуют в боевых кланах, но отсутствуют в данном техническом клане.
       const inviteList = [];
       battleMembers.forEach(member => {
         if (!techMemberIds.has(member.id)) {
@@ -89,14 +130,16 @@ exports.handler = async (event, context) => {
           });
         }
       });
+
       return {
         techClanId: techClan.clanId,
         techClanName: techClan.clanName,
-        excludeList,
-        inviteList
+        inviteList,
+        enemyList,
+        clanlessList
       };
-    });
-    
+    }));
+
     console.log('Результаты обработки:', results);
     return {
       statusCode: 200,
