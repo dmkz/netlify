@@ -100,4 +100,87 @@
       const resultsDiv = document.getElementById('results');
       resultsDiv.innerHTML = '';
       data.forEach(clan => {
-        const clanContainer =
+        const clanContainer = document.createElement('div');
+        clanContainer.style.marginBottom = '20px';
+        const title = document.createElement('h3');
+        title.textContent = `Клан ${clan.techClanId} - ${clan.techClanName}`;
+        clanContainer.appendChild(title);
+
+        const columns = document.createElement('div');
+        columns.style.display = 'flex';
+        columns.style.gap = '10px';
+        
+        // Пригласить: группированное сворачиваемое с заголовком "Нужно пригласить"
+        const inviteCollapsible = createGroupedCollapsible(clan.inviteGroups, 'Нужно пригласить');
+        // Ушёл во вражеские кланы: группированное сворачиваемое с заголовком "Ушёл во вражеские кланы"
+        const enemyCollapsible = createGroupedCollapsible(clan.enemyGroups, 'Ушёл во вражеские кланы');
+        // Без клана: простой сворачиваемый список
+        const clanlessCollapsible = createCollapsible('Без клана', clan.clanlessList, 'clanless');
+
+        columns.appendChild(inviteCollapsible);
+        columns.appendChild(enemyCollapsible);
+        columns.appendChild(clanlessCollapsible);
+        clanContainer.appendChild(columns);
+        resultsDiv.appendChild(clanContainer);
+      });
+    }
+
+    // Сохранение и загрузка данных из localStorage
+    function saveField(id) {
+      const value = document.getElementById(id).value;
+      localStorage.setItem(id, value);
+    }
+    function loadField(id) {
+      const value = localStorage.getItem(id);
+      if (value !== null) {
+        document.getElementById(id).value = value;
+      }
+    }
+
+    window.addEventListener('load', () => {
+      console.log('Страница загружена, загружаем сохранённые данные');
+      ['techClans', 'battleClans', 'excludePlayers'].forEach(loadField);
+      const savedResults = localStorage.getItem('results');
+      if (savedResults) {
+        document.getElementById('results').innerHTML = savedResults;
+      }
+    });
+
+    ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => saveField(id));
+    });
+
+    document.getElementById('processBtn').addEventListener('click', async () => {
+      console.log('Обработка началась');
+      const techClans = document.getElementById('techClans').value;
+      const battleClans = document.getElementById('battleClans').value;
+      const excludePlayers = document.getElementById('excludePlayers').value;
+
+      console.log('Отправляем данные:', { techClans, battleClans, excludePlayers });
+      
+      try {
+        const res = await fetch('/.netlify/functions/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            techClanIds: techClans,
+            battleClanIds: battleClans,
+            excludePlayers: excludePlayers
+          })
+        });
+        console.log('Ответ сервера:', res.status, res.statusText);
+        if (!res.ok) {
+          throw new Error(`Ошибка запроса: ${res.status} ${res.statusText}`);
+        }
+        const data = await res.json();
+        console.log('Полученные данные:', data);
+        renderResults(data);
+        localStorage.setItem('results', document.getElementById('results').innerHTML);
+      } catch (error) {
+        console.error('Ошибка при обработке запроса:', error);
+        document.getElementById('results').innerText = 'Ошибка: ' + error.message;
+      }
+    });
+  </script>
+</body>
+</html>

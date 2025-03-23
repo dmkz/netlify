@@ -88,4 +88,90 @@ exports.handler = async (event, context) => {
         }
       } catch (err) {
         console.error(`Ошибка при проверке игрока ${player.id}:`, err);
-        return { ...player, classification: "unknown
+        return { ...player, classification: "unknown" };
+      }
+    }
+
+    // Получаем данные для технических и боевых кланов
+    const techClans = await Promise.all(techIds.map(id => fetchClan(id)));
+    const battleClans = await Promise.all(battleIds.map(id => fetchClan(id)));
+    console.log('Получено технических кланов:', techClans.length);
+    console.log('Получено боевых кланов:', battleClans.length);
+
+    // Группируем участников боевых кланов для быстрого доступа
+    // battleClanMembers: { [clanId]: [members...] }
+    const battleClanMembers = {};
+    battleClans.forEach(clan => {
+      battleClanMembers[clan.clanId] = clan.members;
+    });
+    // Карта: key = player id, value = { clanId, clanName }
+    const battleMembersMap = new Map();
+    battleClans.forEach(clan => {
+      clan.members.forEach(member => {
+        battleMembersMap.set(member.id, { clanId: clan.clanId, clanName: clan.clanName });
+      });
+    });
+
+    // Для каждого технического клана формируем результаты
+    const results = await Promise.all(techClans.map(async techClan => {
+      const techMemberIds = new Set(techClan.members.map(m => m.id));
+
+      // Группируем для приглашения: игроки из боевых кланов, которых нет в текущем тех. клане
+      const inviteGroups = {};
+      battleMembersMap.forEach((info, memberId) => {
+        if (!techMemberIds.has(memberId)) {
+          if (!inviteGroups[info.clanId]) {
+            inviteGroups[info.clanId] = { clanName: info.clanName, players: [] };
+          }
+          const memberDetail = battleClanMembers[info.clanId].find(m => m.id === memberId);
+          if (memberDetail) {
+            inviteGroups[info.clanId].players.push(memberDetail);
+          }
+        }
+      });
+
+      // Для членов тех. клана, которых нет в боевых кланах, проверяем личную страницу
+      const rawCandidates = techClan.members.filter(member => !battleMembersMap.has(member.id));
+      const classified = await Promise.all(rawCandidates.map(player => classifyPlayer(player)));
+      const enemyCandidates = classified.filter(p => p.classification === 'enemy');
+      const clanlessList = classified.filter(p => p.classification === 'clanless');
+
+      // Группируем enemy по боевым кланам
+      const enemyGroups = {};
+      enemyCandidates.forEach(p => {
+        if (p.joinedClanId) {
+          if (!enemyGroups[p.joinedClanId]) {
+            enemyGroups[p.joinedClanId] = { clanName: p.joinedClanName, players: [] };
+          }
+          enemyGroups[p.joinedClanId].players.push(p);
+        } else {
+          if (!enemyGroups['unknown']) {
+            enemyGroups['unknown'] = { clanName: 'Неизвестный', players: [] };
+          }
+          enemyGroups['unknown'].players.push(p);
+        }
+      });
+
+      return {
+        techClanId: techClan.clanId,
+        techClanName: techClan.clanName,
+        inviteGroups,
+        enemyGroups,
+        clanlessList
+      };
+    }));
+
+    console.log('Результаты обработки:', results);
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify(results, null, 2)
+    };
+  } catch (error) {
+    console.error('Ошибка обработки запроса:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message })
+    };
+  }
+};
