@@ -97,14 +97,14 @@ exports.handler = async (event, context) => {
         const joinedClanId = headerSection.substring(startId, endId);
         
         // Ищем атрибут title="..." после ссылки; предполагается, что он содержит название клана.
-        const titleAttr = 'title="';
+        const titleAttr = 'title=\'';
         const titleIndex = headerSection.indexOf(titleAttr, endId);
         if (titleIndex === -1) {
           console.log(`Игрок ${player.id}: не найден атрибут title для клана ${joinedClanId}`);
           return { ...player, classification: "enemy", joinedClanId, joinedClanName: "Неизвестно" };
         }
         const startTitle = titleIndex + titleAttr.length;
-        const endTitle = headerSection.indexOf('"', startTitle);
+        const endTitle = headerSection.indexOf('\'', startTitle);
         if (endTitle === -1) {
           console.log(`Игрок ${player.id}: не удалось извлечь название клана для ${joinedClanId}`);
           return { ...player, classification: "enemy", joinedClanId, joinedClanName: "Неизвестно" };
