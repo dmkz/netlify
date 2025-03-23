@@ -1,9 +1,10 @@
-// netlify/functions/process.js
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
 
 exports.handler = async (event, context) => {
+  console.log('Получен запрос:', event.httpMethod);
   if (event.httpMethod !== 'POST') {
+    console.log('Неподдерживаемый метод:', event.httpMethod);
     return {
       statusCode: 405,
       body: 'Method Not Allowed',
@@ -11,31 +12,34 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Получаем данные из запроса
-    const { techClanIds, battleClanIds, excludePlayers } = JSON.parse(event.body);
+    const body = JSON.parse(event.body);
+    console.log('Полученные данные:', body);
     
-    // Преобразуем строки в массивы идентификаторов (убираем пустые строки и пробелы)
+    const { techClanIds, battleClanIds, excludePlayers } = body;
     const techIds = techClanIds.split('\n').map(s => s.trim()).filter(Boolean);
     const battleIds = battleClanIds.split('\n').map(s => s.trim()).filter(Boolean);
     const excludeSet = new Set(
       excludePlayers.split('\n').map(s => s.trim()).filter(Boolean)
     );
 
-    // Функция для получения информации о клане по id
+    console.log('Технические кланы:', techIds);
+    console.log('Боевые кланы:', battleIds);
+    console.log('Список исключений:', Array.from(excludeSet));
+
     async function fetchClan(clanId) {
       const url = `https://www.heroeswm.ru/clan_info.php?id=${clanId}`;
+      console.log(`Запрос к клану ${clanId} по URL: ${url}`);
       const res = await fetch(url);
-      if (!res.ok) throw new Error(`Ошибка при получении клана ${clanId}`);
+      if (!res.ok) {
+        throw new Error(`Ошибка при получении клана ${clanId}: статус ${res.status}`);
+      }
       const html = await res.text();
       const $ = cheerio.load(html);
-      // Извлекаем название клана из первого <h1>
       let clanName = $('h1').first().text().trim();
-      // Предполагаем, что участники находятся в самой последней таблице
       const tables = $('table');
       const lastTable = tables.last();
       let members = [];
       lastTable.find('tr').each((i, tr) => {
-        // Ищем ссылку на страницу игрока
         const a = $(tr).find('a[href*="pl_info.php?id="]');
         if (a.length > 0) {
           const href = a.attr('href');
@@ -48,15 +52,13 @@ exports.handler = async (event, context) => {
           }
         }
       });
+      console.log(`Клан ${clanId} (${clanName}): найдено участников: ${members.length}`);
       return { clanId, clanName, members };
     }
 
-    // Получаем данные для технических кланов
     const techClans = await Promise.all(techIds.map(id => fetchClan(id)));
-    // Получаем данные для боевых кланов
     const battleClans = await Promise.all(battleIds.map(id => fetchClan(id)));
 
-    // Создаём карту всех участников боевых кланов (по id)
     const battleMembers = new Map();
     battleClans.forEach(clan => {
       clan.members.forEach(member => {
@@ -64,27 +66,18 @@ exports.handler = async (event, context) => {
       });
     });
 
-    // Для каждого технического клана формируем списки:
-    // 1. Список для исключения: участники тех. клана, которых нет в боевых кланах.
-    // 2. Список для приглашения: участники, присутствующие хотя бы в одном боевом клане, но отсутствующие в текущем тех. клане.
     const results = techClans.map(techClan => {
       const techMemberIds = new Set(techClan.members.map(m => m.id));
-
-      // Исключение: участники, которые есть в тех. клане, но не найдены в боевых кланах.
       const excludeList = techClan.members.filter(member => !battleMembers.has(member.id));
-      
-      // Приглашение: участники из боевых кланов, которых нет в этом тех. клане.
       const inviteList = [];
       battleMembers.forEach(member => {
         if (!techMemberIds.has(member.id)) {
           inviteList.push({
             ...member,
-            // Если игрок уже указан в поле исключений, отмечаем это.
             alreadyExcluded: excludeSet.has(member.id)
           });
         }
       });
-
       return {
         techClanId: techClan.clanId,
         techClanName: techClan.clanName,
@@ -93,6 +86,7 @@ exports.handler = async (event, context) => {
       };
     });
 
+    console.log('Результаты обработки:', results);
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },

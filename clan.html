@@ -46,25 +46,32 @@
   <pre id="result"></pre>
 
   <script>
-    document.getElementById('processBtn').addEventListener('click', async () => {
-      const techClans = document.getElementById('techClans').value;
-      const battleClans = document.getElementById('battleClans').value;
-      const excludePlayers = document.getElementById('excludePlayers').value;
+  document.getElementById('processBtn').addEventListener('click', async () => {
+    const techClans = document.getElementById('techClans').value;
+    const battleClans = document.getElementById('battleClans').value;
+    const excludePlayers = document.getElementById('excludePlayers').value;
 
-      // Отправляем данные в серверлесс-функцию
+    console.log('Отправляем данные:', { techClans, battleClans, excludePlayers });
+    
+    try {
       const res = await fetch('/.netlify/functions/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ techClanIds: techClans, battleClanIds: battleClans, excludePlayers })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        document.getElementById('result').innerText = JSON.stringify(data, null, 2);
-      } else {
-        document.getElementById('result').innerText = 'Ошибка: ' + res.statusText;
+      console.log('Ответ сервера:', res.status, res.statusText);
+      if (!res.ok) {
+        throw new Error(`Ошибка запроса: ${res.status} ${res.statusText}`);
       }
-    });
-  </script>
+      const data = await res.json();
+      console.log('Полученные данные:', data);
+      document.getElementById('result').innerText = JSON.stringify(data, null, 2);
+    } catch (error) {
+      console.error('Ошибка при обработке запроса:', error);
+      document.getElementById('result').innerText = 'Ошибка: ' + error.message;
+    }
+  });
+</script>
 </body>
 </html>
