@@ -22,7 +22,11 @@
       font-family: monospace;
     }
     button { padding: 10px 20px; font-size: 16px; }
-    pre { background: #f4f4f4; padding: 10px; }
+    .collapsible { margin-bottom: 10px; border: 1px solid #ccc; }
+    .collapsible-header {
+      background-color: #f0f0f0; padding: 5px; cursor: pointer;
+    }
+    .collapsible-list { list-style: none; margin: 0; padding: 5px; }
   </style>
 </head>
 <body>
@@ -44,47 +48,54 @@
   <button id="processBtn">Обработать</button>
   <h2>Результаты:</h2>
   <div id="results"></div>
-
+  
   <script>
     console.log('clan.html loaded');
 
     // Функция для создания сворачиваемой секции
-    function createCollapsible(title, items) {
+    function createCollapsible(title, items, groupType) {
       const container = document.createElement('div');
-      container.style.border = '1px solid #ccc';
-      container.style.marginBottom = '10px';
+      container.classList.add('collapsible');
 
-      const header = document.createElement('h4');
-      header.style.cursor = 'pointer';
-      header.style.margin = '0';
-      header.style.padding = '5px';
-      header.style.backgroundColor = '#f0f0f0';
+      const header = document.createElement('div');
+      header.classList.add('collapsible-header');
       header.textContent = title + ' (' + items.length + ')';
       container.appendChild(header);
 
       const list = document.createElement('ul');
-      list.style.listStyle = 'none';
-      list.style.margin = '0';
-      list.style.padding = '5px';
+      list.classList.add('collapsible-list');
       items.forEach(item => {
         const li = document.createElement('li');
         const a = document.createElement('a');
         a.href = `https://www.heroeswm.ru/pl_info.php?id=${item.id}`;
         a.target = '_blank';
         a.textContent = `${item.id} - ${item.name}`;
+        // Для enemy добавим информацию о боевом клане
+        if (groupType === 'enemy' && item.joinedClanId) {
+          a.textContent += ` (ушёл в ${item.joinedClanId} - ${item.joinedClanName})`;
+        }
         li.appendChild(a);
         list.appendChild(li);
       });
       container.appendChild(list);
 
-      // По клику на заголовок скрываем/отображаем список
       header.addEventListener('click', () => {
         list.style.display = list.style.display === 'none' ? 'block' : 'none';
       });
       return container;
     }
 
-    // Функция для рендера результатов
+    // Функция для создания сворачиваемой секции с группировкой (для приглашения)
+    function createGroupedCollapsible(groupedData) {
+      const container = document.createElement('div');
+      Object.keys(groupedData).forEach(battleClanId => {
+        const group = groupedData[battleClanId];
+        const groupContainer = createCollapsible(`${battleClanId} - ${group.clanName}`, group.players, 'invite');
+        container.appendChild(groupContainer);
+      });
+      return container;
+    }
+
     function renderResults(data) {
       const resultsDiv = document.getElementById('results');
       resultsDiv.innerHTML = '';
@@ -95,19 +106,20 @@
         title.textContent = `Клан ${clan.techClanId} - ${clan.techClanName}`;
         clanContainer.appendChild(title);
 
-        // Три колонки
         const columns = document.createElement('div');
         columns.style.display = 'flex';
         columns.style.gap = '10px';
-
-        const colInvite = createCollapsible('Пригласить', clan.inviteList);
-        const colEnemy = createCollapsible('Ушёл во вражеские кланы', clan.enemyList);
-        const colClanless = createCollapsible('Без клана', clan.clanlessList);
+        
+        // Пригласить: сгруппированы по боевым кланам
+        const colInvite = createGroupedCollapsible(clan.inviteGroups);
+        // Ушёл во вражеские кланы: список enemy с информацией о клане
+        const colEnemy = createCollapsible('Ушёл во вражеские кланы', clan.enemyList, 'enemy');
+        // Без клана: список clanless
+        const colClanless = createCollapsible('Без клана', clan.clanlessList, 'clanless');
 
         columns.appendChild(colInvite);
         columns.appendChild(colEnemy);
         columns.appendChild(colClanless);
-
         clanContainer.appendChild(columns);
         resultsDiv.appendChild(clanContainer);
       });
@@ -125,7 +137,6 @@
       }
     }
 
-    // При загрузке страницы – загружаем сохранённые данные
     window.addEventListener('load', () => {
       console.log('Страница загружена, загружаем сохранённые данные');
       ['techClans', 'battleClans', 'excludePlayers'].forEach(loadField);
@@ -135,12 +146,10 @@
       }
     });
 
-    // Сохраняем изменения при каждом вводе
     ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
       document.getElementById(id).addEventListener('input', () => saveField(id));
     });
 
-    // Обработка нажатия на кнопку
     document.getElementById('processBtn').addEventListener('click', async () => {
       console.log('Обработка началась');
       const techClans = document.getElementById('techClans').value;
