@@ -161,7 +161,7 @@ exports.handler = async (event, context) => {
       // (НЕ фильтруем по excludeSet, чтобы даже исключённых отображались с пометкой)
       const rawCandidates = techClan.members.filter(member => !battleMembersMap.has(member.id));
       const classified = await Promise.all(rawCandidates.map(player => classifyPlayer(player)));
-      const enemyCandidates = classified.filter(p => p.classification === 'enemy');
+      const enemyCandidates = classified.filter(p => p.classification === 'enemy' && !excludeSet.has(p.id));
       const clanlessList = classified.filter(p => p.classification === 'clanless');
 
       // Группируем enemy по боевым кланам
