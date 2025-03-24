@@ -53,28 +53,42 @@
 
       // Функция для обновления общего счёта в заголовке группированного списка
 function updateGroupedHeader(groupedContainer) {
-  // Находим контейнер с внутренними collapsible
-  const contentDiv = groupedContainer.querySelector('div:nth-child(2)');
+  console.log("updateGroupedHeader вызвана для:", groupedContainer);
+  // Предполагаем, что groupedContainer имеет двух потомков: 
+  // первый – внешний заголовок, второй – контейнер с внутренними collapsible
+  const contentDiv = groupedContainer.children[1];
+  if (!contentDiv) {
+    console.log("Контейнер с внутренними collapsible не найден.");
+    return;
+  }
+  console.log("Найден contentDiv:", contentDiv);
   let total = 0;
-  if (contentDiv) {
-    // Перебираем прямых потомков (каждая группа — collapsible)
-    const innerCollapsibles = contentDiv.children;
-    for (let i = 0; i < innerCollapsibles.length; i++) {
-      const header = innerCollapsibles[i].querySelector('.collapsible-header');
-      if (header) {
-        const match = header.textContent.match(/\((\d+)\)/);
-        if (match) {
-          total += parseInt(match[1], 10);
-        }
+  const innerCollapsibles = contentDiv.children;
+  console.log("Количество внутренних collapsible:", innerCollapsibles.length);
+  for (let i = 0; i < innerCollapsibles.length; i++) {
+    const innerHeader = innerCollapsibles[i].querySelector('.collapsible-header');
+    if (innerHeader) {
+      console.log("Внутренний заголовок:", innerHeader.textContent);
+      const match = innerHeader.textContent.match(/\((\d+)\)/);
+      if (match) {
+        const count = parseInt(match[1], 10);
+        console.log("Найдено:", count);
+        total += count;
+      } else {
+        console.log("Не удалось извлечь число из:", innerHeader.textContent);
       }
+    } else {
+      console.log("Внутренний collapsible без заголовка:", innerCollapsibles[i]);
     }
   }
-  // Обновляем внешний заголовок, используя базовый заголовок из data-basetitle
+  console.log("Общая сумма:", total);
   const outerHeader = groupedContainer.firstElementChild;
   if (outerHeader) {
     const baseTitle = outerHeader.dataset.basetitle || outerHeader.textContent.split('(')[0].trim();
+    console.log("Базовый заголовок:", baseTitle);
     outerHeader.dataset.basetitle = baseTitle;
     outerHeader.textContent = `${baseTitle} (${total})`;
+    console.log("Новый внешний заголовок:", outerHeader.textContent);
   }
 }
 
@@ -114,7 +128,10 @@ function updateGroupedHeader(groupedContainer) {
             // Если это вложенная группа, обновляем общий счёт во внешнем контейнере
             const outerGrouped = tr.closest('.grouped');
             if (outerGrouped) {
+              console.log("Найден outerGrouped:", outerGrouped);
               updateGroupedHeader(outerGrouped);
+            } else {
+              console.log("outerGrouped не найден для строки:", tr);
             }
             // Добавляем id игрока в поле исключений, если его там ещё нет
             const excludeTextarea = document.getElementById('excludePlayers');
@@ -167,8 +184,7 @@ function createGroupedCollapsible(groupedData, title, groupType) {
 
   const header = document.createElement('div');
   header.classList.add('collapsible-header');
-  // Сохраним базовый заголовок в data-атрибуте:
-  header.dataset.basetitle = title;
+  header.dataset.basetitle = title; // сохраняем базовый заголовок
   header.textContent = title + ' (' + totalCount + ')';
   container.appendChild(header);
 
@@ -189,7 +205,8 @@ function createGroupedCollapsible(groupedData, title, groupType) {
   });
   return container;
 }
-      function renderResults(data) {
+
+function renderResults(data) {
         const resultsDiv = document.getElementById('results');
         resultsDiv.innerHTML = '';
         data.forEach(clan => {
