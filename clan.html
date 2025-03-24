@@ -19,10 +19,7 @@
     td a:hover { text-decoration: underline; }
     .remove-button { color: red; border: none; background: none; cursor: pointer; }
     /* Стили для сообщения статуса */
-    #statusMessage {
-      font-size: 16px;
-      margin-bottom: 10px;
-    }
+    #statusMessage { font-size: 16px; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -52,45 +49,43 @@
       console.log('clan.html loaded');
 
       // Функция для обновления общего счёта в заголовке группированного списка
-function updateGroupedHeader(groupedContainer) {
-  console.log("updateGroupedHeader вызвана для:", groupedContainer);
-  // Предполагаем, что groupedContainer имеет двух потомков: 
-  // первый – внешний заголовок, второй – контейнер с внутренними collapsible
-  const contentDiv = groupedContainer.children[1];
-  if (!contentDiv) {
-    console.log("Контейнер с внутренними collapsible не найден.");
-    return;
-  }
-  console.log("Найден contentDiv:", contentDiv);
-  let total = 0;
-  const innerCollapsibles = contentDiv.children;
-  console.log("Количество внутренних collapsible:", innerCollapsibles.length);
-  for (let i = 0; i < innerCollapsibles.length; i++) {
-    const innerHeader = innerCollapsibles[i].querySelector('.collapsible-header');
-    if (innerHeader) {
-      console.log("Внутренний заголовок:", innerHeader.textContent);
-      const match = innerHeader.textContent.match(/\((\d+)\)/);
-      if (match) {
-        const count = parseInt(match[1], 10);
-        console.log("Найдено:", count);
-        total += count;
-      } else {
-        console.log("Не удалось извлечь число из:", innerHeader.textContent);
+      function updateGroupedHeader(groupedContainer) {
+        console.log("updateGroupedHeader вызвана для:", groupedContainer);
+        // Предполагаем, что groupedContainer имеет двух потомков:
+        // первый – внешний заголовок, второй – контейнер с внутренними collapsible
+        const contentDiv = groupedContainer.children[1];
+        if (!contentDiv) {
+          console.log("Контейнер с внутренними collapsible не найден.");
+          return;
+        }
+        let total = 0;
+        const innerCollapsibles = contentDiv.children;
+        console.log("Количество внутренних collapsible:", innerCollapsibles.length);
+        for (let i = 0; i < innerCollapsibles.length; i++) {
+          const innerHeader = innerCollapsibles[i].querySelector('.collapsible-header');
+          if (innerHeader) {
+            console.log("Внутренний заголовок:", innerHeader.textContent);
+            const match = innerHeader.textContent.match(/\((\d+)\)/);
+            if (match) {
+              const count = parseInt(match[1], 10);
+              console.log("Найдено:", count);
+              total += count;
+            } else {
+              console.log("Не удалось извлечь число из:", innerHeader.textContent);
+            }
+          } else {
+            console.log("Внутренний collapsible без заголовка:", innerCollapsibles[i]);
+          }
+        }
+        console.log("Общая сумма:", total);
+        const outerHeader = groupedContainer.firstElementChild;
+        if (outerHeader) {
+          const baseTitle = outerHeader.dataset.basetitle || outerHeader.textContent.split('(')[0].trim();
+          outerHeader.dataset.basetitle = baseTitle;
+          outerHeader.textContent = `${baseTitle} (${total})`;
+          console.log("Новый внешний заголовок:", outerHeader.textContent);
+        }
       }
-    } else {
-      console.log("Внутренний collapsible без заголовка:", innerCollapsibles[i]);
-    }
-  }
-  console.log("Общая сумма:", total);
-  const outerHeader = groupedContainer.firstElementChild;
-  if (outerHeader) {
-    const baseTitle = outerHeader.dataset.basetitle || outerHeader.textContent.split('(')[0].trim();
-    console.log("Базовый заголовок:", baseTitle);
-    outerHeader.dataset.basetitle = baseTitle;
-    outerHeader.textContent = `${baseTitle} (${total})`;
-    console.log("Новый внешний заголовок:", outerHeader.textContent);
-  }
-}
 
       // Функция для создания таблицы с игроками (3 столбца: id, ник, кнопка удаления)
       function createPlayerTable(items, groupType) {
@@ -120,21 +115,18 @@ function updateGroupedHeader(groupedContainer) {
           btn.addEventListener('click', () => {
             const parentTable = tr.parentElement;
             tr.remove();
-            // Обновляем количество строк в родительском collapsible
+            // Обновляем количество строк во внутреннем collapsible
             const collapsible = parentTable.closest('.collapsible');
             const header = collapsible.querySelector('.collapsible-header');
             const newCount = parentTable.querySelectorAll('tr').length;
             header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
-            // Если это вложенная группа, обновляем общий счёт во внешнем контейнере
-            let outerGrouped = tr.closest('.grouped');
-            if (!outerGrouped) {
-              let p = tr.parentElement;
-              while (p && !p.classList.contains('grouped')) {
-                p = p.parentElement;
-              }
-              outerGrouped = p;
+            // Явно ищем родительский контейнер с классом "grouped"
+            let outerGrouped = tr;
+            while (outerGrouped && !outerGrouped.classList.contains('grouped')) {
+              outerGrouped = outerGrouped.parentElement;
             }
             if (outerGrouped) {
+              console.log("Найден outerGrouped:", outerGrouped);
               updateGroupedHeader(outerGrouped);
             } else {
               console.log("outerGrouped не найден для строки:", tr);
@@ -179,40 +171,40 @@ function updateGroupedHeader(groupedContainer) {
       }
 
       // Функция для создания группированного сворачиваемого списка
-function createGroupedCollapsible(groupedData, title, groupType) {
-  const container = document.createElement('div');
-  container.classList.add('collapsible', 'grouped');
+      function createGroupedCollapsible(groupedData, title, groupType) {
+        const container = document.createElement('div');
+        container.classList.add('collapsible', 'grouped');
 
-  let totalCount = 0;
-  Object.values(groupedData).forEach(group => {
-    totalCount += group.players.length;
-  });
+        let totalCount = 0;
+        Object.values(groupedData).forEach(group => {
+          totalCount += group.players.length;
+        });
 
-  const header = document.createElement('div');
-  header.classList.add('collapsible-header');
-  header.dataset.basetitle = title; // сохраняем базовый заголовок
-  header.textContent = title + ' (' + totalCount + ')';
-  container.appendChild(header);
+        const header = document.createElement('div');
+        header.classList.add('collapsible-header');
+        header.dataset.basetitle = title;
+        header.textContent = title + ' (' + totalCount + ')';
+        container.appendChild(header);
 
-  const content = document.createElement('div');
-  content.style.display = 'none';
-  Object.keys(groupedData).forEach(key => {
-    const group = groupedData[key];
-    const headerText = group.clanName.includes(`#${key}`)
-      ? group.clanName
-      : `${key} - ${group.clanName}`;
-    const groupCollapsible = createCollapsible(headerText, group.players, groupType);
-    content.appendChild(groupCollapsible);
-  });
-  container.appendChild(content);
+        const content = document.createElement('div');
+        content.style.display = 'none';
+        Object.keys(groupedData).forEach(key => {
+          const group = groupedData[key];
+          const headerText = group.clanName.includes(`#${key}`)
+            ? group.clanName
+            : `${key} - ${group.clanName}`;
+          const groupCollapsible = createCollapsible(headerText, group.players, groupType);
+          content.appendChild(groupCollapsible);
+        });
+        container.appendChild(content);
 
-  header.addEventListener('click', () => {
-    content.style.display = content.style.display === 'none' ? 'block' : 'none';
-  });
-  return container;
-}
+        header.addEventListener('click', () => {
+          content.style.display = content.style.display === 'none' ? 'block' : 'none';
+        });
+        return container;
+      }
 
-function renderResults(data) {
+      function renderResults(data) {
         const resultsDiv = document.getElementById('results');
         resultsDiv.innerHTML = '';
         data.forEach(clan => {
