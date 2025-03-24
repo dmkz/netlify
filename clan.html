@@ -131,9 +131,10 @@ function findClosestGroupedLogging(el) {
           btn.addEventListener('click', () => {
               // Сначала ищем внешний grouped‑контейнер, начиная от текущей строки (tr)
               let outerGrouped = tr;
-              while (outerGrouped && !outerGrouped.classList.contains('grouped')) {
-                outerGrouped = outerGrouped.parentNode;
+              while (outerGrouped && (outerGrouped.nodeType !== Node.ELEMENT_NODE || !outerGrouped.classList.contains('grouped'))) {
+                  outerGrouped = outerGrouped.parentNode;
               }
+
               if (outerGrouped) {
                 console.log("Найден outerGrouped до удаления:", outerGrouped);
               } else {
