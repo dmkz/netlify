@@ -69,42 +69,35 @@ exports.handler = async (event, context) => {
       const url = `https://www.heroeswm.ru/pl_info.php?id=${player.id}`;
       console.log(`Проверка игрока ${player.id} по URL: ${url}`);
       try {
-        const html = await fetchAndDecode(url);  // функция для запроса и декодирования из windows-1251
-        // Находим индекс первого вхождения <h1
+        const html = await fetchAndDecode(url);
         const h1Index = html.indexOf("<h1");
         if (h1Index === -1) {
           console.log(`Игрок ${player.id}: <h1 не найден, считаем его без клана`);
           return { ...player, classification: "clanless" };
         }
-        // Берём подстроку от начала до первого <h1
         const headerSection = html.substring(0, h1Index);
-        
-        // Ищем первое вхождение <a href="clan_info.php?id=
-        const prefix = '<a href="clan_info.php?id=';
+        const prefix = "<a href='clan_info.php?id="; // ищем с одинарными кавычками
         const aIndex = headerSection.indexOf(prefix);
         if (aIndex === -1) {
           console.log(`Игрок ${player.id}: ссылка на clan_info не найдена в верхней части, считаем его без клана`);
           return { ...player, classification: "clanless" };
         }
-        
-        // Извлекаем идентификатор клана
         const startId = aIndex + prefix.length;
-        const endId = headerSection.indexOf('"', startId);
+        const endId = headerSection.indexOf("'", startId);
         if (endId === -1) {
           console.log(`Игрок ${player.id}: не удалось извлечь идентификатор клана`);
           return { ...player, classification: "unknown" };
         }
         const joinedClanId = headerSection.substring(startId, endId);
-        
-        // Ищем атрибут title="..." после ссылки; предполагается, что он содержит название клана.
-        const titleAttr = 'title=\'';
+        // Ищем атрибут title='...'
+        const titleAttr = "title='";
         const titleIndex = headerSection.indexOf(titleAttr, endId);
         if (titleIndex === -1) {
           console.log(`Игрок ${player.id}: не найден атрибут title для клана ${joinedClanId}`);
           return { ...player, classification: "enemy", joinedClanId, joinedClanName: "Неизвестно" };
         }
         const startTitle = titleIndex + titleAttr.length;
-        const endTitle = headerSection.indexOf('\'', startTitle);
+        const endTitle = headerSection.indexOf("'", startTitle);
         if (endTitle === -1) {
           console.log(`Игрок ${player.id}: не удалось извлечь название клана для ${joinedClanId}`);
           return { ...player, classification: "enemy", joinedClanId, joinedClanName: "Неизвестно" };
@@ -125,12 +118,10 @@ exports.handler = async (event, context) => {
     console.log('Получено боевых кланов:', battleClans.length);
 
     // Группируем участников боевых кланов для быстрого доступа
-    // battleClanMembers: { [clanId]: [members...] }
     const battleClanMembers = {};
     battleClans.forEach(clan => {
       battleClanMembers[clan.clanId] = clan.members;
     });
-    // Карта: key = player id, value = { clanId, clanName }
     const battleMembersMap = new Map();
     battleClans.forEach(clan => {
       clan.members.forEach(member => {
@@ -142,10 +133,10 @@ exports.handler = async (event, context) => {
     const results = await Promise.all(techClans.map(async techClan => {
       const techMemberIds = new Set(techClan.members.map(m => m.id));
 
-      // Группируем для приглашения: игроки из боевых кланов, которых нет в текущем тех. клане
+      // Группируем для приглашения: игроки из боевых кланов, которых нет в текущем тех. клане и не в списке исключений
       const inviteGroups = {};
       battleMembersMap.forEach((info, memberId) => {
-        if (!techMemberIds.has(memberId)) {
+        if (!techMemberIds.has(memberId) && !excludeSet.has(memberId)) {
           if (!inviteGroups[info.clanId]) {
             inviteGroups[info.clanId] = { clanName: info.clanName, players: [] };
           }
@@ -156,8 +147,8 @@ exports.handler = async (event, context) => {
         }
       });
 
-      // Для членов тех. клана, которых нет в боевых кланах, проверяем личную страницу
-      const rawCandidates = techClan.members.filter(member => !battleMembersMap.has(member.id));
+      // Для членов тех. клана, которых нет в боевых кланов и не исключены
+      const rawCandidates = techClan.members.filter(member => !battleMembersMap.has(member.id) && !excludeSet.has(member.id));
       const classified = await Promise.all(rawCandidates.map(player => classifyPlayer(player)));
       const enemyCandidates = classified.filter(p => p.classification === 'enemy');
       const clanlessList = classified.filter(p => p.classification === 'clanless');
@@ -180,7 +171,7 @@ exports.handler = async (event, context) => {
 
       return {
         techClanId: techClan.clanId,
-        techClanName: techClan.clanName,
+        techClanName: techClan.techClanName || techClan.clanName, // если название уже содержит идентификатор, оно не меняется
         inviteGroups,
         enemyGroups,
         clanlessList

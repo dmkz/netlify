@@ -14,7 +14,7 @@
     .collapsible-header { background-color: #f0f0f0; padding: 5px; cursor: pointer; }
     .collapsible-list { margin: 0; padding: 5px; }
     table { width: 100%; border-collapse: collapse; }
-    td { padding: 5px; border-bottom: 1px solid #ccc; }
+    td { border: 1px solid #ccc; padding: 5px; text-align: left; }
     td a { text-decoration: none; color: blue; }
     td a:hover { text-decoration: underline; }
     .remove-button { color: red; border: none; background: none; cursor: pointer; }
@@ -44,22 +44,18 @@
     document.addEventListener('DOMContentLoaded', () => {
       console.log('clan.html loaded');
 
-      // Функция для создания таблицы с игроками
+      // Функция для создания таблицы с игроками (3 столбца: id, ник, кнопка удаления)
       function createPlayerTable(items, groupType) {
         const table = document.createElement('table');
         items.forEach(item => {
           const tr = document.createElement('tr');
 
-          // Столбец с id (кликабельная ссылка)
+          // Столбец 1: id (простой текст)
           const tdId = document.createElement('td');
-          const aId = document.createElement('a');
-          aId.href = `https://www.heroeswm.ru/pl_info.php?id=${item.id}`;
-          aId.target = '_blank';
-          aId.textContent = item.id;
-          tdId.appendChild(aId);
+          tdId.textContent = item.id;
           tr.appendChild(tdId);
 
-          // Столбец с никнеймом (кликабельная ссылка)
+          // Столбец 2: ник (кликабельная ссылка)
           const tdName = document.createElement('td');
           const aName = document.createElement('a');
           aName.href = `https://www.heroeswm.ru/pl_info.php?id=${item.id}`;
@@ -68,30 +64,21 @@
           tdName.appendChild(aName);
           tr.appendChild(tdName);
 
-          // Если группа "enemy", выводим дополнительную информацию о клане, иначе пустой столбец
-          const tdClan = document.createElement('td');
-          if (groupType === 'enemy' && item.joinedClanId) {
-            tdClan.textContent = `${item.joinedClanId} - ${item.joinedClanName}`;
-          }
-          tr.appendChild(tdClan);
-
-          // Столбец с кнопкой красного крестика
+          // Столбец 3: кнопка удаления
           const tdButton = document.createElement('td');
           const btn = document.createElement('button');
           btn.textContent = '✖';
           btn.classList.add('remove-button');
           btn.addEventListener('click', () => {
-            // Добавляем id игрока в список исключений, если его там ещё нет.
-            const excludeTextarea = document.getElementById('excludePlayers');
-            let currentExcludes = excludeTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
-            if (!currentExcludes.includes(item.id)) {
-              currentExcludes.push(item.id);
-              excludeTextarea.value = currentExcludes.join('\n');
-              localStorage.setItem('excludePlayers', excludeTextarea.value);
-            }
-            // Удаляем строку из таблицы
+            // При удалении, удаляем строку и обновляем заголовок секции
+            const parentTable = tr.parentElement;
             tr.remove();
-            // Обновляем заголовок таблицы (если нужно, уменьшив количество элементов)
+            // Обновляем количество строк в родительском контейнере (заголовок находится в ближайшем родительском collapsible)
+            const collapsible = parentTable.closest('.collapsible');
+            const header = collapsible.querySelector('.collapsible-header');
+            const newCount = parentTable.querySelectorAll('tr').length;
+            // Заголовок может содержать текст вида "Нужно пригласить (36)" – заменяем число
+            header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
           });
           tdButton.appendChild(btn);
           tr.appendChild(tdButton);
@@ -101,7 +88,7 @@
         return table;
       }
 
-      // Функция для создания сворачиваемой секции, которая выводит список игроков в виде таблицы
+      // Функция для создания сворачиваемой секции (для простого списка)
       function createCollapsible(title, items, groupType) {
         const container = document.createElement('div');
         container.classList.add('collapsible');
@@ -124,11 +111,11 @@
       }
 
       // Функция для создания группированного сворачиваемого списка
-      function createGroupedCollapsible(groupedData, title) {
+      function createGroupedCollapsible(groupedData, title, groupType) {
         const container = document.createElement('div');
         container.classList.add('collapsible');
 
-        // Подсчитываем суммарное количество игроков во всех группах
+        // Подсчитываем суммарное количество игроков
         let totalCount = 0;
         Object.values(groupedData).forEach(group => {
           totalCount += group.players.length;
@@ -141,9 +128,14 @@
 
         const content = document.createElement('div');
         content.style.display = 'none';
+        // Пример изменения внутри createGroupedCollapsible при создании групп:
         Object.keys(groupedData).forEach(key => {
           const group = groupedData[key];
-          const groupCollapsible = createCollapsible(`${key} - ${group.clanName}`, group.players, groupType='invite');
+          // Если название группы уже содержит идентификатор (например, "#1209"), то не добавляем его повторно.
+          const headerText = group.clanName.includes(`#${key}`) 
+            ? group.clanName 
+            : `${key} - ${group.clanName}`;
+          const groupCollapsible = createCollapsible(headerText, group.players, groupType);
           content.appendChild(groupCollapsible);
         });
         container.appendChild(content);
@@ -161,9 +153,9 @@
           const clanContainer = document.createElement('div');
           clanContainer.style.marginBottom = '20px';
 
-          // Если techClanName уже содержит идентификатор, выводим только название
           const title = document.createElement('h3');
-          if (clan.techClanName.includes(clan.techClanId)) {
+          // Если techClanName уже содержит идентификатор (например, содержит "#{id}"), выводим только techClanName
+          if (clan.techClanName.includes(`#${clan.techClanId}`)) {
             title.textContent = clan.techClanName;
           } else {
             title.textContent = `Клан ${clan.techClanId} - ${clan.techClanName}`;
@@ -174,11 +166,8 @@
           columns.style.display = 'flex';
           columns.style.gap = '10px';
 
-          // Пригласить: группированное сворачиваемое, заголовок "Нужно пригласить"
-          const inviteCollapsible = createGroupedCollapsible(clan.inviteGroups, 'Нужно пригласить');
-          // Ушёл во вражеские кланы: группированное сворачиваемое, заголовок "Ушёл во вражеские кланы"
-          const enemyCollapsible = createGroupedCollapsible(clan.enemyGroups, 'Ушёл во вражеские кланы');
-          // Без клана: простой сворачиваемый список
+          const inviteCollapsible = createGroupedCollapsible(clan.inviteGroups, 'Нужно пригласить', 'invite');
+          const enemyCollapsible = createGroupedCollapsible(clan.enemyGroups, 'Ушёл во вражеские кланы', 'enemy');
           const clanlessCollapsible = createCollapsible('Без клана', clan.clanlessList, 'clanless');
 
           columns.appendChild(inviteCollapsible);
@@ -189,7 +178,7 @@
         });
       }
 
-      // Функции для сохранения и загрузки значений из localStorage
+      // Функции для сохранения и загрузки данных из localStorage
       function saveField(id) {
         const value = document.getElementById(id).value;
         localStorage.setItem(id, value);
@@ -208,7 +197,7 @@
         document.getElementById('results').innerHTML = savedResults;
       }
 
-      // Сохраняем изменения при каждом вводе
+      // Сохраняем изменения при вводе
       ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
         document.getElementById(id).addEventListener('input', () => saveField(id));
       });
