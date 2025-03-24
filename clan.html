@@ -18,6 +18,11 @@
     td a { text-decoration: none; color: blue; }
     td a:hover { text-decoration: underline; }
     .remove-button { color: red; border: none; background: none; cursor: pointer; }
+    /* Стили для сообщения статуса */
+    #statusMessage {
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
@@ -36,6 +41,8 @@
       <textarea id="excludePlayers"></textarea>
     </div>
   </div>
+  <!-- Элемент для статуса запроса -->
+  <div id="statusMessage"></div>
   <button id="processBtn">Обработать</button>
   <h2>Результаты:</h2>
   <div id="results"></div>
@@ -43,6 +50,25 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       console.log('clan.html loaded');
+
+      // Функция для обновления общего счёта в заголовке группированного списка
+      function updateGroupedHeader(groupedContainer) {
+        let total = 0;
+        const content = groupedContainer.querySelector('div:nth-child(2)');
+        if (content) {
+          const innerHeaders = content.querySelectorAll('.collapsible-header');
+          innerHeaders.forEach(header => {
+            const match = header.textContent.match(/\((\d+)\)$/);
+            if (match) {
+              total += parseInt(match[1], 10);
+            }
+          });
+        }
+        const outerHeader = groupedContainer.querySelector(':scope > .collapsible-header');
+        if (outerHeader) {
+          outerHeader.textContent = outerHeader.textContent.replace(/\(\d+\)$/, `(${total})`);
+        }
+      }
 
       // Функция для создания таблицы с игроками (3 столбца: id, ник, кнопка удаления)
       function createPlayerTable(items, groupType) {
@@ -64,7 +90,7 @@
           tdName.appendChild(aName);
           tr.appendChild(tdName);
 
-          // Столбец 3: кнопка удаления (крестик)
+          // Столбец 3: кнопка удаления
           const tdButton = document.createElement('td');
           const btn = document.createElement('button');
           btn.textContent = '✖';
@@ -77,6 +103,11 @@
             const header = collapsible.querySelector('.collapsible-header');
             const newCount = parentTable.querySelectorAll('tr').length;
             header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
+            // Если это вложенная группа, обновляем общий счёт во внешнем контейнере
+            const outerGrouped = tr.closest('.grouped');
+            if (outerGrouped) {
+              updateGroupedHeader(outerGrouped);
+            }
             // Добавляем id игрока в поле исключений, если его там ещё нет
             const excludeTextarea = document.getElementById('excludePlayers');
             let currentExcludes = excludeTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
@@ -94,7 +125,7 @@
         return table;
       }
 
-      // Функция для создания сворачиваемой секции (простой список)
+      // Функция для создания сворачиваемой секции (для простого списка)
       function createCollapsible(title, items, groupType) {
         const container = document.createElement('div');
         container.classList.add('collapsible');
@@ -119,7 +150,7 @@
       // Функция для создания группированного сворачиваемого списка
       function createGroupedCollapsible(groupedData, title, groupType) {
         const container = document.createElement('div');
-        container.classList.add('collapsible');
+        container.classList.add('collapsible', 'grouped');
 
         let totalCount = 0;
         Object.values(groupedData).forEach(group => {
@@ -180,6 +211,7 @@
         });
       }
 
+      // Функции для сохранения и загрузки данных из localStorage
       function saveField(id) {
         const value = document.getElementById(id).value;
         localStorage.setItem(id, value);
@@ -201,6 +233,17 @@
         document.getElementById(id).addEventListener('input', () => saveField(id));
       });
 
+      // Функция для анимации статуса запроса
+      function animateStatus(messageElement, baseText) {
+        let dots = 0;
+        return setInterval(() => {
+          dots = (dots + 1) % 5; // от 0 до 4 точек
+          messageElement.textContent = baseText + '.'.repeat(dots);
+        }, 1000);
+      }
+
+      const statusEl = document.getElementById('statusMessage');
+
       document.getElementById('processBtn').addEventListener('click', async () => {
         console.log('Обработка началась');
         const techClans = document.getElementById('techClans').value;
@@ -208,7 +251,14 @@
         const excludePlayers = document.getElementById('excludePlayers').value;
 
         console.log('Отправляем данные:', { techClans, battleClans, excludePlayers });
-        
+
+        // Устанавливаем статус ожидания с голубым цветом
+        statusEl.style.color = 'blue';
+        let baseStatus = 'Ваш запрос отправлен. Ожидайте, пожалуйста';
+        statusEl.textContent = baseStatus;
+        const startTime = Date.now();
+        const intervalId = animateStatus(statusEl, baseStatus);
+
         try {
           const res = await fetch('/.netlify/functions/process', {
             method: 'POST',
@@ -220,15 +270,25 @@
             })
           });
           console.log('Ответ сервера:', res.status, res.statusText);
+          clearInterval(intervalId);
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
           if (!res.ok) {
+            statusEl.style.color = 'red';
+            statusEl.textContent = `Возникла ошибка при обработке запроса. Запрос обрабатывался ${elapsed} секунд.`;
             throw new Error(`Ошибка запроса: ${res.status} ${res.statusText}`);
           }
           const data = await res.json();
           console.log('Полученные данные:', data);
           renderResults(data);
           localStorage.setItem('results', document.getElementById('results').innerHTML);
+          statusEl.style.color = 'green';
+          statusEl.textContent = `Ваш запрос обработан за ${elapsed} секунд.`;
         } catch (error) {
           console.error('Ошибка при обработке запроса:', error);
+          clearInterval(intervalId);
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          statusEl.style.color = 'red';
+          statusEl.textContent = `Возникла ошибка при обработке запроса. Запрос обрабатывался ${elapsed} секунд.`;
           document.getElementById('results').innerText = 'Ошибка: ' + error.message;
         }
       });
