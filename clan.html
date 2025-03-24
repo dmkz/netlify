@@ -48,44 +48,46 @@
     document.addEventListener('DOMContentLoaded', () => {
       console.log('clan.html loaded');
 
-      // Функция для обновления общего счёта в заголовке группированного списка
-      function updateGroupedHeader(groupedContainer) {
-        console.log("updateGroupedHeader вызвана для:", groupedContainer);
-        // Предполагаем, что groupedContainer имеет двух потомков:
-        // первый – внешний заголовок, второй – контейнер с внутренними collapsible
-        const contentDiv = groupedContainer.children[1];
-        if (!contentDiv) {
-          console.log("Контейнер с внутренними collapsible не найден.");
-          return;
+      // Функция, которая поднимается по дереву с использованием parentNode
+      function findClosestGrouped(el) {
+        while (el) {
+          if (el.nodeType === Node.ELEMENT_NODE && el.classList.contains('grouped')) {
+            return el;
+          }
+          el = el.parentNode;
         }
-        let total = 0;
-        const innerCollapsibles = contentDiv.children;
-        console.log("Количество внутренних collapsible:", innerCollapsibles.length);
-        for (let i = 0; i < innerCollapsibles.length; i++) {
-          const innerHeader = innerCollapsibles[i].querySelector('.collapsible-header');
-          if (innerHeader) {
-            console.log("Внутренний заголовок:", innerHeader.textContent);
-            const match = innerHeader.textContent.match(/\((\d+)\)/);
-            if (match) {
-              const count = parseInt(match[1], 10);
-              console.log("Найдено:", count);
-              total += count;
-            } else {
-              console.log("Не удалось извлечь число из:", innerHeader.textContent);
+        return null;
+      }
+
+      // Функция для обновления общего счётчика во внешнем заголовке группированного списка
+      function updateGroupedHeader(groupedContainer) {
+          // Предполагаем, что groupedContainer имеет два потомка:
+          // 1. Заголовок внешнего списка
+          // 2. Контейнер с внутренними collapsible
+          const contentDiv = groupedContainer.children[1];
+          let total = 0;
+          if (contentDiv) {
+            // Для каждого внутреннего collapsible:
+            for (let i = 0; i < contentDiv.children.length; i++) {
+              const inner = contentDiv.children[i];
+              const innerHeader = inner.querySelector('.collapsible-header');
+              if (innerHeader) {
+                const match = innerHeader.textContent.match(/\((\d+)\)/);
+                if (match) {
+                  total += parseInt(match[1], 10);
+                }
+              }
             }
-          } else {
-            console.log("Внутренний collapsible без заголовка:", innerCollapsibles[i]);
+          }
+          // Обновляем внешний заголовок (первый потомок)
+          const outerHeader = groupedContainer.firstElementChild;
+          if (outerHeader) {
+            // Сохраняем базовый текст без числа
+            const baseText = outerHeader.dataset.basetitle || outerHeader.textContent.split('(')[0].trim();
+            outerHeader.dataset.basetitle = baseText;
+            outerHeader.textContent = `${baseText} (${total})`;
           }
         }
-        console.log("Общая сумма:", total);
-        const outerHeader = groupedContainer.firstElementChild;
-        if (outerHeader) {
-          const baseTitle = outerHeader.dataset.basetitle || outerHeader.textContent.split('(')[0].trim();
-          outerHeader.dataset.basetitle = baseTitle;
-          outerHeader.textContent = `${baseTitle} (${total})`;
-          console.log("Новый внешний заголовок:", outerHeader.textContent);
-        }
-      }
 
       // Функция для создания таблицы с игроками (3 столбца: id, ник, кнопка удаления)
       function createPlayerTable(items, groupType) {
@@ -117,14 +119,14 @@
             tr.remove();
             // Обновляем количество строк во внутреннем collapsible
             const collapsible = parentTable.closest('.collapsible');
-            const header = collapsible.querySelector('.collapsible-header');
-            const newCount = parentTable.querySelectorAll('tr').length;
-            header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
-            // Явно ищем родительский контейнер с классом "grouped"
-            let outerGrouped = tr;
-            while (outerGrouped && !outerGrouped.classList.contains('grouped')) {
-              outerGrouped = outerGrouped.parentElement;
+            if (collapsible) {
+              const header = collapsible.querySelector('.collapsible-header');
+              const newCount = parentTable.querySelectorAll('tr').length;
+              header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
+              console.log("Внутренний счётчик обновлён:", header.textContent);
             }
+            // Находим ближайший grouped-контейнер с помощью findClosestGrouped
+            const outerGrouped = findClosestGrouped(tr);
             if (outerGrouped) {
               console.log("Найден outerGrouped:", outerGrouped);
               updateGroupedHeader(outerGrouped);
@@ -235,7 +237,6 @@
         });
       }
 
-      // Функции для сохранения и загрузки данных из localStorage
       function saveField(id) {
         const value = document.getElementById(id).value;
         localStorage.setItem(id, value);
