@@ -58,7 +58,21 @@
         }
         return null;
       }
-
+        
+function findClosestGroupedLogging(el) {
+  while (el) {
+    if (el.nodeType === Node.ELEMENT_NODE) {
+      console.log("Проверяем элемент:", el.tagName, el.className);
+      if (el.classList.contains('grouped')) {
+        console.log("Найден элемент с классом 'grouped':", el);
+        return el;
+      }
+    }
+    el = el.parentNode;
+  }
+  console.log("Элемент с классом 'grouped' не найден.");
+  return null;
+}
       // Функция для обновления общего счётчика во внешнем заголовке группированного списка
       function updateGroupedHeader(groupedContainer) {
           // Предполагаем, что groupedContainer имеет два потомка:
@@ -115,33 +129,32 @@
           btn.textContent = '✖';
           btn.classList.add('remove-button');
           btn.addEventListener('click', () => {
-            const parentTable = tr.parentElement;
-            tr.remove();
-            // Обновляем количество строк во внутреннем collapsible
-            const collapsible = parentTable.closest('.collapsible');
-            if (collapsible) {
-              const header = collapsible.querySelector('.collapsible-header');
-              const newCount = parentTable.querySelectorAll('tr').length;
-              header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
-              console.log("Внутренний счётчик обновлён:", header.textContent);
-            }
-            // Находим ближайший grouped-контейнер с помощью findClosestGrouped
-            const outerGrouped = findClosestGrouped(tr);
-            if (outerGrouped) {
-              console.log("Найден outerGrouped:", outerGrouped);
-              updateGroupedHeader(outerGrouped);
-            } else {
-              console.log("outerGrouped не найден для строки:", tr);
-            }
-            // Добавляем id игрока в поле исключений, если его там ещё нет
-            const excludeTextarea = document.getElementById('excludePlayers');
-            let currentExcludes = excludeTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
-            if (!currentExcludes.includes(item.id)) {
-              currentExcludes.push(item.id);
-              excludeTextarea.value = currentExcludes.join('\n');
-              localStorage.setItem('excludePlayers', excludeTextarea.value);
-            }
-          });
+              const parentTable = tr.parentElement;
+              tr.remove();
+              // Обновляем количество строк во внутреннем collapsible
+              const collapsible = parentTable.closest('.collapsible');
+              if (collapsible) {
+                const header = collapsible.querySelector('.collapsible-header');
+                const newCount = parentTable.querySelectorAll('tr').length;
+                header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
+                console.log("Внутренний счётчик обновлён:", header.textContent);
+              }
+              // Используем findClosestGroupedLogging для поиска родительского элемента с классом "grouped"
+              const outerGrouped = findClosestGroupedLogging(tr);
+              if (outerGrouped) {
+                updateGroupedHeader(outerGrouped);
+              } else {
+                console.log("outerGrouped не найден для строки:", tr);
+              }
+              // Добавляем id игрока в поле исключений, если его там ещё нет
+              const excludeTextarea = document.getElementById('excludePlayers');
+              let currentExcludes = excludeTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
+              if (!currentExcludes.includes(item.id)) {
+                currentExcludes.push(item.id);
+                excludeTextarea.value = currentExcludes.join('\n');
+                localStorage.setItem('excludePlayers', excludeTextarea.value);
+              }
+            });
           tdButton.appendChild(btn);
           tr.appendChild(tdButton);
 
