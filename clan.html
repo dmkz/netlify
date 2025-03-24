@@ -52,23 +52,27 @@
       console.log('clan.html loaded');
 
       // Функция для обновления общего счёта в заголовке группированного списка
-      function updateGroupedHeader(groupedContainer) {
+function updateGroupedHeader(groupedContainer) {
+  // Найдём второй дочерний элемент – контейнер с внутренними collapsible
+  const contentDiv = groupedContainer.querySelector('div:nth-child(2)');
   let total = 0;
-  // Предполагаем, что второй дочерний элемент – это контейнер с внутренними сворачиваемыми секциями
-  const content = groupedContainer.children[1];
-  if (content) {
-    const innerHeaders = content.querySelectorAll('.collapsible-header');
-    innerHeaders.forEach(header => {
-      const match = header.textContent.match(/\((\d+)\)$/);
-      if (match) {
-        total += parseInt(match[1], 10);
+  if (contentDiv) {
+    // Перебираем все прямые дочерние элементы внутри contentDiv
+    const innerCollapsibles = contentDiv.children;
+    for (let i = 0; i < innerCollapsibles.length; i++) {
+      const header = innerCollapsibles[i].querySelector('.collapsible-header');
+      if (header) {
+        const match = header.textContent.match(/\((\d+)\)/);
+        if (match) {
+          total += parseInt(match[1], 10);
+        }
       }
-    });
+    }
   }
-  // Первый дочерний элемент – это внешний заголовок
+  // Обновляем внешний заголовок – первый дочерний элемент группированного контейнера
   const outerHeader = groupedContainer.firstElementChild;
   if (outerHeader) {
-    outerHeader.textContent = outerHeader.textContent.replace(/\(\d+\)$/, `(${total})`);
+    outerHeader.textContent = outerHeader.textContent.replace(/\(\d+\)/, `(${total})`);
   }
 }
       // Функция для создания таблицы с игроками (3 столбца: id, ник, кнопка удаления)
