@@ -53,23 +53,24 @@
 
       // Функция для обновления общего счёта в заголовке группированного списка
       function updateGroupedHeader(groupedContainer) {
-        let total = 0;
-        const content = groupedContainer.querySelector('div:nth-child(2)');
-        if (content) {
-          const innerHeaders = content.querySelectorAll('.collapsible-header');
-          innerHeaders.forEach(header => {
-            const match = header.textContent.match(/\((\d+)\)$/);
-            if (match) {
-              total += parseInt(match[1], 10);
-            }
-          });
-        }
-        const outerHeader = groupedContainer.querySelector(':scope > .collapsible-header');
-        if (outerHeader) {
-          outerHeader.textContent = outerHeader.textContent.replace(/\(\d+\)$/, `(${total})`);
-        }
+  let total = 0;
+  // Предполагаем, что второй дочерний элемент – это контейнер с внутренними сворачиваемыми секциями
+  const content = groupedContainer.children[1];
+  if (content) {
+    const innerHeaders = content.querySelectorAll('.collapsible-header');
+    innerHeaders.forEach(header => {
+      const match = header.textContent.match(/\((\d+)\)$/);
+      if (match) {
+        total += parseInt(match[1], 10);
       }
-
+    });
+  }
+  // Первый дочерний элемент – это внешний заголовок
+  const outerHeader = groupedContainer.firstElementChild;
+  if (outerHeader) {
+    outerHeader.textContent = outerHeader.textContent.replace(/\(\d+\)$/, `(${total})`);
+  }
+}
       // Функция для создания таблицы с игроками (3 столбца: id, ник, кнопка удаления)
       function createPlayerTable(items, groupType) {
         const table = document.createElement('table');
