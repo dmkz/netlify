@@ -385,54 +385,55 @@
       }
       const statusEl = document.getElementById('statusMessage');
       document.getElementById('processBtn').addEventListener('click', async () => {
-        console.log('Обработка началась');
-        const techClans = document.getElementById('techClans').value;
-        const battleClans = document.getElementById('battleClans').value;
-        const excludePlayers = document.getElementById('excludePlayers').value;
-        console.log('Отправляем данные:', { techClans, battleClans, excludePlayers });
-        statusEl.style.color = 'blue';
-        let baseStatus = 'Ваш запрос отправлен. Ожидайте, пожалуйста';
-        statusEl.textContent = baseStatus;
-        const startTime = Date.now();
-        const intervalId = animateStatus(statusEl, baseStatus);
-        try {
-          const res = await fetch('/.netlify/functions/process', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              techClanIds: techClans,
-              battleClanIds: battleClans,
-              excludePlayers: excludePlayers
-            })
-          });
-          console.log('Ответ сервера:', res.status, res.statusText);
-          clearInterval(intervalId);
-          const elapsed = Math.round((Date.now() - startTime) / 1000);
-          if (!res.ok) {
+          console.log('Обработка началась');
+          const techClans = document.getElementById('techClans').value;
+          const battleClans = document.getElementById('battleClans').value;
+          const excludePlayers = document.getElementById('excludePlayers').value;
+          console.log('Отправляем данные:', { techClans, battleClans, excludePlayers });
+          statusEl.style.color = 'blue';
+          let baseStatus = 'Ваш запрос отправлен. Ожидайте, пожалуйста';
+          statusEl.textContent = baseStatus;
+          const startTime = Date.now();
+          const intervalId = animateStatus(statusEl, baseStatus);
+          try {
+            const res = await fetch('/.netlify/functions/process', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                techClanIds: techClans,
+                battleClanIds: battleClans,
+                excludePlayers: excludePlayers
+              })
+            });
+            console.log('Ответ сервера:', res.status, res.statusText);
+            clearInterval(intervalId);
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            if (!res.ok) {
+              statusEl.style.color = 'red';
+              statusEl.textContent = `Возникла ошибка при обработке запроса. Запрос обрабатывался ${elapsed} секунд.`;
+              throw new Error(`Ошибка запроса: ${res.status} ${res.statusText}`);
+            }
+            const data = await res.json();
+            console.log('Полученные данные:', data);
+            // Так как сервер возвращает массив технических кланов,
+            // сохраняем его сразу в techResult и передаём в renderResults
+            techResult = data;
+            renderResults(data);
+            localStorage.setItem('results', document.getElementById('results').innerHTML);
+            statusEl.style.color = 'green';
+            statusEl.textContent = `Ваш запрос обработан за ${elapsed} секунд.`;
+            updateTechDisplay();
+            updateBattleDisplay();
+          } catch (error) {
+            console.error('Ошибка при обработке запроса:', error);
+            clearInterval(intervalId);
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
             statusEl.style.color = 'red';
             statusEl.textContent = `Возникла ошибка при обработке запроса. Запрос обрабатывался ${elapsed} секунд.`;
-            throw new Error(`Ошибка запроса: ${res.status} ${res.statusText}`);
+            document.getElementById('results').innerText = 'Ошибка: ' + error.message;
           }
-          const data = await res.json();
-          console.log('Полученные данные:', data);
-          // Предполагаем, что сервер возвращает объект с двумя свойствами: techClans и battleClans
-          techResult = data.techClans;
-          battleResult = data.battleClans;
-          renderResults(techResult);
-          localStorage.setItem('results', document.getElementById('results').innerHTML);
-          statusEl.style.color = 'green';
-          statusEl.textContent = `Ваш запрос обработан за ${elapsed} секунд.`;
-          updateTechDisplay();
-          updateBattleDisplay();
-        } catch (error) {
-          console.error('Ошибка при обработке запроса:', error);
-          clearInterval(intervalId);
-          const elapsed = Math.round((Date.now() - startTime) / 1000);
-          statusEl.style.color = 'red';
-          statusEl.textContent = `Возникла ошибка при обработке запроса. Запрос обрабатывался ${elapsed} секунд.`;
-          document.getElementById('results').innerText = 'Ошибка: ' + error.message;
-        }
-      });
+        });
+
     });
   </script>
 </body>
