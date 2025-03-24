@@ -12,7 +12,12 @@
     button { padding: 10px 20px; font-size: 16px; }
     .collapsible { margin-bottom: 10px; border: 1px solid #ccc; }
     .collapsible-header { background-color: #f0f0f0; padding: 5px; cursor: pointer; }
-    .collapsible-list { list-style: none; margin: 0; padding: 5px; }
+    .collapsible-list { margin: 0; padding: 5px; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 5px; border-bottom: 1px solid #ccc; }
+    td a { text-decoration: none; color: blue; }
+    td a:hover { text-decoration: underline; }
+    .remove-button { color: red; border: none; background: none; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -36,150 +41,209 @@
   <div id="results"></div>
 
   <script>
-    console.log('clan.html loaded');
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('clan.html loaded');
 
-    // Функция для создания сворачиваемой секции (простой список)
-    function createCollapsible(title, items, groupType) {
-      const container = document.createElement('div');
-      container.classList.add('collapsible');
+      // Функция для создания таблицы с игроками
+      function createPlayerTable(items, groupType) {
+        const table = document.createElement('table');
+        items.forEach(item => {
+          const tr = document.createElement('tr');
 
-      const header = document.createElement('div');
-      header.classList.add('collapsible-header');
-      header.textContent = title + ' (' + items.length + ')';
-      container.appendChild(header);
+          // Столбец с id (кликабельная ссылка)
+          const tdId = document.createElement('td');
+          const aId = document.createElement('a');
+          aId.href = `https://www.heroeswm.ru/pl_info.php?id=${item.id}`;
+          aId.target = '_blank';
+          aId.textContent = item.id;
+          tdId.appendChild(aId);
+          tr.appendChild(tdId);
 
-      const list = document.createElement('ul');
-      list.classList.add('collapsible-list');
-      items.forEach(item => {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = `https://www.heroeswm.ru/pl_info.php?id=${item.id}`;
-        a.target = '_blank';
-        a.textContent = `${item.id} - ${item.name}`;
-        if (groupType === 'enemy' && item.joinedClanId) {
-          a.textContent += ` (ушёл в ${item.joinedClanId} - ${item.joinedClanName})`;
-        }
-        li.appendChild(a);
-        list.appendChild(li);
-      });
-      container.appendChild(list);
+          // Столбец с никнеймом (кликабельная ссылка)
+          const tdName = document.createElement('td');
+          const aName = document.createElement('a');
+          aName.href = `https://www.heroeswm.ru/pl_info.php?id=${item.id}`;
+          aName.target = '_blank';
+          aName.textContent = item.name;
+          tdName.appendChild(aName);
+          tr.appendChild(tdName);
 
-      header.addEventListener('click', () => {
-        list.style.display = list.style.display === 'none' ? 'block' : 'none';
-      });
-      list.style.display = 'none'; // скрываем изначально
-      return container;
-    }
+          // Если группа "enemy", выводим дополнительную информацию о клане, иначе пустой столбец
+          const tdClan = document.createElement('td');
+          if (groupType === 'enemy' && item.joinedClanId) {
+            tdClan.textContent = `${item.joinedClanId} - ${item.joinedClanName}`;
+          }
+          tr.appendChild(tdClan);
 
-    // Функция для создания группированного сворачиваемого списка
-    function createGroupedCollapsible(groupedData, title) {
-      const container = document.createElement('div');
-      container.classList.add('collapsible');
+          // Столбец с кнопкой красного крестика
+          const tdButton = document.createElement('td');
+          const btn = document.createElement('button');
+          btn.textContent = '✖';
+          btn.classList.add('remove-button');
+          btn.addEventListener('click', () => {
+            // Добавляем id игрока в список исключений, если его там ещё нет.
+            const excludeTextarea = document.getElementById('excludePlayers');
+            let currentExcludes = excludeTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
+            if (!currentExcludes.includes(item.id)) {
+              currentExcludes.push(item.id);
+              excludeTextarea.value = currentExcludes.join('\n');
+              localStorage.setItem('excludePlayers', excludeTextarea.value);
+            }
+            // Удаляем строку из таблицы
+            tr.remove();
+            // Обновляем заголовок таблицы (если нужно, уменьшив количество элементов)
+          });
+          tdButton.appendChild(btn);
+          tr.appendChild(tdButton);
 
-      const header = document.createElement('div');
-      header.classList.add('collapsible-header');
-      header.textContent = title;
-      container.appendChild(header);
-
-      const content = document.createElement('div');
-      content.style.display = 'none';
-      Object.keys(groupedData).forEach(key => {
-        const group = groupedData[key];
-        const groupCollapsible = createCollapsible(`${key} - ${group.clanName}`, group.players);
-        content.appendChild(groupCollapsible);
-      });
-      container.appendChild(content);
-
-      header.addEventListener('click', () => {
-        content.style.display = content.style.display === 'none' ? 'block' : 'none';
-      });
-      return container;
-    }
-
-    function renderResults(data) {
-      const resultsDiv = document.getElementById('results');
-      resultsDiv.innerHTML = '';
-      data.forEach(clan => {
-        const clanContainer = document.createElement('div');
-        clanContainer.style.marginBottom = '20px';
-        const title = document.createElement('h3');
-        title.textContent = `Клан ${clan.techClanId} - ${clan.techClanName}`;
-        clanContainer.appendChild(title);
-
-        const columns = document.createElement('div');
-        columns.style.display = 'flex';
-        columns.style.gap = '10px';
-        
-        // Пригласить: группированное сворачиваемое с заголовком "Нужно пригласить"
-        const inviteCollapsible = createGroupedCollapsible(clan.inviteGroups, 'Нужно пригласить');
-        // Ушёл во вражеские кланы: группированное сворачиваемое с заголовком "Ушёл во вражеские кланы"
-        const enemyCollapsible = createGroupedCollapsible(clan.enemyGroups, 'Ушёл во вражеские кланы');
-        // Без клана: простой сворачиваемый список
-        const clanlessCollapsible = createCollapsible('Без клана', clan.clanlessList, 'clanless');
-
-        columns.appendChild(inviteCollapsible);
-        columns.appendChild(enemyCollapsible);
-        columns.appendChild(clanlessCollapsible);
-        clanContainer.appendChild(columns);
-        resultsDiv.appendChild(clanContainer);
-      });
-    }
-
-    // Сохранение и загрузка данных из localStorage
-    function saveField(id) {
-      const value = document.getElementById(id).value;
-      localStorage.setItem(id, value);
-    }
-    function loadField(id) {
-      const value = localStorage.getItem(id);
-      if (value !== null) {
-        document.getElementById(id).value = value;
+          table.appendChild(tr);
+        });
+        return table;
       }
-    }
 
-    window.addEventListener('load', () => {
-      console.log('Страница загружена, загружаем сохранённые данные');
+      // Функция для создания сворачиваемой секции, которая выводит список игроков в виде таблицы
+      function createCollapsible(title, items, groupType) {
+        const container = document.createElement('div');
+        container.classList.add('collapsible');
+
+        const header = document.createElement('div');
+        header.classList.add('collapsible-header');
+        header.textContent = title + ' (' + items.length + ')';
+        container.appendChild(header);
+
+        const content = document.createElement('div');
+        content.style.display = 'none';
+        const table = createPlayerTable(items, groupType);
+        content.appendChild(table);
+        container.appendChild(content);
+
+        header.addEventListener('click', () => {
+          content.style.display = content.style.display === 'none' ? 'block' : 'none';
+        });
+        return container;
+      }
+
+      // Функция для создания группированного сворачиваемого списка
+      function createGroupedCollapsible(groupedData, title) {
+        const container = document.createElement('div');
+        container.classList.add('collapsible');
+
+        // Подсчитываем суммарное количество игроков во всех группах
+        let totalCount = 0;
+        Object.values(groupedData).forEach(group => {
+          totalCount += group.players.length;
+        });
+
+        const header = document.createElement('div');
+        header.classList.add('collapsible-header');
+        header.textContent = title + ' (' + totalCount + ')';
+        container.appendChild(header);
+
+        const content = document.createElement('div');
+        content.style.display = 'none';
+        Object.keys(groupedData).forEach(key => {
+          const group = groupedData[key];
+          const groupCollapsible = createCollapsible(`${key} - ${group.clanName}`, group.players, groupType='invite');
+          content.appendChild(groupCollapsible);
+        });
+        container.appendChild(content);
+
+        header.addEventListener('click', () => {
+          content.style.display = content.style.display === 'none' ? 'block' : 'none';
+        });
+        return container;
+      }
+
+      function renderResults(data) {
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '';
+        data.forEach(clan => {
+          const clanContainer = document.createElement('div');
+          clanContainer.style.marginBottom = '20px';
+
+          // Если techClanName уже содержит идентификатор, выводим только название
+          const title = document.createElement('h3');
+          if (clan.techClanName.includes(clan.techClanId)) {
+            title.textContent = clan.techClanName;
+          } else {
+            title.textContent = `Клан ${clan.techClanId} - ${clan.techClanName}`;
+          }
+          clanContainer.appendChild(title);
+
+          const columns = document.createElement('div');
+          columns.style.display = 'flex';
+          columns.style.gap = '10px';
+
+          // Пригласить: группированное сворачиваемое, заголовок "Нужно пригласить"
+          const inviteCollapsible = createGroupedCollapsible(clan.inviteGroups, 'Нужно пригласить');
+          // Ушёл во вражеские кланы: группированное сворачиваемое, заголовок "Ушёл во вражеские кланы"
+          const enemyCollapsible = createGroupedCollapsible(clan.enemyGroups, 'Ушёл во вражеские кланы');
+          // Без клана: простой сворачиваемый список
+          const clanlessCollapsible = createCollapsible('Без клана', clan.clanlessList, 'clanless');
+
+          columns.appendChild(inviteCollapsible);
+          columns.appendChild(enemyCollapsible);
+          columns.appendChild(clanlessCollapsible);
+          clanContainer.appendChild(columns);
+          resultsDiv.appendChild(clanContainer);
+        });
+      }
+
+      // Функции для сохранения и загрузки значений из localStorage
+      function saveField(id) {
+        const value = document.getElementById(id).value;
+        localStorage.setItem(id, value);
+      }
+      function loadField(id) {
+        const value = localStorage.getItem(id);
+        if (value !== null) {
+          document.getElementById(id).value = value;
+        }
+      }
+
+      // При загрузке страницы – восстанавливаем данные
       ['techClans', 'battleClans', 'excludePlayers'].forEach(loadField);
       const savedResults = localStorage.getItem('results');
       if (savedResults) {
         document.getElementById('results').innerHTML = savedResults;
       }
-    });
 
-    ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
-      document.getElementById(id).addEventListener('input', () => saveField(id));
-    });
+      // Сохраняем изменения при каждом вводе
+      ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => saveField(id));
+      });
 
-    document.getElementById('processBtn').addEventListener('click', async () => {
-      console.log('Обработка началась');
-      const techClans = document.getElementById('techClans').value;
-      const battleClans = document.getElementById('battleClans').value;
-      const excludePlayers = document.getElementById('excludePlayers').value;
+      document.getElementById('processBtn').addEventListener('click', async () => {
+        console.log('Обработка началась');
+        const techClans = document.getElementById('techClans').value;
+        const battleClans = document.getElementById('battleClans').value;
+        const excludePlayers = document.getElementById('excludePlayers').value;
 
-      console.log('Отправляем данные:', { techClans, battleClans, excludePlayers });
-      
-      try {
-        const res = await fetch('/.netlify/functions/process', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            techClanIds: techClans,
-            battleClanIds: battleClans,
-            excludePlayers: excludePlayers
-          })
-        });
-        console.log('Ответ сервера:', res.status, res.statusText);
-        if (!res.ok) {
-          throw new Error(`Ошибка запроса: ${res.status} ${res.statusText}`);
+        console.log('Отправляем данные:', { techClans, battleClans, excludePlayers });
+        
+        try {
+          const res = await fetch('/.netlify/functions/process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              techClanIds: techClans,
+              battleClanIds: battleClans,
+              excludePlayers: excludePlayers
+            })
+          });
+          console.log('Ответ сервера:', res.status, res.statusText);
+          if (!res.ok) {
+            throw new Error(`Ошибка запроса: ${res.status} ${res.statusText}`);
+          }
+          const data = await res.json();
+          console.log('Полученные данные:', data);
+          renderResults(data);
+          localStorage.setItem('results', document.getElementById('results').innerHTML);
+        } catch (error) {
+          console.error('Ошибка при обработке запроса:', error);
+          document.getElementById('results').innerText = 'Ошибка: ' + error.message;
         }
-        const data = await res.json();
-        console.log('Полученные данные:', data);
-        renderResults(data);
-        localStorage.setItem('results', document.getElementById('results').innerHTML);
-      } catch (error) {
-        console.error('Ошибка при обработке запроса:', error);
-        document.getElementById('results').innerText = 'Ошибка: ' + error.message;
-      }
+      });
     });
   </script>
 </body>
