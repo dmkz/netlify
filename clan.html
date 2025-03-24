@@ -129,9 +129,21 @@ function findClosestGroupedLogging(el) {
           btn.textContent = '✖';
           btn.classList.add('remove-button');
           btn.addEventListener('click', () => {
+              // Сначала ищем внешний grouped‑контейнер, начиная от текущей строки (tr)
+              let outerGrouped = tr;
+              while (outerGrouped && !outerGrouped.classList.contains('grouped')) {
+                outerGrouped = outerGrouped.parentNode;
+              }
+              if (outerGrouped) {
+                console.log("Найден outerGrouped до удаления:", outerGrouped);
+              } else {
+                console.log("outerGrouped не найден для строки (до удаления):", tr);
+              }
+              
               const parentTable = tr.parentElement;
-              tr.remove();
-              // Обновляем количество строк во внутреннем collapsible
+              tr.remove(); // удаляем строку
+
+              // Обновляем внутренний счётчик: внутри текущего collapsible
               const collapsible = parentTable.closest('.collapsible');
               if (collapsible) {
                 const header = collapsible.querySelector('.collapsible-header');
@@ -139,13 +151,14 @@ function findClosestGroupedLogging(el) {
                 header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
                 console.log("Внутренний счётчик обновлён:", header.textContent);
               }
-              // Используем findClosestGroupedLogging для поиска родительского элемента с классом "grouped"
-              const outerGrouped = findClosestGroupedLogging(tr);
+              
+              // Если мы нашли outerGrouped до удаления, обновляем его счётчик
               if (outerGrouped) {
                 updateGroupedHeader(outerGrouped);
               } else {
-                console.log("outerGrouped не найден для строки:", tr);
+                console.log("outerGrouped не найден для строки после удаления:", tr);
               }
+              
               // Добавляем id игрока в поле исключений, если его там ещё нет
               const excludeTextarea = document.getElementById('excludePlayers');
               let currentExcludes = excludeTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
