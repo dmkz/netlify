@@ -53,11 +53,11 @@
 
       // Функция для обновления общего счёта в заголовке группированного списка
 function updateGroupedHeader(groupedContainer) {
-  // Найдём второй дочерний элемент – контейнер с внутренними collapsible
+  // Находим контейнер с внутренними collapsible
   const contentDiv = groupedContainer.querySelector('div:nth-child(2)');
   let total = 0;
   if (contentDiv) {
-    // Перебираем все прямые дочерние элементы внутри contentDiv
+    // Перебираем прямых потомков (каждая группа — collapsible)
     const innerCollapsibles = contentDiv.children;
     for (let i = 0; i < innerCollapsibles.length; i++) {
       const header = innerCollapsibles[i].querySelector('.collapsible-header');
@@ -69,12 +69,15 @@ function updateGroupedHeader(groupedContainer) {
       }
     }
   }
-  // Обновляем внешний заголовок – первый дочерний элемент группированного контейнера
+  // Обновляем внешний заголовок, используя базовый заголовок из data-basetitle
   const outerHeader = groupedContainer.firstElementChild;
   if (outerHeader) {
-    outerHeader.textContent = outerHeader.textContent.replace(/\(\d+\)/, `(${total})`);
+    const baseTitle = outerHeader.dataset.basetitle || outerHeader.textContent.split('(')[0].trim();
+    outerHeader.dataset.basetitle = baseTitle;
+    outerHeader.textContent = `${baseTitle} (${total})`;
   }
 }
+
       // Функция для создания таблицы с игроками (3 столбца: id, ник, кнопка удаления)
       function createPlayerTable(items, groupType) {
         const table = document.createElement('table');
@@ -153,38 +156,39 @@ function updateGroupedHeader(groupedContainer) {
       }
 
       // Функция для создания группированного сворачиваемого списка
-      function createGroupedCollapsible(groupedData, title, groupType) {
-        const container = document.createElement('div');
-        container.classList.add('collapsible', 'grouped');
+function createGroupedCollapsible(groupedData, title, groupType) {
+  const container = document.createElement('div');
+  container.classList.add('collapsible', 'grouped');
 
-        let totalCount = 0;
-        Object.values(groupedData).forEach(group => {
-          totalCount += group.players.length;
-        });
+  let totalCount = 0;
+  Object.values(groupedData).forEach(group => {
+    totalCount += group.players.length;
+  });
 
-        const header = document.createElement('div');
-        header.classList.add('collapsible-header');
-        header.textContent = title + ' (' + totalCount + ')';
-        container.appendChild(header);
+  const header = document.createElement('div');
+  header.classList.add('collapsible-header');
+  // Сохраним базовый заголовок в data-атрибуте:
+  header.dataset.basetitle = title;
+  header.textContent = title + ' (' + totalCount + ')';
+  container.appendChild(header);
 
-        const content = document.createElement('div');
-        content.style.display = 'none';
-        Object.keys(groupedData).forEach(key => {
-          const group = groupedData[key];
-          const headerText = group.clanName.includes(`#${key}`)
-            ? group.clanName
-            : `${key} - ${group.clanName}`;
-          const groupCollapsible = createCollapsible(headerText, group.players, groupType);
-          content.appendChild(groupCollapsible);
-        });
-        container.appendChild(content);
+  const content = document.createElement('div');
+  content.style.display = 'none';
+  Object.keys(groupedData).forEach(key => {
+    const group = groupedData[key];
+    const headerText = group.clanName.includes(`#${key}`)
+      ? group.clanName
+      : `${key} - ${group.clanName}`;
+    const groupCollapsible = createCollapsible(headerText, group.players, groupType);
+    content.appendChild(groupCollapsible);
+  });
+  container.appendChild(content);
 
-        header.addEventListener('click', () => {
-          content.style.display = content.style.display === 'none' ? 'block' : 'none';
-        });
-        return container;
-      }
-
+  header.addEventListener('click', () => {
+    content.style.display = content.style.display === 'none' ? 'block' : 'none';
+  });
+  return container;
+}
       function renderResults(data) {
         const resultsDiv = document.getElementById('results');
         resultsDiv.innerHTML = '';
