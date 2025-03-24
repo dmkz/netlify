@@ -55,7 +55,7 @@
           tdId.textContent = item.id;
           tr.appendChild(tdId);
 
-          // Столбец 2: ник (только кликабельный)
+          // Столбец 2: ник (только кликабельная)
           const tdName = document.createElement('td');
           const aName = document.createElement('a');
           aName.href = `https://www.heroeswm.ru/pl_info.php?id=${item.id}`;
@@ -72,12 +72,12 @@
           btn.addEventListener('click', () => {
             const parentTable = tr.parentElement;
             tr.remove();
-            // Обновляем количество строк в заголовке родительского collapsible
+            // Обновляем количество строк в родительском collapsible
             const collapsible = parentTable.closest('.collapsible');
             const header = collapsible.querySelector('.collapsible-header');
             const newCount = parentTable.querySelectorAll('tr').length;
             header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
-            // Добавляем id игрока в поле excludePlayers, если его там ещё нет
+            // Добавляем id игрока в поле исключений, если его там ещё нет
             const excludeTextarea = document.getElementById('excludePlayers');
             let currentExcludes = excludeTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
             if (!currentExcludes.includes(item.id)) {
@@ -94,7 +94,7 @@
         return table;
       }
 
-      // Функция для создания сворачиваемой секции (для простого списка)
+      // Функция для создания сворачиваемой секции (простой список)
       function createCollapsible(title, items, groupType) {
         const container = document.createElement('div');
         container.classList.add('collapsible');
@@ -157,7 +157,6 @@
           clanContainer.style.marginBottom = '20px';
 
           const title = document.createElement('h3');
-          // Если techClanName уже содержит идентификатор (например, "#1209"), выводим только techClanName
           if (clan.techClanName.includes(`#${clan.techClanId}`)) {
             title.textContent = clan.techClanName;
           } else {
@@ -181,7 +180,6 @@
         });
       }
 
-      // Функции для сохранения и загрузки данных из localStorage
       function saveField(id) {
         const value = document.getElementById(id).value;
         localStorage.setItem(id, value);
