@@ -126,9 +126,15 @@ function updateGroupedHeader(groupedContainer) {
             const newCount = parentTable.querySelectorAll('tr').length;
             header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
             // Если это вложенная группа, обновляем общий счёт во внешнем контейнере
-            const outerGrouped = tr.closest('.grouped');
+            let outerGrouped = tr.closest('.grouped');
+            if (!outerGrouped) {
+              let p = tr.parentElement;
+              while (p && !p.classList.contains('grouped')) {
+                p = p.parentElement;
+              }
+              outerGrouped = p;
+            }
             if (outerGrouped) {
-              console.log("Найден outerGrouped:", outerGrouped);
               updateGroupedHeader(outerGrouped);
             } else {
               console.log("outerGrouped не найден для строки:", tr);
