@@ -441,8 +441,21 @@
           const parsed = parseTechClan(tc.html, battleIdsSet);
           return { clanId: tc.clanId, clanName: parsed.clanName, members: parsed.members };
         });
+        
+        // фильтр особенных игроков
+        const excludeList = document.getElementById('excludePlayers')
+          .value.split('\n')
+          .map(s => s.trim())
+          .filter(Boolean);
+
+        const parsedTechClansFiltered = parsedTechClans.map(techClan => ({
+          ...techClan,
+          members: techClan.members.filter(member => !excludeList.includes(member.id))
+        }));
+
+        
         // Формируем итоговый результат для каждого технического клана
-        const results = parsedTechClans.map(techClan => {
+        const results = parsedTechClansFiltered.map(techClan => {
           const techMemberIds = new Set(techClan.members.map(m => m.id));
           const inviteGroups = {};
           battleMembersMap.forEach((info, memberId) => {
