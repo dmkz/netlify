@@ -91,7 +91,14 @@ exports.handler = async (event, context) => {
       const url = `https://www.heroeswm.ru/clan_info.php?id=${id}`;
       console.log(`Запрос боевого клана ${id} по URL: ${url}`);
       const html = await fetchAndDecode(url);
-      const { clanName, members } = parseClanPage(html, false, null);
+      let { clanName, members } = parseClanPage(html, false, null);
+      // Так как это страница боевого клана, все найденные игроки считаются его участниками.
+      members = members.map(member => ({
+        ...member,
+        classification: "member",
+        joinedBattleClanId: id,
+        joinedBattleClanName: clanName
+      }));
       console.log(`Боевой клан ${id} (${clanName}) — найдено участников: ${members.length}`);
       return { battleClanId: id, battleClanName: clanName, members };
     }));
