@@ -16,7 +16,7 @@
     /* По умолчанию левая часть имеет 16.67%, правая – 83.33% */
     .left-input { width: 16.67%; height: 100px; font-family: monospace; }
     .right-output { width: 83.33%; height: 100px; font-family: monospace; }
-    /* Для поля "Особенные игроки" переопределяем ширины */
+    /* Для поля "Особенные игроки" переопределяем ширины: левая в 1.5 раза больше */
     #excludePlayers { width: 25% !important; }
     #excludePlayersOutput { width: 75% !important; }
     button { padding: 10px 20px; font-size: 16px; }
@@ -73,8 +73,14 @@
       console.log('clan2.html loaded');
 
       // Глобальные словари: для кланов и игроков
-      let clansDict = JSON.parse(localStorage.getItem('clansDict')) || {};
-      let playersDict = JSON.parse(localStorage.getItem('playersDict')) || {};
+      let clansDict = {};
+      let playersDict = {};
+      try {
+        clansDict = JSON.parse(localStorage.getItem('clansDict')) || {};
+      } catch(e) { clansDict = {}; }
+      try {
+        playersDict = JSON.parse(localStorage.getItem('playersDict')) || {};
+      } catch(e) { playersDict = {}; }
 
       // Функция обновления правых полей с использованием словарей
       function updateRightInput(leftId, rightId) {
@@ -84,22 +90,18 @@
           const lines = left.value.split('\n').map(s => s.trim()).filter(Boolean);
           let newLines = [];
           if (leftId === "excludePlayers") {
-            // Для особенных игроков используем playersDict
             newLines = lines.map(line => playersDict[line] || "неизвестный игрок");
           } else {
-            // Для тех. и боевых кланов используем clansDict
             newLines = lines.map(line => clansDict[line] || "неизвестный клан");
           }
           right.value = newLines.join('\n');
         }
       }
-
-      // Функция синхронизации скролла для пары элементов
+      // Функция синхронизации скролла для пары textarea
       function syncScroll(el1, el2) {
         el1.addEventListener('scroll', () => { el2.scrollTop = el1.scrollTop; });
         el2.addEventListener('scroll', () => { el1.scrollTop = el2.scrollTop; });
       }
-
       // При изменении каждого левого поля обновляем правое и сохраняем значение
       ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
         const left = document.getElementById(id);
@@ -110,11 +112,9 @@
             updateRightInput(id, id + 'Output');
             saveField(id);
           });
-          // Синхронизируем скролл
           syncScroll(left, right);
         }
       });
-
       // Функции сохранения и загрузки входных данных
       function saveField(id) {
         const value = document.getElementById(id).value;
@@ -177,7 +177,7 @@
           const btn = document.createElement('button');
           btn.textContent = '✖';
           btn.classList.add('remove-button');
-          // Ваша версия удаления строки с обновлением счётчиков:
+          // Ваша версия удаления строки и обновления счётчиков:
           btn.addEventListener('click', () => {
               let outerGrouped = tr;
               while (outerGrouped && (outerGrouped.nodeType !== Node.ELEMENT_NODE || !outerGrouped.classList.contains('grouped'))) {
@@ -334,7 +334,7 @@
         return { clanName, members };
       }
 
-      // Упрощённый парсинг HTML-страницы технического клана
+      // Упрощённый парсинг HTML-страницы технического клана с определением глашатаев
       function parseTechClan(html, battleIdsSet) {
         let h1Start = html.indexOf("<h1");
         if (h1Start === -1) return { clanName: "", members: [] };
@@ -347,6 +347,22 @@
         if (bStart !== -1 && bEnd !== -1) {
           clanName = h1Content.substring(bStart + 3, bEnd).trim();
         }
+        // Определяем глашатаев: ищем подстроку после "<b>Глашатай:</b>" до ближайшего "<BR>"
+        let heraldSet = new Set();
+        let heraldMarker = "<b>Глашатай:</b>";
+        let heraldIndex = html.indexOf(heraldMarker);
+        if (heraldIndex !== -1) {
+          let brIndex = html.indexOf("<BR>", heraldIndex);
+          if (brIndex !== -1) {
+            let heraldSection = html.substring(heraldIndex, brIndex);
+            let regex = /pl_info\.php\?id=(\d+)/g;
+            let match;
+            while ((match = regex.exec(heraldSection)) !== null) {
+              heraldSet.add(match[1]);
+            }
+          }
+        }
+        // Парсим таблицу с игроками
         let tableIndex = html.lastIndexOf("<table");
         if (tableIndex === -1) return { clanName, members: [] };
         let tableEnd = html.indexOf("</table>", tableIndex);
@@ -373,36 +389,32 @@
                 let nameEnd = trContent.indexOf("<", nameStart);
                 if (nameEnd !== -1) {
                   let playerName = trContent.substring(nameStart, nameEnd).trim();
-                  let prefix = trContent.substring(0, playerAnchorIndex);
-                  let joinedBattleClanId = null;
-                  let joinedBattleClanName = null;
-                  let battleAnchorIndex = prefix.indexOf("clan_info.php?id=");
-                  if (battleAnchorIndex !== -1) {
-                    let bcidStart = battleAnchorIndex + "clan_info.php?id=".length;
-                    let bcidEnd = prefix.indexOf("\"", bcidStart);
-                    if (bcidEnd === -1) { bcidEnd = prefix.indexOf("'", bcidStart); }
-                    if (bcidEnd !== -1) {
-                      joinedBattleClanId = prefix.substring(bcidStart, bcidEnd).trim();
-                    }
-                    let titleIndex = prefix.indexOf("title='", battleAnchorIndex);
-                    if (titleIndex !== -1) {
-                      titleIndex += "title='".length;
-                      let titleEnd = prefix.indexOf("'", titleIndex);
-                      if (titleEnd !== -1) {
-                        joinedBattleClanName = prefix.substring(titleIndex, titleEnd).trim();
-                      }
-                    }
-                  }
+                  // Определяем, является ли игрок глашатаем
+                  let isHerald = heraldSet.has(playerId);
                   let score = null;
                   let classification = "clanless";
-                  if (joinedBattleClanId) {
-                    classification = battleIdsSet.has(joinedBattleClanId) ? "member" : "enemy";
+                  if (!isHerald && trContent.indexOf("clan_info.php?id=") !== -1) {
+                    // Если у игрока есть ссылка на боевой клан, то классифицируем его по battleIdsSet
+                    // (аналогично прежней логике)
+                    let prefix = trContent.substring(0, playerAnchorIndex);
+                    let battleAnchorIndex = prefix.indexOf("clan_info.php?id=");
+                    if (battleAnchorIndex !== -1) {
+                      let bcidStart = battleAnchorIndex + "clan_info.php?id=".length;
+                      let bcidEnd = prefix.indexOf("\"", bcidStart);
+                      if (bcidEnd === -1) { bcidEnd = prefix.indexOf("'", bcidStart); }
+                      if (bcidEnd !== -1) {
+                        let joinedBattleClanId = prefix.substring(bcidStart, bcidEnd).trim();
+                        classification = battleIdsSet.has(joinedBattleClanId) ? "member" : "enemy";
+                      }
+                    }
                   }
                   members.push({
                     id: playerId,
                     name: playerName,
-                    joinedBattleClanId: joinedBattleClanId,
-                    joinedBattleClanName: joinedBattleClanName,
+                    isHerald: isHerald,
+                    // Остальные поля как раньше:
+                    joinedBattleClanId: null, // если требуется, можно расширить логику для получения этой информации
+                    joinedBattleClanName: null,
                     score: score,
                     classification: classification
                   });
@@ -428,9 +440,27 @@
           const columns = document.createElement('div');
           columns.style.display = 'flex';
           columns.style.gap = '10px';
+          // Новая колонка "Сделать глашатаем" – для игроков, у которых isHerald===false
+          let heraldCandidates = {};
+          clan.heraldCandidates && Object.assign(heraldCandidates, clan.heraldCandidates);
+          // Если результатов по глашатаю ещё нет, сформируем их из всех технических кланов
+          if (!Object.keys(heraldCandidates).length) {
+            clan.members.forEach(member => {
+              if (!member.isHerald) {
+                let key = member.joinedBattleClanId || "без_боевого_клана";
+                if (!heraldCandidates[key]) {
+                  heraldCandidates[key] = { clanName: member.joinedBattleClanName || "Без боевого клана", players: [] };
+                }
+                heraldCandidates[key].players.push(member);
+              }
+            });
+          }
+          const heraldCollapsible = createGroupedCollapsible(heraldCandidates, 'Сделать глашатаем', 'herald');
           const inviteCollapsible = createGroupedCollapsible(clan.inviteGroups, 'Нужно пригласить', 'invite');
           const enemyCollapsible = createGroupedCollapsible(clan.enemyGroups, 'Ушёл во вражеские кланы', 'enemy');
           const clanlessCollapsible = createCollapsible('Без клана', clan.clanlessList, 'clanless');
+          // Новый порядок: сначала "Сделать глашатаем", затем "Нужно пригласить", затем остальные
+          columns.appendChild(heraldCollapsible);
           columns.appendChild(inviteCollapsible);
           columns.appendChild(enemyCollapsible);
           columns.appendChild(clanlessCollapsible);
@@ -468,12 +498,11 @@
             playersDict[member.id] = member.name;
           });
         });
+        // Сохраняем словари
         localStorage.setItem('clansDict', JSON.stringify(clansDict));
         localStorage.setItem('playersDict', JSON.stringify(playersDict));
         const excludeList = document.getElementById('excludePlayers')
-          .value.split('\n')
-          .map(s => s.trim())
-          .filter(Boolean);
+          .value.split('\n').map(s => s.trim()).filter(Boolean);
         const parsedTechClansFiltered = parsedTechClans.map(techClan => ({
           ...techClan,
           members: techClan.members.filter(member => !excludeList.includes(member.id))
@@ -512,14 +541,27 @@
             }
           });
           const clanlessList = techClan.members.filter(member => member.classification === 'clanless');
+          // Формируем список кандидатов на глашатая: игроки, у которых isHerald === false
+          const heraldCandidates = {};
+          techClan.members.forEach(member => {
+            if (!member.isHerald) {
+              let key = member.joinedBattleClanId || "без_боевого_клана";
+              if (!heraldCandidates[key]) {
+                heraldCandidates[key] = { clanName: member.joinedBattleClanName || "Без боевого клана", players: [] };
+              }
+              heraldCandidates[key].players.push(member);
+            }
+          });
           return {
             clanId: techClan.clanId,
             clanName: techClan.clanName,
+            heraldCandidates,  // новый список
             inviteGroups,
             enemyGroups,
             clanlessList
           };
         });
+        // Дополнительная фильтрация по excludeList для всех групп
         resultsObj.forEach(clan => {
           Object.keys(clan.inviteGroups).forEach(key => {
             clan.inviteGroups[key].players = clan.inviteGroups[key].players.filter(
@@ -534,10 +576,16 @@
           clan.clanlessList = clan.clanlessList.filter(
             player => !excludeList.includes(player.id)
           );
+          // И фильтрация для списка кандидатов на глашатая
+          Object.keys(clan.heraldCandidates).forEach(key => {
+            clan.heraldCandidates[key].players = clan.heraldCandidates[key].players.filter(
+              player => !excludeList.includes(player.id)
+            );
+          });
         });
         displayResults(resultsObj);
         localStorage.setItem('results', JSON.stringify(resultsObj));
-        // После обработки обновляем правые поля для всех входных данных
+        // После обработки обновляем правые поля для входных данных
         updateRightInput('techClans', 'techClansOutput');
         updateRightInput('battleClans', 'battleClansOutput');
         updateRightInput('excludePlayers', 'excludePlayersOutput');
