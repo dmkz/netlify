@@ -8,7 +8,23 @@
     body { font-family: Arial, sans-serif; margin: 20px; }
     .container { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
     .field { flex: 1; min-width: 300px; }
-    textarea { width: 100%; height: 200px; font-family: monospace; }
+    /* Новый контейнер для разделённого поля ввода */
+    .split-field {
+      display: flex;
+      gap: 10px;
+    }
+    /* Левая (редактируемая) часть – 16.67% */
+    .left-input {
+      width: 16.67%;
+      height: 100px;
+      font-family: monospace;
+    }
+    /* Правая (только чтение) часть – 83.33% */
+    .right-output {
+      width: 83.33%;
+      height: 100px;
+      font-family: monospace;
+    }
     button { padding: 10px 20px; font-size: 16px; }
     .collapsible { margin-bottom: 10px; border: 1px solid #ccc; }
     .collapsible-header { background-color: #f0f0f0; padding: 5px; cursor: pointer; }
@@ -24,21 +40,33 @@
 <body>
   <h1>Администрирование тех. клана</h1>
   <div class="container">
+    <!-- Технические кланы -->
     <div class="field">
       <h3>Технические кланы<br/>(ID, по одному в строке)</h3>
-      <textarea id="techClans">9098</textarea>
+      <div class="split-field">
+        <textarea class="left-input" id="techClans">9098</textarea>
+        <textarea class="right-output" id="techClansOutput" readonly></textarea>
+      </div>
     </div>
+    <!-- Боевые кланы -->
     <div class="field">
       <h3>Боевые кланы<br/>(ID, по одному в строке)</h3>
-      <textarea id="battleClans">1209
+      <div class="split-field">
+        <textarea class="left-input" id="battleClans">1209
 7490
 7705
 9595
 5722</textarea>
+        <textarea class="right-output" id="battleClansOutput" readonly></textarea>
+      </div>
     </div>
+    <!-- Особенные игроки -->
     <div class="field">
       <h3>Особенные игроки<br/>(ID, по одному в строке)</h3>
-      <textarea id="excludePlayers"></textarea>
+      <div class="split-field">
+        <textarea class="left-input" id="excludePlayers"></textarea>
+        <textarea class="right-output" id="excludePlayersOutput" readonly></textarea>
+      </div>
     </div>
   </div>
   <!-- Элемент для статуса запроса -->
@@ -50,6 +78,28 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       console.log('clan2.html loaded');
+
+      // Функция обновления правых полей по содержимому левых
+      function updateRightInput(leftId, rightId) {
+        const left = document.getElementById(leftId);
+        const right = document.getElementById(rightId);
+        if (left && right) {
+          right.value = left.value;
+        }
+      }
+      // При изменении каждого левого поля обновляем соответствующее правое
+      ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
+        const left = document.getElementById(id);
+        const right = document.getElementById(id + 'Output');
+        if (left && right) {
+          // Обновляем сразу при загрузке
+          updateRightInput(id, id + 'Output');
+          left.addEventListener('input', () => {
+            updateRightInput(id, id + 'Output');
+            saveField(id); // сохраняем в localStorage
+          });
+        }
+      });
 
       // Функции для работы со сворачиваемыми блоками
       function findClosestGrouped(el) {
@@ -99,7 +149,7 @@
           const btn = document.createElement('button');
           btn.textContent = '✖';
           btn.classList.add('remove-button');
-          // Используем вашу версию кода для удаления строки и обновления счётчиков
+          // Ваша версия удаления строки и обновления счётчиков:
           btn.addEventListener('click', () => {
               // Сначала ищем внешний grouped‑контейнер, начиная от текущей строки (tr)
               let outerGrouped = tr;
@@ -124,7 +174,7 @@
                 console.log("Внутренний счётчик обновлён:", header.textContent);
               }
               
-              // Если мы нашли outerGrouped до удаления, обновляем его счётчик
+              // Если нашли outerGrouped, обновляем его счётчик
               if (outerGrouped) {
                 updateGroupedHeader(outerGrouped);
               } else {
@@ -138,6 +188,8 @@
                 currentExcludes.push(item.id);
                 excludeTextarea.value = currentExcludes.join('\n');
                 localStorage.setItem('excludePlayers', excludeTextarea.value);
+                // Также обновляем правое поле для исключённых игроков
+                updateRightInput('excludePlayers', 'excludePlayersOutput');
               }
           });
           tdButton.appendChild(btn);
@@ -341,7 +393,6 @@
       }
 
       function renderResults(data) {
-        // Парсим боевые кланы
         const parsedBattleClans = data.battleClans.map(bc => {
           const parsed = parseBattleClan(bc.html, bc.clanId);
           return { clanId: bc.clanId, clanName: parsed.clanName, members: parsed.members };
@@ -366,7 +417,6 @@
           ...techClan,
           members: techClan.members.filter(member => !excludeList.includes(member.id))
         }));
-        // Формируем итоговый результат для каждого технического клана
         const results = parsedTechClansFiltered.map(techClan => {
           const techMemberIds = new Set(techClan.members.map(m => m.id));
           const inviteGroups = {};
@@ -445,7 +495,6 @@
           clanContainer.appendChild(columns);
           resultsDiv.appendChild(clanContainer);
         });
-        // Сохраняем содержимое сгруппированных списков в localStorage
         localStorage.setItem('results', resultsDiv.innerHTML);
       }
 
