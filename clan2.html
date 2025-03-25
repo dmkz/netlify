@@ -8,23 +8,17 @@
     body { font-family: Arial, sans-serif; margin: 20px; }
     .container { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
     .field { flex: 1; min-width: 300px; }
-    /* Новый контейнер для разделённого поля ввода */
+    /* Контейнер для разделённого поля ввода */
     .split-field {
       display: flex;
       gap: 10px;
     }
-    /* Левая (редактируемая) часть – 16.67% */
-    .left-input {
-      width: 16.67%;
-      height: 100px;
-      font-family: monospace;
-    }
-    /* Правая (только чтение) часть – 83.33% */
-    .right-output {
-      width: 83.33%;
-      height: 100px;
-      font-family: monospace;
-    }
+    /* По умолчанию левая часть имеет 16.67%, правая – 83.33% */
+    .left-input { width: 16.67%; height: 100px; font-family: monospace; }
+    .right-output { width: 83.33%; height: 100px; font-family: monospace; }
+    /* Для поля "Особенные игроки" переопределяем ширины */
+    #excludePlayers { width: 25% !important; }
+    #excludePlayersOutput { width: 75% !important; }
     button { padding: 10px 20px; font-size: 16px; }
     .collapsible { margin-bottom: 10px; border: 1px solid #ccc; }
     .collapsible-header { background-color: #f0f0f0; padding: 5px; cursor: pointer; }
@@ -78,17 +72,11 @@
     document.addEventListener('DOMContentLoaded', () => {
       console.log('clan2.html loaded');
 
-      // Глобальные словари: clansDict и playersDict
-      let clansDict = {};
-      let playersDict = {};
-      try {
-        clansDict = JSON.parse(localStorage.getItem('clansDict')) || {};
-      } catch (e) { clansDict = {}; }
-      try {
-        playersDict = JSON.parse(localStorage.getItem('playersDict')) || {};
-      } catch (e) { playersDict = {}; }
+      // Глобальные словари: для кланов и игроков
+      let clansDict = JSON.parse(localStorage.getItem('clansDict')) || {};
+      let playersDict = JSON.parse(localStorage.getItem('playersDict')) || {};
 
-      // Функция обновления правых полей по содержимому левых
+      // Функция обновления правых полей с использованием словарей
       function updateRightInput(leftId, rightId) {
         const left = document.getElementById(leftId);
         const right = document.getElementById(rightId);
@@ -96,15 +84,23 @@
           const lines = left.value.split('\n').map(s => s.trim()).filter(Boolean);
           let newLines = [];
           if (leftId === "excludePlayers") {
+            // Для особенных игроков используем playersDict
             newLines = lines.map(line => playersDict[line] || "неизвестный игрок");
-          } else { // techClans и battleClans
+          } else {
+            // Для тех. и боевых кланов используем clansDict
             newLines = lines.map(line => clansDict[line] || "неизвестный клан");
           }
           right.value = newLines.join('\n');
         }
       }
 
-      // При изменении каждого левого поля обновляем соответствующее правое и сохраняем значение
+      // Функция синхронизации скролла для пары элементов
+      function syncScroll(el1, el2) {
+        el1.addEventListener('scroll', () => { el2.scrollTop = el1.scrollTop; });
+        el2.addEventListener('scroll', () => { el1.scrollTop = el2.scrollTop; });
+      }
+
+      // При изменении каждого левого поля обновляем правое и сохраняем значение
       ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
         const left = document.getElementById(id);
         const right = document.getElementById(id + 'Output');
@@ -114,6 +110,8 @@
             updateRightInput(id, id + 'Output');
             saveField(id);
           });
+          // Синхронизируем скролл
+          syncScroll(left, right);
         }
       });
 
@@ -179,7 +177,7 @@
           const btn = document.createElement('button');
           btn.textContent = '✖';
           btn.classList.add('remove-button');
-          // Ваша версия удаления строки и обновления счётчиков:
+          // Ваша версия удаления строки с обновлением счётчиков:
           btn.addEventListener('click', () => {
               let outerGrouped = tr;
               while (outerGrouped && (outerGrouped.nodeType !== Node.ELEMENT_NODE || !outerGrouped.classList.contains('grouped'))) {
@@ -441,16 +439,14 @@
         });
       }
 
-      // Функция renderResults получает данные с сервера, формирует объект результатов, создаёт словари и обновляет правые поля
+      // Функция renderResults получает данные с сервера, формирует объект результатов, обновляет словари и правые поля, и сохраняет результаты как JSON
       function renderResults(data) {
         const parsedBattleClans = data.battleClans.map(bc => {
           const parsed = parseBattleClan(bc.html, bc.clanId);
           return { clanId: bc.clanId, clanName: parsed.clanName, members: parsed.members };
         });
         parsedBattleClans.forEach(bc => {
-          // Заполняем словарь кланов
           clansDict[bc.clanId] = bc.clanName;
-          // Заполняем словарь игроков
           bc.members.forEach(member => {
             playersDict[member.id] = member.name;
           });
@@ -467,16 +463,13 @@
           return { clanId: tc.clanId, clanName: parsed.clanName, members: parsed.members };
         });
         parsedTechClans.forEach(tc => {
-          // Обновляем словарь кланов
           clansDict[tc.clanId] = tc.clanName;
           tc.members.forEach(member => {
             playersDict[member.id] = member.name;
           });
         });
-        // Сохраняем словари в localStorage
         localStorage.setItem('clansDict', JSON.stringify(clansDict));
         localStorage.setItem('playersDict', JSON.stringify(playersDict));
-
         const excludeList = document.getElementById('excludePlayers')
           .value.split('\n')
           .map(s => s.trim())
@@ -527,7 +520,6 @@
             clanlessList
           };
         });
-        // Дополнительная фильтрация по excludeList для всех групп
         resultsObj.forEach(clan => {
           Object.keys(clan.inviteGroups).forEach(key => {
             clan.inviteGroups[key].players = clan.inviteGroups[key].players.filter(
@@ -551,7 +543,7 @@
         updateRightInput('excludePlayers', 'excludePlayersOutput');
       }
 
-      // При загрузке страницы, если сохранён JSON с результатами, отрисовываем его
+      // При загрузке страницы, если сохранённый JSON с результатами существует, отрисовываем его
       const savedResults = localStorage.getItem('results');
       if (savedResults) {
         try {
