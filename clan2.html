@@ -65,7 +65,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       console.log('clan2.html loaded');
 
-      // Функция, которая поднимается по дереву с использованием parentNode
+      // Функции для работы с "сворачиваемыми" блоками (collapsible)
       function findClosestGrouped(el) {
         while (el) {
           if (el.nodeType === Node.ELEMENT_NODE && el.classList.contains('grouped')) {
@@ -186,17 +186,156 @@
         return container;
       }
 
+      // Новые функции для парсинга HTML-страниц кланов, полученных с сервера
+      function parseTechClan(html, battleIdsSet) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const h1 = doc.querySelector('h1');
+        const clanName = h1 ? h1.textContent.trim() : '';
+        const tables = doc.querySelectorAll('table');
+        const lastTable = tables[tables.length - 1];
+        let members = [];
+        if (lastTable) {
+          const rows = lastTable.querySelectorAll('tr');
+          rows.forEach(tr => {
+            const links = tr.querySelectorAll('a[href*="pl_info.php?id="]');
+            if (links.length === 0) return;
+            const aPlayer = links[links.length - 1];
+            const href = aPlayer.getAttribute('href');
+            const idMatch = href.match(/pl_info\.php\?id=(\d+)/);
+            if (!idMatch) return;
+            const playerId = idMatch[1];
+            const playerName = aPlayer.textContent.trim();
+            let classification = 'clanless';
+            let joinedBattleClanId = null;
+            let joinedBattleClanName = null;
+            const rowHtml = tr.innerHTML;
+            const playerLinkHtml = aPlayer.outerHTML;
+            const index = rowHtml.indexOf(playerLinkHtml);
+            if (index !== -1) {
+              const beforePlayer = rowHtml.substring(0, index);
+              const battleMatch = beforePlayer.match(/<a\s+href=["']clan_info\.php\?id=(\d+)["'][^>]*title=['"]([^'"]+)['"]/);
+              if (battleMatch) {
+                joinedBattleClanId = battleMatch[1];
+                joinedBattleClanName = battleMatch[2];
+                if (battleIdsSet.has(joinedBattleClanId)) {
+                  classification = "member";
+                } else {
+                  classification = "enemy";
+                }
+              }
+            }
+            members.push({ id: playerId, name: playerName, classification, joinedBattleClanId, joinedBattleClanName });
+          });
+        }
+        return { clanName, members };
+      }
+
+      function parseBattleClan(html, battleClanId) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const h1 = doc.querySelector('h1');
+        const clanName = h1 ? h1.textContent.trim() : '';
+        const tables = doc.querySelectorAll('table');
+        const lastTable = tables[tables.length - 1];
+        let members = [];
+        if (lastTable) {
+          const rows = lastTable.querySelectorAll('tr');
+          rows.forEach(tr => {
+            const links = tr.querySelectorAll('a[href*="pl_info.php?id="]');
+            if (links.length === 0) return;
+            const aPlayer = links[links.length - 1];
+            const href = aPlayer.getAttribute('href');
+            const idMatch = href.match(/pl_info\.php\?id=(\d+)/);
+            if (!idMatch) return;
+            const playerId = idMatch[1];
+            const playerName = aPlayer.textContent.trim();
+            members.push({ id: playerId, name: playerName, classification: 'member', joinedBattleClanId: battleClanId, joinedBattleClanName: clanName });
+          });
+        }
+        return { clanName, members };
+      }
+
+      // Функция, которая получает HTML-данные с сервера, парсит их и формирует итоговый результат
       function renderResults(data) {
-        // На клиенте фильтруем enemy-группы: удаляем игроков, указанных в excludePlayers
-        const excludeList = document.getElementById('excludePlayers').value.split('\n').map(s => s.trim()).filter(Boolean);
-        data.forEach(clan => {
-          Object.keys(clan.enemyGroups).forEach(key => {
-            clan.enemyGroups[key].players = clan.enemyGroups[key].players.filter(player => !excludeList.includes(player.id));
+        // Создаем набор ID боевых кланов (для технических кланов)
+        const battleIdsSet = new Set(data.battleClans.map(b => b.clanId));
+
+        // Парсим данные боевых кланов
+        const parsedBattleClans = data.battleClans.map(bc => {
+          const parsed = parseBattleClan(bc.html, bc.clanId);
+          return { clanId: bc.clanId, clanName: parsed.clanName, members: parsed.members };
+        });
+
+        // Создаем мапу участников боевых кланов для формирования группы "Нужно пригласить"
+        const battleMembersMap = new Map();
+        parsedBattleClans.forEach(bc => {
+          bc.members.forEach(member => {
+            battleMembersMap.set(member.id, { clanId: bc.clanId, clanName: bc.clanName });
           });
         });
+
+        // Парсим данные технических кланов
+        const parsedTechClans = data.techClans.map(tc => {
+          const parsed = parseTechClan(tc.html, battleIdsSet);
+          return { clanId: tc.clanId, clanName: parsed.clanName, members: parsed.members };
+        });
+
+        // Формируем итоговый результат для каждого технического клана
+        const results = parsedTechClans.map(techClan => {
+          const techMemberIds = new Set(techClan.members.map(m => m.id));
+
+          // inviteGroups: игроки, числящиеся в боевых кланах, но отсутствующие в техническом клане
+          const inviteGroups = {};
+          battleMembersMap.forEach((info, memberId) => {
+            if (!techMemberIds.has(memberId)) {
+              if (!inviteGroups[info.clanId]) {
+                inviteGroups[info.clanId] = { clanName: info.clanName, players: [] };
+              }
+              const battleClan = parsedBattleClans.find(bc => bc.clanId === info.clanId);
+              if (battleClan) {
+                const memberDetail = battleClan.members.find(m => m.id === memberId);
+                if (memberDetail) {
+                  inviteGroups[info.clanId].players.push(memberDetail);
+                }
+              }
+            }
+          });
+
+          // enemyGroups: игроки технического клана, классифицированные как "enemy"
+          const enemyGroups = {};
+          techClan.members.forEach(member => {
+            if (member.classification === 'enemy') {
+              if (member.joinedBattleClanId) {
+                if (!enemyGroups[member.joinedBattleClanId]) {
+                  enemyGroups[member.joinedBattleClanId] = { clanName: member.joinedBattleClanName || 'Неизвестный', players: [] };
+                }
+                enemyGroups[member.joinedBattleClanId].players.push(member);
+              } else {
+                if (!enemyGroups['unknown']) {
+                  enemyGroups['unknown'] = { clanName: 'Неизвестный', players: [] };
+                }
+                enemyGroups['unknown'].players.push(member);
+              }
+            }
+          });
+
+          // clanlessList: игроки, для которых не обнаружена ссылка на боевой клан
+          const clanlessList = techClan.members.filter(member => member.classification === 'clanless');
+
+          return {
+            clanId: techClan.clanId,
+            clanName: techClan.clanName,
+            inviteGroups,
+            enemyGroups,
+            clanlessList
+          };
+        });
+
+        // Отображаем результат
         const resultsDiv = document.getElementById('results');
         resultsDiv.innerHTML = '';
-        data.forEach(clan => {
+        results.forEach(clan => {
           const clanContainer = document.createElement('div');
           clanContainer.style.marginBottom = '20px';
           const title = document.createElement('h3');
@@ -215,9 +354,10 @@
           resultsDiv.appendChild(clanContainer);
         });
         // Для отладки: выводим сырые данные в дополнительное поле
-        document.getElementById('rawData').value = JSON.stringify(data, null, 2);
+        document.getElementById('rawData').value = JSON.stringify(results, null, 2);
       }
 
+      // Функции для сохранения/загрузки значений полей из localStorage
       function saveField(id) {
         const value = document.getElementById(id).value;
         localStorage.setItem(id, value);
