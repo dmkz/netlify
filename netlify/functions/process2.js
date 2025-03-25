@@ -11,48 +11,42 @@ async function fetchAndDecode(url) {
   return iconv.decode(Buffer.from(buffer), 'windows-1251');
 }
 
-// Функция для разбора страницы клана
-// isTechnical === true для технического клана (в котором мы ищем информацию о боевом клане у каждого игрока)
-// isTechnical === false для боевого клана (просто собираем список участников)
+// Функция для разбора страницы клана.
+// isTechnical === true: для технического клана, где мы пытаемся извлечь информацию о боевом клане у каждого участника.
+// battleIdsSet – множество ID боевых кланов, переданное пользователем.
 function parseClanPage(html, isTechnical, battleIdsSet) {
   const $ = cheerio.load(html);
   const clanName = $('h1').first().text().trim();
   const tables = $('table');
   const lastTable = tables.last();
   let members = [];
-  
   lastTable.find('tr').each((i, tr) => {
-    // Находим последний элемент-ссылку, который содержит информацию об игроке
+    const rowHtml = $(tr).html();
+    // Находим ссылку игрока (используем последнюю найденную ссылку на страницу игрока)
     const aPlayer = $(tr).find('a[href*="pl_info.php?id="]').last();
     if (!aPlayer.length) return;
-    const hrefMatch = aPlayer.attr('href').match(/pl_info\.php\?id=(\d+)/);
-    if (!hrefMatch) return;
-    const playerId = hrefMatch[1];
+    const idMatch = aPlayer.attr('href').match(/pl_info\.php\?id=(\d+)/);
+    if (!idMatch) return;
+    const playerId = idMatch[1];
     const playerName = aPlayer.text().trim();
-    
-    // По умолчанию считаем, что игрок не числится ни в каком боевом клане
+    // По умолчанию считаем игрока без боевого клана
     let classification = "clanless";
     let joinedBattleClanId = null;
     let joinedBattleClanName = null;
-    
     if (isTechnical) {
-      // Получаем HTML строки
-      const rowHtml = $(tr).html();
-      // Определяем позицию HTML последней ссылки игрока
+      // Определяем, есть ли в HTML строки перед ссылкой игрока ссылка на боевой клан.
       const playerLinkHtml = aPlayer[0].outerHTML;
       const index = rowHtml.indexOf(playerLinkHtml);
       if (index !== -1) {
-        // Берем часть строки до ссылки игрока
         const beforePlayer = rowHtml.substring(0, index);
-        // Ищем в этой части ссылку на клан с атрибутом title
-        // При этом допускаются как одинарные, так и двойные кавычки
+        // Регулярное выражение ищет: <a href="clan_info.php?id=XXX" ... title='YYY'>
         const battleMatch = beforePlayer.match(/<a href=["']clan_info\.php\?id=(\d+)["'][^>]*title=['"]([^'"]+)['"]/);
         if (battleMatch) {
           joinedBattleClanId = battleMatch[1];
           joinedBattleClanName = battleMatch[2];
-          // Если найденный боевой клан входит в список переданных боевых кланов,
-          // считаем, что игрок числится в нужном боевом клане ("member"), иначе – ушёл во вражеский ("enemy")
-          if (battleIdsSet.has(joinedBattleClanId)) {
+          // Если найденный боевой клан входит в переданное множество – считаем, что игрок числится корректно ("member"),
+          // иначе – игрок ушёл во вражеский клан ("enemy").
+          if (battleIdsSet && battleIdsSet.has(joinedBattleClanId)) {
             classification = "member";
           } else {
             classification = "enemy";
@@ -60,26 +54,16 @@ function parseClanPage(html, isTechnical, battleIdsSet) {
         }
       }
     }
-    
-    members.push({
-      id: playerId,
-      name: playerName,
-      classification,
-      joinedBattleClanId,
-      joinedBattleClanName
-    });
+    members.push({ id: playerId, name: playerName, classification, joinedBattleClanId, joinedBattleClanName });
   });
-  
   return { clanName, members };
 }
 
 exports.handler = async (event, context) => {
   console.log('Получен запрос:', event.httpMethod);
   if (event.httpMethod !== 'POST') {
-    console.log('Неподдерживаемый HTTP метод:', event.httpMethod);
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
-  
   try {
     const { default: fetch } = await import('node-fetch');
     const body = JSON.parse(event.body);
@@ -90,8 +74,6 @@ exports.handler = async (event, context) => {
     const battleIds = battleClanIds.split('\n').map(s => s.trim()).filter(Boolean);
     console.log('Технические кланы (IDs):', techIds);
     console.log('Боевые кланы (IDs):', battleIds);
-    
-    // Создаем множество для боевых кланов для быстрой проверки
     const battleIdsSet = new Set(battleIds);
     
     // Получаем информацию по техническим кланам
@@ -100,7 +82,7 @@ exports.handler = async (event, context) => {
       console.log(`Запрос технического клана ${id} по URL: ${url}`);
       const html = await fetchAndDecode(url);
       const { clanName, members } = parseClanPage(html, true, battleIdsSet);
-      console.log(`Технический клан ${id} (${clanName}) – найдено участников: ${members.length}`);
+      console.log(`Технический клан ${id} (${clanName}) — найдено участников: ${members.length}`);
       return { clanId: id, clanName, members };
     }));
     
@@ -110,15 +92,15 @@ exports.handler = async (event, context) => {
       console.log(`Запрос боевого клана ${id} по URL: ${url}`);
       const html = await fetchAndDecode(url);
       const { clanName, members } = parseClanPage(html, false, null);
-      console.log(`Боевой клан ${id} (${clanName}) – найдено участников: ${members.length}`);
+      console.log(`Боевой клан ${id} (${clanName}) — найдено участников: ${members.length}`);
       return { battleClanId: id, battleClanName: clanName, members };
     }));
     
-    // Создаем мапу участников боевых кланов: key = player id, value = { clanId, clanName }
+    // Создаем мапу участников боевых кланов для формирования списка приглашения
     const battleMembersMap = new Map();
-    battleClans.forEach(battleClan => {
-      battleClan.members.forEach(member => {
-        battleMembersMap.set(member.id, { clanId: battleClan.battleClanId, clanName: battleClan.battleClanName });
+    battleClans.forEach(bc => {
+      bc.members.forEach(member => {
+        battleMembersMap.set(member.id, { clanId: bc.battleClanId, clanName: bc.battleClanName });
       });
     });
     
@@ -126,7 +108,7 @@ exports.handler = async (event, context) => {
     const results = techClans.map(techClan => {
       const techMemberIds = new Set(techClan.members.map(m => m.id));
       
-      // inviteGroups: игроки, которые числятся в боевых кланах (собранных из battleClans),
+      // inviteGroups: игроки, которые числятся в боевых кланах (по данным с боевых кланов),
       // но отсутствуют в техническом клане
       const inviteGroups = {};
       battleMembersMap.forEach((info, memberId) => {
@@ -134,7 +116,6 @@ exports.handler = async (event, context) => {
           if (!inviteGroups[info.clanId]) {
             inviteGroups[info.clanId] = { clanName: info.clanName, players: [] };
           }
-          // Находим информацию о игроке в списке участников соответствующего боевого клана
           const battleClan = battleClans.find(bc => bc.battleClanId === info.clanId);
           if (battleClan) {
             const memberDetail = battleClan.members.find(m => m.id === memberId);
@@ -145,8 +126,8 @@ exports.handler = async (event, context) => {
         }
       });
       
-      // enemyGroups: из технического клана выбираем тех, кто имеет battle-ссылку,
-      // но эта ссылка (joinedBattleClanId) не входит в переданные battleIdsSet
+      // enemyGroups: из технического клана выбираем тех, которые имеют battle-ссылку,
+      // и если их joinedBattleClanId отсутствует в battleIdsSet – считаем, что они ушли во вражеский клан
       const enemyGroups = {};
       techClan.members.forEach(member => {
         if (member.classification === 'enemy') {
@@ -164,12 +145,12 @@ exports.handler = async (event, context) => {
         }
       });
       
-      // clanlessList: игроки технического клана без battle-ссылки
+      // clanlessList: игроки технического клана без ссылки на боевой клан
       const clanlessList = techClan.members.filter(member => member.classification === 'clanless');
       
       return {
-        techClanId: techClan.clanId,
-        techClanName: techClan.clanName,
+        clanId: techClan.clanId,
+        clanName: techClan.clanName,
         inviteGroups,
         enemyGroups,
         clanlessList
