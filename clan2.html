@@ -514,9 +514,14 @@
       // При загрузке страницы, если в localStorage есть сохранённый JSON с результатами, отрисовываем его
       const savedResults = localStorage.getItem('results');
       if (savedResults) {
-        const resultsObj = JSON.parse(savedResults);
-        displayResults(resultsObj);
-      }
+          try {
+            const resultsObj = JSON.parse(savedResults);
+            displayResults(resultsObj);
+          } catch (e) {
+            console.error('Ошибка при парсинге сохранённых результатов, удаляем данные из localStorage', e);
+            localStorage.removeItem('results');
+          }
+        }
 
       function animateStatus(messageElement, baseText) {
         let dots = 0;
