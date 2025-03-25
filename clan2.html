@@ -31,10 +31,10 @@
       overflow-y: scroll;
     }
     /* Контейнер для отладки боевых кланов */
-    #debugOutput {
+    #debugOutput, #debugTechOutput {
       margin-top: 20px;
     }
-    #debugOutput textarea {
+    #debugOutput textarea, #debugTechOutput textarea {
       margin-bottom: 10px;
     }
   </style>
@@ -70,6 +70,9 @@
   <!-- Контейнер для отладочного вывода боевых кланов -->
   <h2>Отладка боевых кланов:</h2>
   <div id="debugOutput"></div>
+  <!-- Контейнер для отладочного вывода технических кланов -->
+  <h2>Отладка технических кланов:</h2>
+  <div id="debugTechOutput"></div>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -192,7 +195,7 @@
         return container;
       }
 
-      // Упрощённый парсинг HTML-страницы боевого клана с извлечением поля score
+      // Упрощённый парсинг HTML-страницы боевого клана (оставляем без изменений)
       function parseBattleClan(html, battleClanId) {
         // Найти заголовок <h1> и извлечь его содержимое
         let h1Start = html.indexOf("<h1");
@@ -226,12 +229,10 @@
           let anchorIndex = trContent.indexOf("pl_info.php?id=");
           if (anchorIndex !== -1) {
             let idStart = anchorIndex + "pl_info.php?id=".length;
-            // Ищем завершающую кавычку (одинарную или двойную)
             let idEnd = trContent.indexOf("'", idStart);
             if (idEnd === -1) { idEnd = trContent.indexOf("\"", idStart); }
             if (idEnd !== -1) {
               let playerId = trContent.substring(idStart, idEnd).trim();
-              // Ищем текст между символом ">" и следующим "<"
               let nameStart = trContent.indexOf(">", idEnd);
               if (nameStart !== -1) {
                 nameStart++;
@@ -244,13 +245,11 @@
                   if (tdLastIndex !== -1) {
                     let tdStart = trContent.indexOf(">", tdLastIndex);
                     if (tdStart !== -1) {
-                      tdStart++; // начало содержимого td
+                      tdStart++;
                       let tdEnd = trContent.indexOf("</td>", tdStart);
                       if (tdEnd !== -1) {
                         let tdContent = trContent.substring(tdStart, tdEnd);
-                        // Удаляем все HTML-теги и спецсимволы &nbsp;
-                        tdContent = tdContent.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, "");
-                        tdContent = tdContent.trim();
+                        tdContent = tdContent.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, "").trim();
                         score = tdContent === "" ? "0" : tdContent;
                       }
                     }
@@ -267,14 +266,13 @@
               }
             }
           }
-          pos = trEnd + 5; // переходим за "</tr>"
+          pos = trEnd + 5;
         }
-        // Формирование отладочного текста
+        // Формирование отладочного текста для боевого клана
         let debugText = `Клан: ${clanName}\nУчастников: ${members.length}\n`;
         members.forEach((member, index) => {
           debugText += `Игрок ${index + 1}: ${member.name} (ID: ${member.id}), Score: ${member.score}\n`;
         });
-        // Выводим отладочную информацию в отдельное текстовое поле
         let debugContainer = document.getElementById("debugOutput");
         if (!debugContainer) {
           debugContainer = document.createElement("div");
@@ -290,54 +288,122 @@
         return { clanName, members };
       }
 
-      // Функция для парсинга технического клана (без изменений)
+      // Упрощённый парсинг HTML-страницы технического клана
       function parseTechClan(html, battleIdsSet) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const h1 = doc.querySelector('h1');
-        const clanName = h1 ? h1.textContent.trim() : '';
-        const tables = doc.querySelectorAll('table');
-        const lastTable = tables[tables.length - 1];
+        // Находим заголовок <h1> и извлекаем название клана из вложенного <b>
+        let h1Start = html.indexOf("<h1");
+        if (h1Start === -1) return { clanName: "", members: [] };
+        let h1End = html.indexOf("</h1>", h1Start);
+        if (h1End === -1) h1End = html.length;
+        let h1Content = html.substring(h1Start, h1End);
+        let bStart = h1Content.indexOf("<b>");
+        let bEnd = h1Content.indexOf("</b>", bStart);
+        let clanName = "";
+        if (bStart !== -1 && bEnd !== -1) {
+          clanName = h1Content.substring(bStart + 3, bEnd).trim();
+        }
+        // Находим последнее вхождение "<table" и получаем содержимое таблицы
+        let tableIndex = html.lastIndexOf("<table");
+        if (tableIndex === -1) return { clanName, members: [] };
+        let tableEnd = html.indexOf("</table>", tableIndex);
+        if (tableEnd === -1) tableEnd = html.length;
+        let tableContent = html.substring(tableIndex, tableEnd);
         let members = [];
-        if (lastTable) {
-          const rows = lastTable.querySelectorAll('tr');
-          rows.forEach(tr => {
-            const links = tr.querySelectorAll('a[href*="pl_info.php?id="]');
-            if (links.length === 0) return;
-            const aPlayer = links[links.length - 1];
-            const href = aPlayer.getAttribute('href');
-            const idMatch = href.match(/pl_info\.php\?id=(\d+)/);
-            if (!idMatch) return;
-            const playerId = idMatch[1];
-            const playerName = aPlayer.textContent.trim();
-            let classification = 'clanless';
-            let joinedBattleClanId = null;
-            let joinedBattleClanName = null;
-            const rowHtml = tr.innerHTML;
-            const playerLinkHtml = aPlayer.outerHTML;
-            const index = rowHtml.indexOf(playerLinkHtml);
-            if (index !== -1) {
-              const beforePlayer = rowHtml.substring(0, index);
-              const battleMatch = beforePlayer.match(/<a\s+href=["']clan_info\.php\?id=(\d+)["'][^>]*title=['"]([^'"]+)['"]/);
-              if (battleMatch) {
-                joinedBattleClanId = battleMatch[1];
-                joinedBattleClanName = battleMatch[2];
-                if (battleIdsSet.has(joinedBattleClanId)) {
-                  classification = "member";
-                } else {
-                  classification = "enemy";
+        let pos = 0;
+        // Перебираем строки таблицы (<tr> ... </tr>)
+        while (true) {
+          let trStart = tableContent.indexOf("<tr", pos);
+          if (trStart === -1) break;
+          let trEnd = tableContent.indexOf("</tr>", trStart);
+          if (trEnd === -1) break;
+          let trContent = tableContent.substring(trStart, trEnd);
+          // Ищем позицию ссылки на страницу игрока (с идентификатором и ником)
+          let playerAnchorIndex = trContent.indexOf("pl_info.php?id=");
+          if (playerAnchorIndex !== -1) {
+            // Извлекаем ID игрока
+            let idStart = playerAnchorIndex + "pl_info.php?id=".length;
+            let idEnd = trContent.indexOf("'", idStart);
+            if (idEnd === -1) { idEnd = trContent.indexOf("\"", idStart); }
+            if (idEnd !== -1) {
+              let playerId = trContent.substring(idStart, idEnd).trim();
+              // Извлекаем никнейм (между ">" и "<" у ссылки)
+              let nameStart = trContent.indexOf(">", idEnd);
+              if (nameStart !== -1) {
+                nameStart++;
+                let nameEnd = trContent.indexOf("<", nameStart);
+                if (nameEnd !== -1) {
+                  let playerName = trContent.substring(nameStart, nameEnd).trim();
+                  // В оставшейся части (до ссылки) ищем информацию о боевом клане
+                  let prefix = trContent.substring(0, playerAnchorIndex);
+                  let joinedBattleClanId = null;
+                  let joinedBattleClanName = null;
+                  let battleAnchorIndex = prefix.indexOf("clan_info.php?id=");
+                  if (battleAnchorIndex !== -1) {
+                    let bcidStart = battleAnchorIndex + "clan_info.php?id=".length;
+                    let bcidEnd = prefix.indexOf("'", bcidStart);
+                    if (bcidEnd === -1) { bcidEnd = prefix.indexOf("\"", bcidStart); }
+                    if (bcidEnd !== -1) {
+                      joinedBattleClanId = prefix.substring(bcidStart, bcidEnd).trim();
+                    }
+                    let titleIndex = prefix.indexOf("title='", battleAnchorIndex);
+                    if (titleIndex !== -1) {
+                      titleIndex += "title='".length;
+                      let titleEnd = prefix.indexOf("'", titleIndex);
+                      if (titleEnd !== -1) {
+                        joinedBattleClanName = prefix.substring(titleIndex, titleEnd).trim();
+                      }
+                    }
+                  }
+                  // Для технического клана поле score не заполнено
+                  let score = null;
+                  // Определяем classification: если joinedBattleClanId отсутствует – "clanless",
+                  // иначе, если оно содержится в battleIdsSet – "member", иначе – "enemy"
+                  let classification = "clanless";
+                  if (joinedBattleClanId) {
+                    if (battleIdsSet.has(joinedBattleClanId)) {
+                      classification = "member";
+                    } else {
+                      classification = "enemy";
+                    }
+                  }
+                  members.push({
+                    id: playerId,
+                    name: playerName,
+                    joinedBattleClanId: joinedBattleClanId,
+                    joinedBattleClanName: joinedBattleClanName,
+                    score: score,
+                    classification: classification
+                  });
                 }
               }
             }
-            members.push({ id: playerId, name: playerName, classification, joinedBattleClanId, joinedBattleClanName });
-          });
+          }
+          pos = trEnd + 5;
         }
+        // Формируем отладочный текст для технического клана
+        let debugText = `Технический клан: ${clanName}\nУчастников: ${members.length}\n`;
+        members.forEach((member, index) => {
+          let bcInfo = member.joinedBattleClanId ? `${member.joinedBattleClanName} (#${member.joinedBattleClanId})` : "нет боевого клана";
+          debugText += `Игрок ${index + 1}: ${member.name} (ID: ${member.id}), Боевой клан: ${bcInfo}\n`;
+        });
+        let debugContainer = document.getElementById("debugTechOutput");
+        if (!debugContainer) {
+          debugContainer = document.createElement("div");
+          debugContainer.id = "debugTechOutput";
+          document.body.appendChild(debugContainer);
+        }
+        let debugTextarea = document.createElement("textarea");
+        debugTextarea.readOnly = true;
+        debugTextarea.style.width = "100%";
+        debugTextarea.style.height = "200px";
+        debugTextarea.value = debugText;
+        debugContainer.appendChild(debugTextarea);
         return { clanName, members };
       }
 
       // Функция renderResults обрабатывает данные с сервера и формирует итоговый результат
       function renderResults(data) {
-        // Парсим боевые кланы с использованием новой функции parseBattleClan
+        // Парсим боевые кланы с использованием parseBattleClan
         const parsedBattleClans = data.battleClans.map(bc => {
           const parsed = parseBattleClan(bc.html, bc.clanId);
           return { clanId: bc.clanId, clanName: parsed.clanName, members: parsed.members };
@@ -351,7 +417,7 @@
         });
         // Создаём множество ID боевых кланов для технических кланов
         const battleIdsSet = new Set(data.battleClans.map(b => b.clanId));
-        // Парсим технические кланы (с использованием прежней функции)
+        // Парсим технические кланы с использованием новой функции parseTechClan
         const parsedTechClans = data.techClans.map(tc => {
           const parsed = parseTechClan(tc.html, battleIdsSet);
           return { clanId: tc.clanId, clanName: parsed.clanName, members: parsed.members };
