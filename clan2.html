@@ -78,14 +78,32 @@
     document.addEventListener('DOMContentLoaded', () => {
       console.log('clan2.html loaded');
 
+      // Глобальные словари: clansDict и playersDict
+      let clansDict = {};
+      let playersDict = {};
+      try {
+        clansDict = JSON.parse(localStorage.getItem('clansDict')) || {};
+      } catch (e) { clansDict = {}; }
+      try {
+        playersDict = JSON.parse(localStorage.getItem('playersDict')) || {};
+      } catch (e) { playersDict = {}; }
+
       // Функция обновления правых полей по содержимому левых
       function updateRightInput(leftId, rightId) {
         const left = document.getElementById(leftId);
         const right = document.getElementById(rightId);
         if (left && right) {
-          right.value = left.value;
+          const lines = left.value.split('\n').map(s => s.trim()).filter(Boolean);
+          let newLines = [];
+          if (leftId === "excludePlayers") {
+            newLines = lines.map(line => playersDict[line] || "неизвестный игрок");
+          } else { // techClans и battleClans
+            newLines = lines.map(line => clansDict[line] || "неизвестный клан");
+          }
+          right.value = newLines.join('\n');
         }
       }
+
       // При изменении каждого левого поля обновляем соответствующее правое и сохраняем значение
       ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
         const left = document.getElementById(id);
@@ -423,12 +441,19 @@
         });
       }
 
-      // Функция renderResults получает данные с сервера, формирует объект results и вызывает displayResults,
-      // затем сохраняет resultsObj в localStorage в виде JSON
+      // Функция renderResults получает данные с сервера, формирует объект результатов, создаёт словари и обновляет правые поля
       function renderResults(data) {
         const parsedBattleClans = data.battleClans.map(bc => {
           const parsed = parseBattleClan(bc.html, bc.clanId);
           return { clanId: bc.clanId, clanName: parsed.clanName, members: parsed.members };
+        });
+        parsedBattleClans.forEach(bc => {
+          // Заполняем словарь кланов
+          clansDict[bc.clanId] = bc.clanName;
+          // Заполняем словарь игроков
+          bc.members.forEach(member => {
+            playersDict[member.id] = member.name;
+          });
         });
         const battleMembersMap = new Map();
         parsedBattleClans.forEach(bc => {
@@ -441,6 +466,17 @@
           const parsed = parseTechClan(tc.html, battleIdsSet);
           return { clanId: tc.clanId, clanName: parsed.clanName, members: parsed.members };
         });
+        parsedTechClans.forEach(tc => {
+          // Обновляем словарь кланов
+          clansDict[tc.clanId] = tc.clanName;
+          tc.members.forEach(member => {
+            playersDict[member.id] = member.name;
+          });
+        });
+        // Сохраняем словари в localStorage
+        localStorage.setItem('clansDict', JSON.stringify(clansDict));
+        localStorage.setItem('playersDict', JSON.stringify(playersDict));
+
         const excludeList = document.getElementById('excludePlayers')
           .value.split('\n')
           .map(s => s.trim())
@@ -509,19 +545,23 @@
         });
         displayResults(resultsObj);
         localStorage.setItem('results', JSON.stringify(resultsObj));
+        // После обработки обновляем правые поля для всех входных данных
+        updateRightInput('techClans', 'techClansOutput');
+        updateRightInput('battleClans', 'battleClansOutput');
+        updateRightInput('excludePlayers', 'excludePlayersOutput');
       }
 
-      // При загрузке страницы, если в localStorage есть сохранённый JSON с результатами, отрисовываем его
+      // При загрузке страницы, если сохранён JSON с результатами, отрисовываем его
       const savedResults = localStorage.getItem('results');
       if (savedResults) {
-          try {
-            const resultsObj = JSON.parse(savedResults);
-            displayResults(resultsObj);
-          } catch (e) {
-            console.error('Ошибка при парсинге сохранённых результатов, удаляем данные из localStorage', e);
-            localStorage.removeItem('results');
-          }
+        try {
+          const resultsObj = JSON.parse(savedResults);
+          displayResults(resultsObj);
+        } catch(e) {
+          console.error("Ошибка при парсинге результатов:", e);
+          localStorage.removeItem('results');
         }
+      }
 
       function animateStatus(messageElement, baseText) {
         let dots = 0;
