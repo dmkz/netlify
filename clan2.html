@@ -99,7 +99,7 @@
           const btn = document.createElement('button');
           btn.textContent = '✖';
           btn.classList.add('remove-button');
-          // Используем вашу версию кода для удаления строки и обновления счётчиков:
+          // Используем вашу версию кода для удаления строки и обновления счётчиков
           btn.addEventListener('click', () => {
               // Сначала ищем внешний grouped‑контейнер, начиная от текущей строки (tr)
               let outerGrouped = tr;
@@ -341,6 +341,7 @@
       }
 
       function renderResults(data) {
+        // Парсим боевые кланы
         const parsedBattleClans = data.battleClans.map(bc => {
           const parsed = parseBattleClan(bc.html, bc.clanId);
           return { clanId: bc.clanId, clanName: parsed.clanName, members: parsed.members };
@@ -356,6 +357,7 @@
           const parsed = parseTechClan(tc.html, battleIdsSet);
           return { clanId: tc.clanId, clanName: parsed.clanName, members: parsed.members };
         });
+        // Фильтруем особенных игроков для технических кланов
         const excludeList = document.getElementById('excludePlayers')
           .value.split('\n')
           .map(s => s.trim())
@@ -364,6 +366,7 @@
           ...techClan,
           members: techClan.members.filter(member => !excludeList.includes(member.id))
         }));
+        // Формируем итоговый результат для каждого технического клана
         const results = parsedTechClansFiltered.map(techClan => {
           const techMemberIds = new Set(techClan.members.map(m => m.id));
           const inviteGroups = {};
@@ -442,8 +445,11 @@
           clanContainer.appendChild(columns);
           resultsDiv.appendChild(clanContainer);
         });
+        // Сохраняем содержимое сгруппированных списков в localStorage
+        localStorage.setItem('results', resultsDiv.innerHTML);
       }
 
+      // Сохранение и загрузка входных данных
       function saveField(id) {
         const value = document.getElementById(id).value;
         localStorage.setItem(id, value);
@@ -455,6 +461,11 @@
         }
       }
       ['techClans', 'battleClans', 'excludePlayers'].forEach(loadField);
+      // Загружаем сохранённое содержимое результатов, если оно есть
+      const savedResults = localStorage.getItem('results');
+      if (savedResults) {
+        document.getElementById('results').innerHTML = savedResults;
+      }
       document.getElementById('techClans').addEventListener('input', () => saveField('techClans'));
       document.getElementById('battleClans').addEventListener('input', () => saveField('battleClans'));
       document.getElementById('excludePlayers').addEventListener('input', () => saveField('excludePlayers'));
