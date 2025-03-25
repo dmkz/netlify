@@ -19,6 +19,17 @@
     td a:hover { text-decoration: underline; }
     .remove-button { color: red; border: none; background: none; cursor: pointer; }
     #statusMessage { font-size: 16px; margin-bottom: 10px; }
+    /* Дополнительное поле для сырых данных */
+    #rawData {
+      width: 100%;
+      height: 200px;
+      font-family: monospace;
+      margin-top: 15px;
+      border: 1px solid #ccc;
+      padding: 5px;
+      white-space: pre-wrap;
+      overflow-y: scroll;
+    }
   </style>
 </head>
 <body>
@@ -41,16 +52,30 @@
       <textarea id="excludePlayers"></textarea>
     </div>
   </div>
+  <!-- Элемент для статуса запроса -->
   <div id="statusMessage"></div>
   <button id="processBtn">Обработать</button>
   <h2>Результаты:</h2>
   <div id="results"></div>
+  <!-- Дополнительное поле для сырых данных (JSON) -->
+  <h2>Сырые данные от сервера (для дебага):</h2>
+  <textarea id="rawData" readonly></textarea>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       console.log('clan2.html loaded');
 
-      // Функция для обновления общего счётчика в группированном списке
+      // Функция, которая поднимается по дереву с использованием parentNode
+      function findClosestGrouped(el) {
+        while (el) {
+          if (el.nodeType === Node.ELEMENT_NODE && el.classList.contains('grouped')) {
+            return el;
+          }
+          el = el.parentNode;
+        }
+        return null;
+      }
+
       function updateGroupedHeader(groupedContainer) {
         const contentDiv = groupedContainer.children[1];
         let total = 0;
@@ -150,7 +175,6 @@
         content.style.display = 'none';
         Object.keys(groupedData).forEach(key => {
           const group = groupedData[key];
-          // Используем только возвращённое название клана
           const headerText = group.clanName;
           const groupCollapsible = createCollapsible(headerText, group.players, groupType);
           content.appendChild(groupCollapsible);
@@ -163,7 +187,7 @@
       }
 
       function renderResults(data) {
-        // На клиенте фильтруем enemy-группы: исключаем игроков, чьи ID указаны в excludePlayers
+        // На клиенте фильтруем enemy-группы: удаляем игроков, указанных в excludePlayers
         const excludeList = document.getElementById('excludePlayers').value.split('\n').map(s => s.trim()).filter(Boolean);
         data.forEach(clan => {
           Object.keys(clan.enemyGroups).forEach(key => {
@@ -176,7 +200,6 @@
           const clanContainer = document.createElement('div');
           clanContainer.style.marginBottom = '20px';
           const title = document.createElement('h3');
-          // Используем название технического клана, полученное с сервера
           title.textContent = clan.clanName;
           clanContainer.appendChild(title);
           const columns = document.createElement('div');
@@ -191,6 +214,8 @@
           clanContainer.appendChild(columns);
           resultsDiv.appendChild(clanContainer);
         });
+        // Для отладки: выводим сырые данные в дополнительное поле
+        document.getElementById('rawData').value = JSON.stringify(data, null, 2);
       }
 
       function saveField(id) {
