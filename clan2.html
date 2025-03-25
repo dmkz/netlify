@@ -28,7 +28,6 @@
     button { padding: 10px 20px; font-size: 16px; }
     .collapsible { margin-bottom: 10px; border: 1px solid #ccc; }
     .collapsible-header { background-color: #f0f0f0; padding: 5px; cursor: pointer; }
-    .collapsible-list { margin: 0; padding: 5px; }
     table { width: 100%; border-collapse: collapse; }
     td { border: 1px solid #ccc; padding: 5px; text-align: left; }
     td a { text-decoration: none; color: blue; }
@@ -87,19 +86,32 @@
           right.value = left.value;
         }
       }
-      // При изменении каждого левого поля обновляем соответствующее правое
+      // При изменении каждого левого поля обновляем соответствующее правое и сохраняем значение
       ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
         const left = document.getElementById(id);
         const right = document.getElementById(id + 'Output');
         if (left && right) {
-          // Обновляем сразу при загрузке
           updateRightInput(id, id + 'Output');
           left.addEventListener('input', () => {
             updateRightInput(id, id + 'Output');
-            saveField(id); // сохраняем в localStorage
+            saveField(id);
           });
         }
       });
+
+      // Функции сохранения и загрузки входных данных
+      function saveField(id) {
+        const value = document.getElementById(id).value;
+        localStorage.setItem(id, value);
+      }
+      function loadField(id) {
+        const value = localStorage.getItem(id);
+        if (value !== null) {
+          document.getElementById(id).value = value;
+          updateRightInput(id, id + 'Output');
+        }
+      }
+      ['techClans', 'battleClans', 'excludePlayers'].forEach(loadField);
 
       // Функции для работы со сворачиваемыми блоками
       function findClosestGrouped(el) {
@@ -151,7 +163,6 @@
           btn.classList.add('remove-button');
           // Ваша версия удаления строки и обновления счётчиков:
           btn.addEventListener('click', () => {
-              // Сначала ищем внешний grouped‑контейнер, начиная от текущей строки (tr)
               let outerGrouped = tr;
               while (outerGrouped && (outerGrouped.nodeType !== Node.ELEMENT_NODE || !outerGrouped.classList.contains('grouped'))) {
                   outerGrouped = outerGrouped.parentNode;
@@ -163,9 +174,8 @@
               }
               
               const parentTable = tr.parentElement;
-              tr.remove(); // удаляем строку
-
-              // Обновляем внутренний счётчик: внутри текущего collapsible
+              tr.remove();
+              
               const collapsible = parentTable.closest('.collapsible');
               if (collapsible) {
                 const header = collapsible.querySelector('.collapsible-header');
@@ -174,21 +184,18 @@
                 console.log("Внутренний счётчик обновлён:", header.textContent);
               }
               
-              // Если нашли outerGrouped, обновляем его счётчик
               if (outerGrouped) {
                 updateGroupedHeader(outerGrouped);
               } else {
                 console.log("outerGrouped не найден для строки после удаления:", tr);
               }
               
-              // Добавляем ID удалённого игрока в список исключённых (если его там ещё нет)
               const excludeTextarea = document.getElementById('excludePlayers');
               let currentExcludes = excludeTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
               if (!currentExcludes.includes(item.id)) {
                 currentExcludes.push(item.id);
                 excludeTextarea.value = currentExcludes.join('\n');
                 localStorage.setItem('excludePlayers', excludeTextarea.value);
-                // Также обновляем правое поле для исключённых игроков
                 updateRightInput('excludePlayers', 'excludePlayersOutput');
               }
           });
@@ -392,6 +399,32 @@
         return { clanName, members };
       }
 
+      // Функция displayResults создаёт динамические элементы по объекту results
+      function displayResults(resultsObj) {
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '';
+        resultsObj.forEach(clan => {
+          const clanContainer = document.createElement('div');
+          clanContainer.style.marginBottom = '20px';
+          const title = document.createElement('h3');
+          title.textContent = clan.clanName;
+          clanContainer.appendChild(title);
+          const columns = document.createElement('div');
+          columns.style.display = 'flex';
+          columns.style.gap = '10px';
+          const inviteCollapsible = createGroupedCollapsible(clan.inviteGroups, 'Нужно пригласить', 'invite');
+          const enemyCollapsible = createGroupedCollapsible(clan.enemyGroups, 'Ушёл во вражеские кланы', 'enemy');
+          const clanlessCollapsible = createCollapsible('Без клана', clan.clanlessList, 'clanless');
+          columns.appendChild(inviteCollapsible);
+          columns.appendChild(enemyCollapsible);
+          columns.appendChild(clanlessCollapsible);
+          clanContainer.appendChild(columns);
+          resultsDiv.appendChild(clanContainer);
+        });
+      }
+
+      // Функция renderResults получает данные с сервера, формирует объект results и вызывает displayResults,
+      // затем сохраняет resultsObj в localStorage в виде JSON
       function renderResults(data) {
         const parsedBattleClans = data.battleClans.map(bc => {
           const parsed = parseBattleClan(bc.html, bc.clanId);
@@ -408,7 +441,6 @@
           const parsed = parseTechClan(tc.html, battleIdsSet);
           return { clanId: tc.clanId, clanName: parsed.clanName, members: parsed.members };
         });
-        // Фильтруем особенных игроков для технических кланов
         const excludeList = document.getElementById('excludePlayers')
           .value.split('\n')
           .map(s => s.trim())
@@ -417,7 +449,7 @@
           ...techClan,
           members: techClan.members.filter(member => !excludeList.includes(member.id))
         }));
-        const results = parsedTechClansFiltered.map(techClan => {
+        const resultsObj = parsedTechClansFiltered.map(techClan => {
           const techMemberIds = new Set(techClan.members.map(m => m.id));
           const inviteGroups = {};
           battleMembersMap.forEach((info, memberId) => {
@@ -460,7 +492,7 @@
           };
         });
         // Дополнительная фильтрация по excludeList для всех групп
-        results.forEach(clan => {
+        resultsObj.forEach(clan => {
           Object.keys(clan.inviteGroups).forEach(key => {
             clan.inviteGroups[key].players = clan.inviteGroups[key].players.filter(
               player => !excludeList.includes(player.id)
@@ -475,49 +507,16 @@
             player => !excludeList.includes(player.id)
           );
         });
-        const resultsDiv = document.getElementById('results');
-        resultsDiv.innerHTML = '';
-        results.forEach(clan => {
-          const clanContainer = document.createElement('div');
-          clanContainer.style.marginBottom = '20px';
-          const title = document.createElement('h3');
-          title.textContent = clan.clanName;
-          clanContainer.appendChild(title);
-          const columns = document.createElement('div');
-          columns.style.display = 'flex';
-          columns.style.gap = '10px';
-          const inviteCollapsible = createGroupedCollapsible(clan.inviteGroups, 'Нужно пригласить', 'invite');
-          const enemyCollapsible = createGroupedCollapsible(clan.enemyGroups, 'Ушёл во вражеские кланы', 'enemy');
-          const clanlessCollapsible = createCollapsible('Без клана', clan.clanlessList, 'clanless');
-          columns.appendChild(inviteCollapsible);
-          columns.appendChild(enemyCollapsible);
-          columns.appendChild(clanlessCollapsible);
-          clanContainer.appendChild(columns);
-          resultsDiv.appendChild(clanContainer);
-        });
-        localStorage.setItem('results', resultsDiv.innerHTML);
+        displayResults(resultsObj);
+        localStorage.setItem('results', JSON.stringify(resultsObj));
       }
 
-      // Сохранение и загрузка входных данных
-      function saveField(id) {
-        const value = document.getElementById(id).value;
-        localStorage.setItem(id, value);
-      }
-      function loadField(id) {
-        const value = localStorage.getItem(id);
-        if (value !== null) {
-          document.getElementById(id).value = value;
-        }
-      }
-      ['techClans', 'battleClans', 'excludePlayers'].forEach(loadField);
-      // Загружаем сохранённое содержимое результатов, если оно есть
+      // При загрузке страницы, если в localStorage есть сохранённый JSON с результатами, отрисовываем его
       const savedResults = localStorage.getItem('results');
       if (savedResults) {
-        document.getElementById('results').innerHTML = savedResults;
+        const resultsObj = JSON.parse(savedResults);
+        displayResults(resultsObj);
       }
-      document.getElementById('techClans').addEventListener('input', () => saveField('techClans'));
-      document.getElementById('battleClans').addEventListener('input', () => saveField('battleClans'));
-      document.getElementById('excludePlayers').addEventListener('input', () => saveField('excludePlayers'));
 
       function animateStatus(messageElement, baseText) {
         let dots = 0;
