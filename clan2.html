@@ -497,6 +497,27 @@
             clanlessList
           };
         });
+        
+        results.forEach(clan => {
+          // Фильтруем группу "Нужно пригласить"
+          Object.keys(clan.inviteGroups).forEach(key => {
+            clan.inviteGroups[key].players = clan.inviteGroups[key].players.filter(
+              player => !excludeList.includes(player.id)
+            );
+          });
+          // Фильтруем группу "Ушёл во вражеские кланы"
+          Object.keys(clan.enemyGroups).forEach(key => {
+            clan.enemyGroups[key].players = clan.enemyGroups[key].players.filter(
+              player => !excludeList.includes(player.id)
+            );
+          });
+          // Фильтруем список игроков без клана
+          clan.clanlessList = clan.clanlessList.filter(
+            player => !excludeList.includes(player.id)
+          );
+        });
+
+
         // Вывод результатов на экран
         const resultsDiv = document.getElementById('results');
         resultsDiv.innerHTML = '';
