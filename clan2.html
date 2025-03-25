@@ -340,8 +340,8 @@
                   let battleAnchorIndex = prefix.indexOf("clan_info.php?id=");
                   if (battleAnchorIndex !== -1) {
                     let bcidStart = battleAnchorIndex + "clan_info.php?id=".length;
-                    let bcidEnd = prefix.indexOf("'", bcidStart);
-                    if (bcidEnd === -1) { bcidEnd = prefix.indexOf("\"", bcidStart); }
+                    let bcidEnd = prefix.indexOf("\"", bcidStart);
+                    if (bcidEnd === -1) { bcidEnd = prefix.indexOf("'", bcidStart); }
                     if (bcidEnd !== -1) {
                       joinedBattleClanId = prefix.substring(bcidStart, bcidEnd).trim();
                     }
