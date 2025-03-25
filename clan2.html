@@ -127,16 +127,35 @@
           btn.textContent = '✖';
           btn.classList.add('remove-button');
           btn.addEventListener('click', () => {
-            const parentTable = tr.parentElement;
-            tr.remove();
-            const collapsible = parentTable.closest('.collapsible');
-            if (collapsible) {
-              const header = collapsible.querySelector('.collapsible-header');
-              const newCount = parentTable.querySelectorAll('tr').length;
-              header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
-            }
-            const outerGrouped = tr.closest('.grouped');
-            if (outerGrouped) { updateGroupedHeader(outerGrouped); }
+            let outerGrouped = tr;
+              while (outerGrouped && (outerGrouped.nodeType !== Node.ELEMENT_NODE || !outerGrouped.classList.contains('grouped'))) {
+                  outerGrouped = outerGrouped.parentNode;
+              }
+
+              if (outerGrouped) {
+                console.log("Найден outerGrouped до удаления:", outerGrouped);
+              } else {
+                console.log("outerGrouped не найден для строки (до удаления):", tr);
+              }
+              
+              const parentTable = tr.parentElement;
+              tr.remove(); // удаляем строку
+
+              // Обновляем внутренний счётчик: внутри текущего collapsible
+              const collapsible = parentTable.closest('.collapsible');
+              if (collapsible) {
+                const header = collapsible.querySelector('.collapsible-header');
+                const newCount = parentTable.querySelectorAll('tr').length;
+                header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
+                console.log("Внутренний счётчик обновлён:", header.textContent);
+              }
+              
+              // Если мы нашли outerGrouped до удаления, обновляем его счётчик
+              if (outerGrouped) {
+                updateGroupedHeader(outerGrouped);
+              } else {
+                console.log("outerGrouped не найден для строки после удаления:", tr);
+              }
             const excludeTextarea = document.getElementById('excludePlayers');
             let currentExcludes = excludeTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
             if (!currentExcludes.includes(item.id)) {
