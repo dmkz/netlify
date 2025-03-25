@@ -75,7 +75,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       console.log('clan2.html loaded');
 
-      // Функции для работы с collapsible-блоками (без изменений)
+      // Функции для работы со сворачиваемыми блоками
       function findClosestGrouped(el) {
         while (el) {
           if (el.nodeType === Node.ELEMENT_NODE && el.classList.contains('grouped')) {
@@ -192,7 +192,7 @@
         return container;
       }
 
-      // Функция для парсинга HTML-страницы боевого клана (упрощённая версия)
+      // Упрощённый парсинг HTML-страницы боевого клана с извлечением поля score
       function parseBattleClan(html, battleClanId) {
         // Найти заголовок <h1> и извлечь его содержимое
         let h1Start = html.indexOf("<h1");
@@ -238,12 +238,30 @@
                 let nameEnd = trContent.indexOf("<", nameStart);
                 if (nameEnd !== -1) {
                   let playerName = trContent.substring(nameStart, nameEnd).trim();
+                  // Извлекаем поле score: ищем последний <td> перед </tr>
+                  let tdLastIndex = trContent.lastIndexOf("<td");
+                  let score = "0";
+                  if (tdLastIndex !== -1) {
+                    let tdStart = trContent.indexOf(">", tdLastIndex);
+                    if (tdStart !== -1) {
+                      tdStart++; // начало содержимого td
+                      let tdEnd = trContent.indexOf("</td>", tdStart);
+                      if (tdEnd !== -1) {
+                        let tdContent = trContent.substring(tdStart, tdEnd);
+                        // Удаляем все HTML-теги и спецсимволы &nbsp;
+                        tdContent = tdContent.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, "");
+                        tdContent = tdContent.trim();
+                        score = tdContent === "" ? "0" : tdContent;
+                      }
+                    }
+                  }
                   members.push({
                     id: playerId,
                     name: playerName,
                     classification: 'member',
                     joinedBattleClanId: battleClanId,
-                    joinedBattleClanName: clanName
+                    joinedBattleClanName: clanName,
+                    score: score
                   });
                 }
               }
@@ -254,9 +272,9 @@
         // Формирование отладочного текста
         let debugText = `Клан: ${clanName}\nУчастников: ${members.length}\n`;
         members.forEach((member, index) => {
-          debugText += `Игрок ${index + 1}: ${member.name} (ID: ${member.id})\n`;
+          debugText += `Игрок ${index + 1}: ${member.name} (ID: ${member.id}), Score: ${member.score}\n`;
         });
-        // Создаём текстовое поле для отладки и выводим туда информацию
+        // Выводим отладочную информацию в отдельное текстовое поле
         let debugContainer = document.getElementById("debugOutput");
         if (!debugContainer) {
           debugContainer = document.createElement("div");
@@ -272,7 +290,7 @@
         return { clanName, members };
       }
 
-      // Функция для парсинга технического клана (оставляем прежнюю реализацию с использованием DOMParser)
+      // Функция для парсинга технического клана (без изменений)
       function parseTechClan(html, battleIdsSet) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
@@ -317,7 +335,7 @@
         return { clanName, members };
       }
 
-      // Функция renderResults обрабатывает данные с сервера
+      // Функция renderResults обрабатывает данные с сервера и формирует итоговый результат
       function renderResults(data) {
         // Парсим боевые кланы с использованием новой функции parseBattleClan
         const parsedBattleClans = data.battleClans.map(bc => {
