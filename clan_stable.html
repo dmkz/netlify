@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Администрирование тех. клана</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .container { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
+    .field { flex: 1; min-width: 300px; }
+    textarea { width: 100%; height: 200px; font-family: monospace; }
+    button { padding: 10px 20px; font-size: 16px; }
+    .collapsible { margin-bottom: 10px; border: 1px solid #ccc; }
+    .collapsible-header { background-color: #f0f0f0; padding: 5px; cursor: pointer; }
+    .collapsible-list { margin: 0; padding: 5px; }
+    table { width: 100%; border-collapse: collapse; }
+    td { border: 1px solid #ccc; padding: 5px; text-align: left; }
+    td a { text-decoration: none; color: blue; }
+    td a:hover { text-decoration: underline; }
+    .remove-button { color: red; border: none; background: none; cursor: pointer; }
+    /* Стили для сообщения статуса */
+    #statusMessage { font-size: 16px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Администрирование тех. клана</h1>
+  <div class="container">
+    <div class="field">
+      <h3>Технические кланы<br/>(ID, по одному в строке)</h3>
+      <textarea id="techClans">9098</textarea>
+    </div>
+    <div class="field">
+      <h3>Боевые кланы<br/>(ID, по одному в строке)</h3>
+      <textarea id="battleClans">1209
+7490
+7705
+9595
+5722</textarea>
+    </div>
+    <div class="field">
+      <h3>Особенные игроки<br/>(ID, по одному в строке)</h3>
+      <textarea id="excludePlayers"></textarea>
+    </div>
+  </div>
+  <!-- Элемент для статуса запроса -->
+  <div id="statusMessage"></div>
+  <button id="processBtn">Обработать</button>
+  <h2>Результаты:</h2>
+  <div id="results"></div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('clan.html loaded');
+
+      // Функция, которая поднимается по дереву с использованием parentNode
+      function findClosestGrouped(el) {
+        while (el) {
+          if (el.nodeType === Node.ELEMENT_NODE && el.classList.contains('grouped')) {
+            return el;
+          }
+          el = el.parentNode;
+        }
+        return null;
+      }
+        
+function findClosestGroupedLogging(el) {
+  while (el) {
+    if (el.nodeType === Node.ELEMENT_NODE) {
+      console.log("Проверяем элемент:", el.tagName, el.className);
+      if (el.classList.contains('grouped')) {
+        console.log("Найден элемент с классом 'grouped':", el);
+        return el;
+      }
+    }
+    el = el.parentNode;
+  }
+  console.log("Элемент с классом 'grouped' не найден.");
+  return null;
+}
+      // Функция для обновления общего счётчика во внешнем заголовке группированного списка
+      function updateGroupedHeader(groupedContainer) {
+          // Предполагаем, что groupedContainer имеет два потомка:
+          // 1. Заголовок внешнего списка
+          // 2. Контейнер с внутренними collapsible
+          const contentDiv = groupedContainer.children[1];
+          let total = 0;
+          if (contentDiv) {
+            // Для каждого внутреннего collapsible:
+            for (let i = 0; i < contentDiv.children.length; i++) {
+              const inner = contentDiv.children[i];
+              const innerHeader = inner.querySelector('.collapsible-header');
+              if (innerHeader) {
+                const match = innerHeader.textContent.match(/\((\d+)\)/);
+                if (match) {
+                  total += parseInt(match[1], 10);
+                }
+              }
+            }
+          }
+          // Обновляем внешний заголовок (первый потомок)
+          const outerHeader = groupedContainer.firstElementChild;
+          if (outerHeader) {
+            // Сохраняем базовый текст без числа
+            const baseText = outerHeader.dataset.basetitle || outerHeader.textContent.split('(')[0].trim();
+            outerHeader.dataset.basetitle = baseText;
+            outerHeader.textContent = `${baseText} (${total})`;
+          }
+        }
+
+      // Функция для создания таблицы с игроками (3 столбца: id, ник, кнопка удаления)
+      function createPlayerTable(items, groupType) {
+        const table = document.createElement('table');
+        items.forEach(item => {
+          const tr = document.createElement('tr');
+
+          // Столбец 1: id (простой текст)
+          const tdId = document.createElement('td');
+          tdId.textContent = item.id;
+          tr.appendChild(tdId);
+
+          // Столбец 2: ник (только кликабельная)
+          const tdName = document.createElement('td');
+          const aName = document.createElement('a');
+          aName.href = `https://www.heroeswm.ru/pl_info.php?id=${item.id}`;
+          aName.target = '_blank';
+          aName.textContent = item.name;
+          tdName.appendChild(aName);
+          tr.appendChild(tdName);
+
+          // Столбец 3: кнопка удаления
+          const tdButton = document.createElement('td');
+          const btn = document.createElement('button');
+          btn.textContent = '✖';
+          btn.classList.add('remove-button');
+          btn.addEventListener('click', () => {
+              // Сначала ищем внешний grouped‑контейнер, начиная от текущей строки (tr)
+              let outerGrouped = tr;
+              while (outerGrouped && (outerGrouped.nodeType !== Node.ELEMENT_NODE || !outerGrouped.classList.contains('grouped'))) {
+                  outerGrouped = outerGrouped.parentNode;
+              }
+
+              if (outerGrouped) {
+                console.log("Найден outerGrouped до удаления:", outerGrouped);
+              } else {
+                console.log("outerGrouped не найден для строки (до удаления):", tr);
+              }
+              
+              const parentTable = tr.parentElement;
+              tr.remove(); // удаляем строку
+
+              // Обновляем внутренний счётчик: внутри текущего collapsible
+              const collapsible = parentTable.closest('.collapsible');
+              if (collapsible) {
+                const header = collapsible.querySelector('.collapsible-header');
+                const newCount = parentTable.querySelectorAll('tr').length;
+                header.textContent = header.textContent.replace(/\(\d+\)/, `(${newCount})`);
+                console.log("Внутренний счётчик обновлён:", header.textContent);
+              }
+              
+              // Если мы нашли outerGrouped до удаления, обновляем его счётчик
+              if (outerGrouped) {
+                updateGroupedHeader(outerGrouped);
+              } else {
+                console.log("outerGrouped не найден для строки после удаления:", tr);
+              }
+              
+              // Добавляем id игрока в поле исключений, если его там ещё нет
+              const excludeTextarea = document.getElementById('excludePlayers');
+              let currentExcludes = excludeTextarea.value.split('\n').map(s => s.trim()).filter(Boolean);
+              if (!currentExcludes.includes(item.id)) {
+                currentExcludes.push(item.id);
+                excludeTextarea.value = currentExcludes.join('\n');
+                localStorage.setItem('excludePlayers', excludeTextarea.value);
+              }
+            });
+          tdButton.appendChild(btn);
+          tr.appendChild(tdButton);
+
+          table.appendChild(tr);
+        });
+        return table;
+      }
+
+      // Функция для создания сворачиваемой секции (для простого списка)
+      function createCollapsible(title, items, groupType) {
+        const container = document.createElement('div');
+        container.classList.add('collapsible');
+
+        const header = document.createElement('div');
+        header.classList.add('collapsible-header');
+        header.textContent = title + ' (' + items.length + ')';
+        container.appendChild(header);
+
+        const content = document.createElement('div');
+        content.style.display = 'none';
+        const table = createPlayerTable(items, groupType);
+        content.appendChild(table);
+        container.appendChild(content);
+
+        header.addEventListener('click', () => {
+          content.style.display = content.style.display === 'none' ? 'block' : 'none';
+        });
+        return container;
+      }
+
+      // Функция для создания группированного сворачиваемого списка
+      function createGroupedCollapsible(groupedData, title, groupType) {
+        const container = document.createElement('div');
+        container.classList.add('collapsible', 'grouped');
+
+        let totalCount = 0;
+        Object.values(groupedData).forEach(group => {
+          totalCount += group.players.length;
+        });
+
+        const header = document.createElement('div');
+        header.classList.add('collapsible-header');
+        header.dataset.basetitle = title;
+        header.textContent = title + ' (' + totalCount + ')';
+        container.appendChild(header);
+
+        const content = document.createElement('div');
+        content.style.display = 'none';
+        Object.keys(groupedData).forEach(key => {
+          const group = groupedData[key];
+          const headerText = group.clanName.includes(`#${key}`)
+            ? group.clanName
+            : `${key} - ${group.clanName}`;
+          const groupCollapsible = createCollapsible(headerText, group.players, groupType);
+          content.appendChild(groupCollapsible);
+        });
+        container.appendChild(content);
+
+        header.addEventListener('click', () => {
+          content.style.display = content.style.display === 'none' ? 'block' : 'none';
+        });
+        return container;
+      }
+
+      function renderResults(data) {
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '';
+        data.forEach(clan => {
+          const clanContainer = document.createElement('div');
+          clanContainer.style.marginBottom = '20px';
+
+          const title = document.createElement('h3');
+          if (clan.techClanName.includes(`#${clan.techClanId}`)) {
+            title.textContent = clan.techClanName;
+          } else {
+            title.textContent = `Клан ${clan.techClanId} - ${clan.techClanName}`;
+          }
+          clanContainer.appendChild(title);
+
+          const columns = document.createElement('div');
+          columns.style.display = 'flex';
+          columns.style.gap = '10px';
+
+          const inviteCollapsible = createGroupedCollapsible(clan.inviteGroups, 'Нужно пригласить', 'invite');
+          const enemyCollapsible = createGroupedCollapsible(clan.enemyGroups, 'Ушёл во вражеские кланы', 'enemy');
+          const clanlessCollapsible = createCollapsible('Без клана', clan.clanlessList, 'clanless');
+
+          columns.appendChild(inviteCollapsible);
+          columns.appendChild(enemyCollapsible);
+          columns.appendChild(clanlessCollapsible);
+          clanContainer.appendChild(columns);
+          resultsDiv.appendChild(clanContainer);
+        });
+      }
+
+      function saveField(id) {
+        const value = document.getElementById(id).value;
+        localStorage.setItem(id, value);
+      }
+      function loadField(id) {
+        const value = localStorage.getItem(id);
+        if (value !== null) {
+          document.getElementById(id).value = value;
+        }
+      }
+
+      ['techClans', 'battleClans', 'excludePlayers'].forEach(loadField);
+      const savedResults = localStorage.getItem('results');
+      if (savedResults) {
+        document.getElementById('results').innerHTML = savedResults;
+      }
+
+      ['techClans', 'battleClans', 'excludePlayers'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => saveField(id));
+      });
+
+      // Функция для анимации статуса запроса
+      function animateStatus(messageElement, baseText) {
+        let dots = 0;
+        return setInterval(() => {
+          dots = (dots + 1) % 5; // от 0 до 4 точек
+          messageElement.textContent = baseText + '.'.repeat(dots);
+        }, 1000);
+      }
+
+      const statusEl = document.getElementById('statusMessage');
+
+      document.getElementById('processBtn').addEventListener('click', async () => {
+        console.log('Обработка началась');
+        const techClans = document.getElementById('techClans').value;
+        const battleClans = document.getElementById('battleClans').value;
+        const excludePlayers = document.getElementById('excludePlayers').value;
+
+        console.log('Отправляем данные:', { techClans, battleClans, excludePlayers });
+
+        // Устанавливаем статус ожидания с голубым цветом
+        statusEl.style.color = 'blue';
+        let baseStatus = 'Ваш запрос отправлен. Ожидайте, пожалуйста';
+        statusEl.textContent = baseStatus;
+        const startTime = Date.now();
+        const intervalId = animateStatus(statusEl, baseStatus);
+
+        try {
+          const res = await fetch('/.netlify/functions/process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              techClanIds: techClans,
+              battleClanIds: battleClans,
+              excludePlayers: excludePlayers
+            })
+          });
+          console.log('Ответ сервера:', res.status, res.statusText);
+          clearInterval(intervalId);
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          if (!res.ok) {
+            statusEl.style.color = 'red';
+            statusEl.textContent = `Возникла ошибка при обработке запроса. Запрос обрабатывался ${elapsed} секунд.`;
+            throw new Error(`Ошибка запроса: ${res.status} ${res.statusText}`);
+          }
+          const data = await res.json();
+          console.log('Полученные данные:', data);
+          renderResults(data);
+          localStorage.setItem('results', document.getElementById('results').innerHTML);
+          statusEl.style.color = 'green';
+          statusEl.textContent = `Ваш запрос обработан за ${elapsed} секунд.`;
+        } catch (error) {
+          console.error('Ошибка при обработке запроса:', error);
+          clearInterval(intervalId);
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          statusEl.style.color = 'red';
+          statusEl.textContent = `Возникла ошибка при обработке запроса. Запрос обрабатывался ${elapsed} секунд.`;
+          document.getElementById('results').innerText = 'Ошибка: ' + error.message;
+        }
+      });
+    });
+  </script>
+</body>
+</html>
