@@ -1,12 +1,18 @@
 const { JSDOM } = require("jsdom");
+const iconv = require("iconv-lite");
 
-// Функция для обработки данных одного игрока
 const fetchPlayerData = async (id) => {
   const url = `https://www.heroeswm.ru/pl_info.php?id=${id}`;
   console.log(`Обработка игрока с id ${id} по URL: ${url}`);
+  
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const html = await res.text();
+  
+  // Получаем ответ как ArrayBuffer и декодируем с помощью iconv-lite (Windows-1251)
+  const arrayBuffer = await res.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  const html = iconv.decode(buffer, 'windows-1251');
+  
   const dom = new JSDOM(html);
   const document = dom.window.document;
   
@@ -50,7 +56,7 @@ const fetchPlayerData = async (id) => {
 exports.handler = async (event, context) => {
   console.log('Получен запрос с методом:', event.httpMethod);
   
-  // Добавляем CORS заголовки
+  // Добавляем CORS-заголовки
   const headers = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type",
@@ -76,8 +82,8 @@ exports.handler = async (event, context) => {
   
   console.log('Получены playerIds:', playerIds);
   
-  // Ограничение количества параллельных запросов (например, 5 одновременно)
-  const concurrencyLimit = 50;
+  // Параллельная обработка с ограничением количества одновременных запросов
+  const concurrencyLimit = 5;
   const results = [];
   let index = 0;
   
@@ -94,7 +100,6 @@ exports.handler = async (event, context) => {
     }
   }
   
-  // Запускаем несколько параллельных "рабочих" для обработки запросов
   const workers = [];
   for (let i = 0; i < concurrencyLimit; i++) {
     workers.push(worker());
