@@ -125,7 +125,7 @@
       <h3>Технические кланы<br/>(ID, по одному в строке)</h3>
       <div class="split-field">
         <textarea class="left-input" id="techClans">9098</textarea>
-        <textarea class="right-output" id="techClansOutput" readonly></textarea>
+        <textarea class="right-output" id="techClansOutput" readonly>#9098 Пантеон.</textarea>
       </div>
     </div>
     <!-- Боевые кланы -->
@@ -137,7 +137,11 @@
 7705
 9595
 5722</textarea>
-        <textarea class="right-output" id="battleClansOutput" readonly></textarea>
+        <textarea class="right-output" id="battleClansOutput" readonly>#1209 Any Key
+#7490 Rising Phoenix
+#7705 † Angels &amp; Demons &Psi;
+#9595 Immortal Dynasty
+#5722 Галерея Теней</textarea>
       </div>
     </div>
     <!-- Особенные игроки -->
@@ -149,6 +153,8 @@
       </div>
     </div>
   </div>
+  <div id="statusMessage"></div>
+  <button id="processBtn">Обработать</button>
   <h2>Результаты:</h2>
   <!-- Глобальный выбор домена для отправки писем перенесён сюда -->
   <div>
@@ -161,8 +167,7 @@
   </div>
   <div id="results"></div>
 
-  <div id="statusMessage"></div>
-  <button id="processBtn">Обработать</button>
+  
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
