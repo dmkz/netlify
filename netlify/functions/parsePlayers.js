@@ -1,7 +1,7 @@
-// Файл: parsePlayers.js
 const { JSDOM } = require("jsdom");
 
 exports.handler = async (event, context) => {
+  console.log('Получен запрос с методом:', event.httpMethod);
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
@@ -12,13 +12,17 @@ exports.handler = async (event, context) => {
     playerIds = body.playerIds;
     if (!Array.isArray(playerIds)) throw new Error("playerIds must be an array");
   } catch (e) {
+    console.error('Ошибка обработки тела запроса:', e);
     return { statusCode: 400, body: JSON.stringify({ error: "Invalid request body" }) };
   }
+  
+  console.log('Получены playerIds:', playerIds);
   
   const results = [];
   for (const id of playerIds) {
     const url = `https://www.heroeswm.ru/pl_info.php?id=${id}`;
     try {
+      console.log(`Обработка игрока с id ${id} по URL: ${url}`);
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const html = await res.text();
@@ -60,12 +64,13 @@ exports.handler = async (event, context) => {
       }
       
       results.push({ id, name: playerName, crafts });
+      console.log(`Успешно обработан игрок ${id}:`, { name: playerName, crafts });
     } catch (e) {
-      // Можно логировать ошибку для данного id
       console.error(`Ошибка для игрока ${id}:`, e);
     }
   }
   
+  console.log(`Обработка завершена. Обработано ${results.length} игроков из ${playerIds.length}`);
   return {
     statusCode: 200,
     body: JSON.stringify({ players: results })
