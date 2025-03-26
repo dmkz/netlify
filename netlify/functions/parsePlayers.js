@@ -77,7 +77,7 @@ exports.handler = async (event, context) => {
   console.log('Получены playerIds:', playerIds);
   
   // Ограничение количества параллельных запросов (например, 5 одновременно)
-  const concurrencyLimit = 5;
+  const concurrencyLimit = 50;
   const results = [];
   let index = 0;
   
