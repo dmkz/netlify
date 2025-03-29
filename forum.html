@@ -152,8 +152,9 @@
     // Вспомогательная функция для исправления ссылки:
     // Заменяет все вхождения "<=" с числом на "&lt=" с этим числом.
     function fixHref(rawHref) {
-      return rawHref.replace(/<=(-?\d+)/g, '&lt=$1');
+      return rawHref.split('<=').join('&lt=');
     }
+
     
     // Функция обновления статуса парсинга
     function updateStatus(pagesParsed, fights, startTime) {
