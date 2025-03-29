@@ -86,12 +86,14 @@
       }
     });
     
+    // Запрос страницы через Netlify-функцию
     async function fetchPage(tid, page) {
       const response = await fetch(`/.netlify/functions/parser?tid=${tid}&page=${page}`);
       if (!response.ok) throw new Error('Ошибка сети: ' + response.status);
       return await response.text();
     }
     
+    // Извлечение названия темы и числа страниц из тега <title>
     function parseTitleAndPages(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
@@ -106,15 +108,17 @@
       };
     }
     
+    // Парсинг боёв из HTML страницы
     function parseFights(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
+      // Ищем ссылки с war.php или warlog.php
       const links = Array.from(doc.querySelectorAll('a[href*="war.php"], a[href*="warlog.php"]'));
       const fights = [];
       
       links.forEach(link => {
         let rawHref = link.getAttribute('href');
-        // Исправляем URL – если в нём встречается ошибка вида "<=число"
+        // Исправляем URL: если найдено "<=", переносим его в параметр lt как первый параметр.
         rawHref = fixHref(rawHref);
         
         const url = new URL(rawHref, 'https://www.heroeswm.ru');
@@ -137,7 +141,8 @@
       return fights;
     }
     
-    // Новая версия функции fixHref, которая разбирает строку запроса и корректирует параметры
+    // Функция fixHref: если в каком-либо параметре встречается "<=", удаляем его из этого параметра
+    // и добавляем параметр lt с соответствующим значением в начало строки запроса.
     function fixHref(rawHref) {
       const parts = rawHref.split('?');
       if (parts.length < 2) return rawHref;
@@ -145,32 +150,37 @@
       const query = parts[1];
       const params = query.split('&');
       let newParams = [];
-      let ltValue = null;
+      let ltParam = null;
       
       params.forEach(param => {
         const [key, value = ''] = param.split('=');
         if (value.includes('<=')) {
-          const [cleanValue, errPart] = value.split('<=');
-          newParams.push(`${key}=${cleanValue}`);
-          if (!newParams.some(p => p.startsWith('lt=')) && errPart !== undefined) {
-            ltValue = errPart;
+          const [cleanValue, ltValue] = value.split('<=');
+          // Сохраняем параметр без "<=" в исходном параметре (если есть значение)
+          if (cleanValue) {
+            newParams.push(`${key}=${cleanValue}`);
           }
+          // Сохраняем найденное значение для параметра lt
+          ltParam = `lt=${ltValue}`;
         } else {
           newParams.push(param);
         }
       });
-      if (ltValue !== null && !newParams.some(p => p.startsWith('lt='))) {
-        newParams.push(`lt=${ltValue}`);
+      // Если найден параметр lt, добавляем его первым
+      if (ltParam !== null) {
+        newParams = [ltParam, ...newParams];
       }
       return base + '?' + newParams.join('&');
     }
     
+    // Обновление статуса парсинга
     function updateStatus(pagesParsed, fights, startTime) {
       const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
       const totalFights = fights.diamonds.length + fights.player.length + fights.preview.length;
       statusDiv.innerHTML = `<p>Распаршено страниц: <strong>${pagesParsed}</strong> | Найдено боёв: <strong>${totalFights}</strong> | Время: <strong>${elapsed} s</strong></p>`;
     }
     
+    // Отображение результатов с кликабельными ссылками и кнопками "Скопировать"
     function displayResults(topicTitle, totalPages, fights) {
       let html = `<h2>Результаты парсинга</h2>
                   <p>Тема: <strong>${topicTitle}</strong>. Всего страниц: <strong>${totalPages}</strong>.</p>`;
@@ -180,7 +190,6 @@
         if (group.length) {
           groupHtml += `<ul id="${groupId}">`;
           group.forEach(f => {
-            // Создаём ссылку через DOM, чтобы задать и href, и текст без лишнего экранирования.
             groupHtml += `<li><a href="${f.url}" target="_blank">${f.url}</a></li>`;
           });
           groupHtml += `</ul>`;
@@ -197,6 +206,7 @@
       resultsDiv.innerHTML = html;
     }
     
+    // Функция копирования содержимого группы в буфер обмена
     function copyGroup(groupId) {
       const groupElement = document.getElementById(groupId);
       if (!groupElement) {
