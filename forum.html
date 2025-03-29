@@ -15,10 +15,7 @@
     <input id="tid" type="text" placeholder="Введите ID темы">
     <button id="startBtn">Старт</button>
   </div>
-  <!-- Статус парсинга -->
   <div id="status"></div>
-  
-  <!-- Результаты парсинга -->
   <div id="results"></div>
   
   <script>
@@ -33,29 +30,17 @@
         return;
       }
       
-      // Сброс предыдущего состояния
       statusDiv.innerHTML = '';
       resultsDiv.innerHTML = '';
-      
       const startTime = performance.now();
       
       try {
-        // Получаем raw HTML последней страницы
         const lastPageHTML = await fetchPage(tid, 'last');
-        
-        // Извлекаем название темы и число страниц
         const { title, totalPages } = parseTitleAndPages(lastPageHTML);
         statusDiv.innerHTML = `<p>Тема: <strong>${title}</strong>. Страниц: <strong>${totalPages}</strong>.</p>`;
         
-        // Объект для хранения боёв по группам
-        let fights = {
-          diamonds: [],
-          player: [],
-          preview: []
-        };
+        let fights = { diamonds: [], player: [], preview: [] };
         let pagesParsed = 0;
-        
-        // Загружаем все страницы параллельно
         const fetchPromises = [];
         for (let page = 1; page <= totalPages; page++) {
           fetchPromises.push(
@@ -86,14 +71,12 @@
       }
     });
     
-    // Запрос страницы через Netlify-функцию
     async function fetchPage(tid, page) {
       const response = await fetch(`/.netlify/functions/parser?tid=${tid}&page=${page}`);
       if (!response.ok) throw new Error('Ошибка сети: ' + response.status);
       return await response.text();
     }
     
-    // Извлечение названия темы и числа страниц из тега <title>
     function parseTitleAndPages(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
@@ -108,21 +91,56 @@
       };
     }
     
-    // Парсинг боёв из HTML страницы
+    // Функция, которая ищет подстроку "<=" в значениях параметров.
+    // Если она обнаружена, убирает её из текущего параметра и добавляет параметр lt с этим значением в начало строки.
+    function fixHref(rawHref) {
+      const parts = rawHref.split('?');
+      if (parts.length < 2) return rawHref;
+      const base = parts[0];
+      const query = parts[1];
+      const params = query.split('&');
+      let normalParams = [];
+      let ltValue = null;
+      
+      params.forEach(param => {
+        const [key, value = ''] = param.split('=');
+        if (value.includes('<=')) {
+          const [cleanValue, ltVal] = value.split('<=');
+          if (cleanValue) {
+            normalParams.push(`${key}=${cleanValue}`);
+          }
+          ltValue = ltVal;
+        } else {
+          normalParams.push(param);
+        }
+      });
+      let finalQuery = '';
+      if (ltValue !== null) {
+        finalQuery = `lt=${ltValue}`;
+        if (normalParams.length) {
+          finalQuery += '&' + normalParams.join('&');
+        }
+      } else {
+        finalQuery = normalParams.join('&');
+      }
+      return base + '?' + finalQuery;
+    }
+    
+    // Функция для парсинга ссылок на бои.
+    // Вместо создания объекта URL, мы используем исправленную строку и затем извлекаем параметры через URLSearchParams.
     function parseFights(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
-      // Ищем ссылки с war.php или warlog.php
       const links = Array.from(doc.querySelectorAll('a[href*="war.php"], a[href*="warlog.php"]'));
       const fights = [];
       
       links.forEach(link => {
         let rawHref = link.getAttribute('href');
-        // Исправляем URL: если найдено "<=", переносим его в параметр lt как первый параметр.
-        rawHref = fixHref(rawHref);
-        
-        const url = new URL(rawHref, 'https://www.heroeswm.ru');
-        const params = new URLSearchParams(url.search);
+        // Применяем функцию исправления – получаем итоговую строку, в которой lt находится первым, если он есть.
+        const finalHref = fixHref(rawHref);
+        // Извлекаем строку запроса из итогового URL:
+        const queryPart = finalHref.split('?')[1] || '';
+        const params = new URLSearchParams(queryPart);
         if (!params.has('warid')) return;
         
         let type = '';
@@ -136,51 +154,18 @@
             type = 'player';
           }
         }
-        fights.push({ url: url.toString(), type });
+        // Добавляем итоговый URL в виде строки – он уже сформирован нужным образом.
+        fights.push({ url: finalHref, type });
       });
       return fights;
     }
     
-    // Функция fixHref: если в каком-либо параметре встречается "<=", удаляем его из этого параметра
-    // и добавляем параметр lt с соответствующим значением в начало строки запроса.
-    function fixHref(rawHref) {
-      const parts = rawHref.split('?');
-      if (parts.length < 2) return rawHref;
-      const base = parts[0];
-      const query = parts[1];
-      const params = query.split('&');
-      let newParams = [];
-      let ltParam = null;
-      
-      params.forEach(param => {
-        const [key, value = ''] = param.split('=');
-        if (value.includes('<=')) {
-          const [cleanValue, ltValue] = value.split('<=');
-          // Сохраняем параметр без "<=" в исходном параметре (если есть значение)
-          if (cleanValue) {
-            newParams.push(`${key}=${cleanValue}`);
-          }
-          // Сохраняем найденное значение для параметра lt
-          ltParam = `lt=${ltValue}`;
-        } else {
-          newParams.push(param);
-        }
-      });
-      // Если найден параметр lt, добавляем его первым
-      if (ltParam !== null) {
-        newParams = [ltParam, ...newParams];
-      }
-      return base + '?' + newParams.join('&');
-    }
-    
-    // Обновление статуса парсинга
     function updateStatus(pagesParsed, fights, startTime) {
       const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
       const totalFights = fights.diamonds.length + fights.player.length + fights.preview.length;
       statusDiv.innerHTML = `<p>Распаршено страниц: <strong>${pagesParsed}</strong> | Найдено боёв: <strong>${totalFights}</strong> | Время: <strong>${elapsed} s</strong></p>`;
     }
     
-    // Отображение результатов с кликабельными ссылками и кнопками "Скопировать"
     function displayResults(topicTitle, totalPages, fights) {
       let html = `<h2>Результаты парсинга</h2>
                   <p>Тема: <strong>${topicTitle}</strong>. Всего страниц: <strong>${totalPages}</strong>.</p>`;
@@ -206,7 +191,6 @@
       resultsDiv.innerHTML = html;
     }
     
-    // Функция копирования содержимого группы в буфер обмена
     function copyGroup(groupId) {
       const groupElement = document.getElementById(groupId);
       if (!groupElement) {
@@ -215,12 +199,8 @@
       }
       const textToCopy = Array.from(groupElement.querySelectorAll("li")).map(li => li.innerText).join("\n");
       navigator.clipboard.writeText(textToCopy)
-        .then(() => {
-          alert("Скопировано в буфер обмена");
-        })
-        .catch(err => {
-          alert("Ошибка копирования: " + err);
-        });
+        .then(() => alert("Скопировано в буфер обмена"))
+        .catch(err => alert("Ошибка копирования: " + err));
     }
   </script>
 </body>
