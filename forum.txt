@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Парсер форумных проходок</title>
+</head>
+<body>
+  <h1>Парсер форумных проходок</h1>
+  <input id="tid" type="text" placeholder="Введите ID темы">
+  <button id="startBtn">Старт</button>
+  <div id="status"></div>
+  <div id="results"></div>
+
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const statusDiv = document.getElementById('status');
+    const resultsDiv = document.getElementById('results');
+
+    startBtn.addEventListener('click', async () => {
+      const tid = document.getElementById('tid').value.trim();
+      if (!tid) return alert('Укажите ID темы');
+      
+      const startTime = performance.now();
+      
+      // 1. Получаем последнюю страницу, чтобы определить общее число страниц и название темы
+      const lastPageHTML = await fetchPage(tid, 'last');
+      const { title, totalPages } = parseTitleAndPages(lastPageHTML);
+      statusDiv.innerHTML = `<p>Тема: <strong>${title}</strong>. Страниц: <strong>${totalPages}</strong>.</p>`;
+      
+      // 2. Загружаем все страницы параллельно
+      let pagesParsed = 0;
+      let fights = {
+        diamonds: [],
+        player: [],
+        preview: []
+      };
+
+      const fetchPromises = [];
+      for (let i = 1; i <= totalPages; i++) {
+        fetchPromises.push(
+          fetchPage(tid, i).then(html => {
+            pagesParsed++;
+            updateStatus(pagesParsed, fights, startTime);
+            // Парсим бои на странице
+            const pageFights = parseFights(html);
+            // Группируем бои по типам
+            pageFights.forEach(fight => {
+              if (fight.type === 'diamonds') {
+                fights.diamonds.push(fight);
+              } else if (fight.type === 'player') {
+                fights.player.push(fight);
+              } else if (fight.type === 'preview') {
+                fights.preview.push(fight);
+              }
+            });
+          })
+        );
+      }
+      
+      await Promise.all(fetchPromises);
+      updateStatus(pagesParsed, fights, startTime);
+      displayResults(title, totalPages, fights);
+    });
+
+    // Функция для вызова Netlify-функции
+    async function fetchPage(tid, page) {
+      const res = await fetch(`/.netlify/functions/parser?tid=${tid}&page=${page}`);
+      return await res.text();
+    }
+
+    // Извлечение названия темы и общего числа страниц из тега <title>
+    function parseTitleAndPages(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const titleTag = doc.querySelector('title').innerText;
+      // Например, titleTag = '"[News] Омут Русалки" - страница 122 из 122 | ...'
+      const titleMatch = titleTag.match(/^"([^"]+)"\s+-\s+страница/);
+      const pagesMatch = titleTag.match(/из\s+(\d+)/);
+      return {
+        title: titleMatch ? titleMatch[1] : 'Неизвестная тема',
+        totalPages: pagesMatch ? parseInt(pagesMatch[1], 10) : 1
+      };
+    }
+
+    // Парсинг ссылок боёв из HTML страницы
+    function parseFights(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const links = Array.from(doc.querySelectorAll('a[href*="war.php"], a[href*="warlog.php"]'));
+      const fights = [];
+
+      links.forEach(link => {
+        const href = link.getAttribute('href');
+        // Преобразуем относительный URL в абсолютный, если нужно:
+        const url = new URL(href, 'https://www.heroeswm.ru');
+        const params = new URLSearchParams(url.search);
+        // warid обязателен:
+        if (!params.has('warid')) return;
+
+        // Определяем тип боя
+        let type = '';
+        if (params.has('showt')) {
+          type = 'diamonds';
+        } else {
+          // Если есть show_enemy, это предпросмотр
+          if (params.has('show_enemy')) {
+            type = 'preview';
+          }
+          // Если есть show или show_for_all – это бой игрока
+          if (params.has('show') || params.has('show_for_all')) {
+            type = 'player';
+          }
+        }
+        fights.push({ url: url.toString(), type });
+      });
+      return fights;
+    }
+
+    // Обновление статуса парсинга
+    function updateStatus(pagesParsed, fights, startTime) {
+      const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+      const totalFights = fights.diamonds.length + fights.player.length + fights.preview.length;
+      statusDiv.innerHTML = `<p>Распаршено страниц: <strong>${pagesParsed}</strong> | Найдено боёв: <strong>${totalFights}</strong> | Время: <strong>${elapsed} s</strong></p>`;
+    }
+
+    // Вывод результатов
+    function displayResults(topicTitle, totalPages, fights) {
+      let html = `<h2>Результаты парсинга</h2>
+                  <p>Тема: <strong>${topicTitle}</strong>. Всего страниц: <strong>${totalPages}</strong>.</p>`;
+      html += `<h3>Бои за бриллианты (${fights.diamonds.length})</h3><ul>`;
+      fights.diamonds.forEach(f => html += `<li>${f.url}</li>`);
+      html += `</ul>`;
+      html += `<h3>Бои игрока (${fights.player.length})</h3><ul>`;
+      fights.player.forEach(f => html += `<li>${f.url}</li>`);
+      html += `</ul>`;
+      html += `<h3>Предпросмотр (${fights.preview.length})</h3><ul>`;
+      fights.preview.forEach(f => html += `<li>${f.url}</li>`);
+      html += `</ul>`;
+      resultsDiv.innerHTML = html;
+    }
+  </script>
+</body>
+</html>
