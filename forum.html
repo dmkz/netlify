@@ -2,17 +2,24 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Парсер форумных проходок с raw data</title>
+  <title>Парсер форумных проходок</title>
 </head>
 <body>
   <h1>Парсер форумных проходок</h1>
-  <input id="tid" type="text" placeholder="Введите ID темы">
-  <button id="startBtn">Старт</button>
+  <div>
+    <input id="tid" type="text" placeholder="Введите ID темы">
+    <button id="startBtn">Старт</button>
+  </div>
+  <!-- Статус парсинга -->
   <div id="status"></div>
-  <!-- Textarea для вывода raw HTML -->
+  
+  <!-- Raw Data последней страницы -->
+  <h2>Raw Data (последняя страница)</h2>
   <textarea id="rawData" rows="15" cols="100" placeholder="Raw data будет здесь"></textarea>
+  
+  <!-- Результаты парсинга -->
   <div id="results"></div>
-
+  
   <script>
     const startBtn = document.getElementById('startBtn');
     const statusDiv = document.getElementById('status');
@@ -21,43 +28,167 @@
 
     startBtn.addEventListener('click', async () => {
       const tid = document.getElementById('tid').value.trim();
-      if (!tid) return alert('Укажите ID темы');
-
+      if (!tid) {
+        alert('Укажите ID темы');
+        return;
+      }
+      
+      // Сброс предыдущего состояния
+      statusDiv.innerHTML = '';
+      resultsDiv.innerHTML = '';
+      rawDataTextArea.value = '';
+      
+      const startTime = performance.now();
+      
       try {
-        // Получаем raw data последней страницы для определения темы и числа страниц
+        // Получаем raw HTML последней страницы
         const lastPageHTML = await fetchPage(tid, 'last');
-        // Вывод raw HTML в textarea
+        // Выводим raw data в textarea
         rawDataTextArea.value = lastPageHTML;
-
+        
+        // Извлекаем название темы и число страниц
         const { title, totalPages } = parseTitleAndPages(lastPageHTML);
         statusDiv.innerHTML = `<p>Тема: <strong>${title}</strong>. Страниц: <strong>${totalPages}</strong>.</p>`;
+        
+        // Объект для хранения боёв по группам
+        let fights = {
+          diamonds: [],
+          player: [],
+          preview: []
+        };
+        let pagesParsed = 0;
+        
+        // Загружаем все страницы параллельно
+        const fetchPromises = [];
+        for (let page = 1; page <= totalPages; page++) {
+          fetchPromises.push(
+            fetchPage(tid, page).then(pageHTML => {
+              pagesParsed++;
+              // Обновляем статус парсинга
+              updateStatus(pagesParsed, fights, startTime);
+              // Парсим бои с текущей страницы
+              const pageFights = parseFights(pageHTML);
+              pageFights.forEach(fight => {
+                if (fight.type === 'diamonds') {
+                  fights.diamonds.push(fight);
+                } else if (fight.type === 'player') {
+                  fights.player.push(fight);
+                } else if (fight.type === 'preview') {
+                  fights.preview.push(fight);
+                }
+              });
+            }).catch(error => {
+              console.error(`Ошибка при загрузке страницы ${page}:`, error);
+            })
+          );
+        }
+        await Promise.all(fetchPromises);
+        updateStatus(pagesParsed, fights, startTime);
+        displayResults(title, totalPages, fights);
       } catch (error) {
-        alert('Ошибка получения raw data: ' + error.message);
+        alert('Ошибка: ' + error.message);
+        console.error(error);
       }
     });
-
-    // Функция для вызова Netlify-функции и получения HTML страницы
+    
+    // Функция для запроса страницы через Netlify-функцию
     async function fetchPage(tid, page) {
-      const res = await fetch(`/.netlify/functions/parser?tid=${tid}&page=${page}`);
-      if (!res.ok) throw new Error('Ошибка сети: ' + res.status);
-      return await res.text();
+      const response = await fetch(`/.netlify/functions/parser?tid=${tid}&page=${page}`);
+      if (!response.ok) throw new Error('Ошибка сети: ' + response.status);
+      return await response.text();
     }
-
-    // Функция для парсинга названия темы и общего числа страниц из тега <title>
+    
+    // Функция для извлечения названия темы и числа страниц из тега <title>
     function parseTitleAndPages(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
       const titleElement = doc.querySelector('title');
-      if (!titleElement) {
-        throw new Error("Элемент <title> не найден в HTML");
-      }
+      if (!titleElement) throw new Error("Элемент <title> не найден в HTML");
       const titleText = titleElement.innerText;
+      // Пример: "[News] Омут Русалки" - страница 122 из 122 | Общий игровой форум ...
       const titleMatch = titleText.match(/^"([^"]+)"\s+-\s+страница/);
       const pagesMatch = titleText.match(/из\s+(\d+)/);
       return {
         title: titleMatch ? titleMatch[1] : 'Неизвестная тема',
         totalPages: pagesMatch ? parseInt(pagesMatch[1], 10) : 1
       };
+    }
+    
+    // Функция для парсинга боёв из HTML страницы
+    function parseFights(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      // Ищем ссылки, содержащие war.php или warlog.php
+      const links = Array.from(doc.querySelectorAll('a[href*="war.php"], a[href*="warlog.php"]'));
+      const fights = [];
+      
+      links.forEach(link => {
+        const href = link.getAttribute('href');
+        // Преобразуем относительный URL в абсолютный
+        const url = new URL(href, 'https://www.heroeswm.ru');
+        const params = new URLSearchParams(url.search);
+        // warid - обязательный параметр
+        if (!params.has('warid')) return;
+        
+        let type = '';
+        // Если присутствует параметр showt, это "Бои за бриллианты"
+        if (params.has('showt')) {
+          type = 'diamonds';
+        } else {
+          // Если есть show_enemy, то это предпросмотр
+          if (params.has('show_enemy')) {
+            type = 'preview';
+          }
+          // Если присутствует show или show_for_all, то это бой игрока
+          if (params.has('show') || params.has('show_for_all')) {
+            type = 'player';
+          }
+        }
+        fights.push({ url: url.toString(), type });
+      });
+      return fights;
+    }
+    
+    // Функция обновления статуса парсинга
+    function updateStatus(pagesParsed, fights, startTime) {
+      const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+      const totalFights = fights.diamonds.length + fights.player.length + fights.preview.length;
+      statusDiv.innerHTML = `<p>Распаршено страниц: <strong>${pagesParsed}</strong> | Найдено боёв: <strong>${totalFights}</strong> | Время: <strong>${elapsed} s</strong></p>`;
+    }
+    
+    // Функция отображения результатов
+    function displayResults(topicTitle, totalPages, fights) {
+      let html = `<h2>Результаты парсинга</h2>
+                  <p>Тема: <strong>${topicTitle}</strong>. Всего страниц: <strong>${totalPages}</strong>.</p>`;
+      
+      html += `<h3>Бои за бриллианты (${fights.diamonds.length})</h3>`;
+      if (fights.diamonds.length) {
+        html += `<ul>`;
+        fights.diamonds.forEach(f => html += `<li>${f.url}</li>`);
+        html += `</ul>`;
+      } else {
+        html += `<p>Нет боёв за бриллианты.</p>`;
+      }
+      
+      html += `<h3>Бои игрока (${fights.player.length})</h3>`;
+      if (fights.player.length) {
+        html += `<ul>`;
+        fights.player.forEach(f => html += `<li>${f.url}</li>`);
+        html += `</ul>`;
+      } else {
+        html += `<p>Нет боёв игрока.</p>`;
+      }
+      
+      html += `<h3>Предпросмотр (${fights.preview.length})</h3>`;
+      if (fights.preview.length) {
+        html += `<ul>`;
+        fights.preview.forEach(f => html += `<li>${f.url}</li>`);
+        html += `</ul>`;
+      } else {
+        html += `<p>Нет предпросмотра.</p>`;
+      }
+      
+      resultsDiv.innerHTML = html;
     }
   </script>
 </body>
