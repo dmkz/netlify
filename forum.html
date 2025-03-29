@@ -120,9 +120,14 @@
       const fights = [];
       
       links.forEach(link => {
-        const href = link.getAttribute('href');
+        // Получаем "сырое" значение атрибута, чтобы избежать двойного декодирования HTML-сущностей
+        let rawHref = link.getAttribute('href');
+        // Если параметр lt задан как "<" (например, "<=-1" или просто "<"),
+        // заменяем его на корректное "lt". Обрабатываем и начало строки, и внутри строки.
+        rawHref = rawHref.replace(/\?</, '?lt').replace(/&</g, '&lt');
+        
         // Преобразуем относительный URL в абсолютный
-        const url = new URL(href, 'https://www.heroeswm.ru');
+        const url = new URL(rawHref, 'https://www.heroeswm.ru');
         const params = new URLSearchParams(url.search);
         // warid - обязательный параметр
         if (!params.has('warid')) return;
