@@ -91,43 +91,53 @@
       };
     }
     
-    // Функция, которая ищет подстроку "<=" в значениях параметров.
-    // Если она обнаружена, убирает её из текущего параметра и добавляет параметр lt с этим значением в начало строки.
+    // Функция, которая исправляет ссылку:
+    // – Приводит относительную ссылку к абсолютной (добавляет домен)
+    // – Ищет в значении параметров подстроку "<=", удаляет её из текущего параметра и извлекает значение для lt
+    // – Собирает новую строку запроса, где параметр lt (если найден) ставится первым
     function fixHref(rawHref) {
-      const parts = rawHref.split('?');
-      if (parts.length < 2) return rawHref;
-      const base = parts[0];
-      const query = parts[1];
-      const params = query.split('&');
-      let normalParams = [];
-      let ltValue = null;
+      // Приводим ссылку к абсолютной, если она относительная
+      let absoluteHref = rawHref;
+      if (!absoluteHref.startsWith('http')) {
+        absoluteHref = 'https://www.heroeswm.ru' + absoluteHref;
+      }
       
-      params.forEach(param => {
-        const [key, value = ''] = param.split('=');
-        if (value.includes('<=')) {
-          const [cleanValue, ltVal] = value.split('<=');
-          if (cleanValue) {
-            normalParams.push(`${key}=${cleanValue}`);
+      const urlObj = new URL(absoluteHref);
+      const paramsArr = [];
+      urlObj.searchParams.forEach((value, key) => {
+        paramsArr.push({ key, value });
+      });
+      
+      let ltValue = null;
+      const filteredParams = [];
+      paramsArr.forEach(param => {
+        if (param.value.includes('<=')) {
+          const [cleanValue, errorPart] = param.value.split('<=');
+          filteredParams.push({ key: param.key, value: cleanValue });
+          if (ltValue === null && errorPart) {
+            ltValue = errorPart;
           }
-          ltValue = ltVal;
+        } else if (param.key === 'lt') {
+          // Пропускаем существующий lt
         } else {
-          normalParams.push(param);
+          filteredParams.push(param);
         }
       });
-      let finalQuery = '';
+      
+      // Собираем новую строку запроса: если найден ltValue, добавляем его первым
+      let newQueryParts = [];
       if (ltValue !== null) {
-        finalQuery = `lt=${ltValue}`;
-        if (normalParams.length) {
-          finalQuery += '&' + normalParams.join('&');
-        }
-      } else {
-        finalQuery = normalParams.join('&');
+        newQueryParts.push(`lt=${encodeURIComponent(ltValue)}`);
       }
-      return base + '?' + finalQuery;
+      filteredParams.forEach(param => {
+        newQueryParts.push(`${encodeURIComponent(param.key)}=${encodeURIComponent(param.value)}`);
+      });
+      
+      urlObj.search = newQueryParts.join('&');
+      return urlObj.toString();
     }
     
-    // Функция для парсинга ссылок на бои.
-    // Вместо создания объекта URL, мы используем исправленную строку и затем извлекаем параметры через URLSearchParams.
+    // Парсинг ссылок на бои – используем fixHref для получения итогового URL-строки
     function parseFights(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
@@ -135,10 +145,10 @@
       const fights = [];
       
       links.forEach(link => {
-        let rawHref = link.getAttribute('href');
-        // Применяем функцию исправления – получаем итоговую строку, в которой lt находится первым, если он есть.
+        const rawHref = link.getAttribute('href');
         const finalHref = fixHref(rawHref);
-        // Извлекаем строку запроса из итогового URL:
+        
+        // Используем URLSearchParams для определения типа боя, но итоговая ссылка берется из fixHref
         const queryPart = finalHref.split('?')[1] || '';
         const params = new URLSearchParams(queryPart);
         if (!params.has('warid')) return;
@@ -154,7 +164,6 @@
             type = 'player';
           }
         }
-        // Добавляем итоговый URL в виде строки – он уже сформирован нужным образом.
         fights.push({ url: finalHref, type });
       });
       return fights;
