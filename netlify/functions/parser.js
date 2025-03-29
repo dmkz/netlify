@@ -1,9 +1,22 @@
 // netlify/functions/parser.js
-const fetch = require("node-fetch");
 const iconv = require("iconv-lite");
 
 exports.handler = async (event, context) => {
   console.log("Получены параметры запроса:", event.queryStringParameters);
+  
+  let fetch;
+  try {
+    // Динамический импорт node-fetch для работы с ES-модулем
+    const module = await import('node-fetch');
+    fetch = module.default;
+    console.log("node-fetch успешно импортирован.");
+  } catch (err) {
+    console.error("Ошибка при импорте node-fetch:", err);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Ошибка импорта node-fetch" }),
+    };
+  }
 
   try {
     const { tid, page } = event.queryStringParameters;
@@ -32,7 +45,7 @@ exports.handler = async (event, context) => {
     const arrayBuffer = await response.arrayBuffer();
     console.log("Получен ArrayBuffer, длина:", arrayBuffer.byteLength);
 
-    // Декодируем из windows-1251:
+    // Декодирование из windows-1251:
     const decodedHTML = iconv.decode(Buffer.from(arrayBuffer), "windows-1251");
     console.log("Успешно декодирован HTML");
 
