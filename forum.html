@@ -61,9 +61,7 @@
           fetchPromises.push(
             fetchPage(tid, page).then(pageHTML => {
               pagesParsed++;
-              // Обновляем статус парсинга
               updateStatus(pagesParsed, fights, startTime);
-              // Парсим бои с текущей страницы
               const pageFights = parseFights(pageHTML);
               pageFights.forEach(fight => {
                 if (fight.type === 'diamonds') {
@@ -88,21 +86,18 @@
       }
     });
     
-    // Функция для запроса страницы через Netlify-функцию
     async function fetchPage(tid, page) {
       const response = await fetch(`/.netlify/functions/parser?tid=${tid}&page=${page}`);
       if (!response.ok) throw new Error('Ошибка сети: ' + response.status);
       return await response.text();
     }
     
-    // Функция для извлечения названия темы и числа страниц из тега <title>
     function parseTitleAndPages(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
       const titleElement = doc.querySelector('title');
       if (!titleElement) throw new Error("Элемент <title> не найден в HTML");
       const titleText = titleElement.innerText;
-      // Пример: "[News] Омут Русалки" - страница 122 из 122 | Общий игровой форум ...
       const titleMatch = titleText.match(/^"([^"]+)"\s+-\s+страница/);
       const pagesMatch = titleText.match(/из\s+(\d+)/);
       return {
@@ -111,35 +106,28 @@
       };
     }
     
-    // Функция для парсинга боёв из HTML страницы
     function parseFights(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
-      // Ищем ссылки, содержащие war.php или warlog.php
       const links = Array.from(doc.querySelectorAll('a[href*="war.php"], a[href*="warlog.php"]'));
       const fights = [];
       
       links.forEach(link => {
         let rawHref = link.getAttribute('href');
-        // Применяем исправление для параметра lt:
+        // Исправляем URL – если в нём встречается ошибка вида "<=число"
         rawHref = fixHref(rawHref);
         
-        // Преобразуем относительный URL в абсолютный
         const url = new URL(rawHref, 'https://www.heroeswm.ru');
         const params = new URLSearchParams(url.search);
-        // warid - обязательный параметр
         if (!params.has('warid')) return;
         
         let type = '';
-        // Если присутствует параметр showt, это "Бои за бриллианты"
         if (params.has('showt')) {
           type = 'diamonds';
         } else {
-          // Если есть show_enemy, то это предпросмотр
           if (params.has('show_enemy')) {
             type = 'preview';
           }
-          // Если присутствует show или show_for_all, то это бой игрока
           if (params.has('show') || params.has('show_for_all')) {
             type = 'player';
           }
@@ -149,31 +137,50 @@
       return fights;
     }
     
-    // Вспомогательная функция для исправления ссылки:
-    // Заменяет все вхождения "<=" с числом на "&lt=" с этим числом.
+    // Новая версия функции fixHref, которая разбирает строку запроса и корректирует параметры
     function fixHref(rawHref) {
-      return rawHref.split('<=').join('&lt=');
+      const parts = rawHref.split('?');
+      if (parts.length < 2) return rawHref;
+      const base = parts[0];
+      const query = parts[1];
+      const params = query.split('&');
+      let newParams = [];
+      let ltValue = null;
+      
+      params.forEach(param => {
+        const [key, value = ''] = param.split('=');
+        if (value.includes('<=')) {
+          const [cleanValue, errPart] = value.split('<=');
+          newParams.push(`${key}=${cleanValue}`);
+          if (!newParams.some(p => p.startsWith('lt=')) && errPart !== undefined) {
+            ltValue = errPart;
+          }
+        } else {
+          newParams.push(param);
+        }
+      });
+      if (ltValue !== null && !newParams.some(p => p.startsWith('lt='))) {
+        newParams.push(`lt=${ltValue}`);
+      }
+      return base + '?' + newParams.join('&');
     }
-
     
-    // Функция обновления статуса парсинга
     function updateStatus(pagesParsed, fights, startTime) {
       const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
       const totalFights = fights.diamonds.length + fights.player.length + fights.preview.length;
       statusDiv.innerHTML = `<p>Распаршено страниц: <strong>${pagesParsed}</strong> | Найдено боёв: <strong>${totalFights}</strong> | Время: <strong>${elapsed} s</strong></p>`;
     }
     
-    // Функция отображения результатов с кнопками "Скопировать" и кликабельными ссылками
     function displayResults(topicTitle, totalPages, fights) {
       let html = `<h2>Результаты парсинга</h2>
                   <p>Тема: <strong>${topicTitle}</strong>. Всего страниц: <strong>${totalPages}</strong>.</p>`;
       
-      // Вспомогательная функция для формирования блока группы
       function renderGroup(title, group, groupId) {
         let groupHtml = `<h3>${title} (${group.length}) <button class="copy-btn" onclick="copyGroup('${groupId}')">Скопировать</button></h3>`;
         if (group.length) {
           groupHtml += `<ul id="${groupId}">`;
           group.forEach(f => {
+            // Создаём ссылку через DOM, чтобы задать и href, и текст без лишнего экранирования.
             groupHtml += `<li><a href="${f.url}" target="_blank">${f.url}</a></li>`;
           });
           groupHtml += `</ul>`;
@@ -190,7 +197,6 @@
       resultsDiv.innerHTML = html;
     }
     
-    // Функция копирования содержимого группы в буфер обмена
     function copyGroup(groupId) {
       const groupElement = document.getElementById(groupId);
       if (!groupElement) {
