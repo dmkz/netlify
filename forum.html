@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>Парсер форумных проходок</title>
+  <style>
+    button.copy-btn {
+      margin-left: 10px;
+    }
+  </style>
 </head>
 <body>
   <h1>Парсер форумных проходок</h1>
@@ -13,17 +18,12 @@
   <!-- Статус парсинга -->
   <div id="status"></div>
   
-  <!-- Raw Data последней страницы -->
-  <h2>Raw Data (последняя страница)</h2>
-  <textarea id="rawData" rows="15" cols="100" placeholder="Raw data будет здесь"></textarea>
-  
   <!-- Результаты парсинга -->
   <div id="results"></div>
   
   <script>
     const startBtn = document.getElementById('startBtn');
     const statusDiv = document.getElementById('status');
-    const rawDataTextArea = document.getElementById('rawData');
     const resultsDiv = document.getElementById('results');
 
     startBtn.addEventListener('click', async () => {
@@ -36,15 +36,12 @@
       // Сброс предыдущего состояния
       statusDiv.innerHTML = '';
       resultsDiv.innerHTML = '';
-      rawDataTextArea.value = '';
       
       const startTime = performance.now();
       
       try {
         // Получаем raw HTML последней страницы
         const lastPageHTML = await fetchPage(tid, 'last');
-        // Выводим raw data в textarea
-        rawDataTextArea.value = lastPageHTML;
         
         // Извлекаем название темы и число страниц
         const { title, totalPages } = parseTitleAndPages(lastPageHTML);
@@ -156,39 +153,48 @@
       statusDiv.innerHTML = `<p>Распаршено страниц: <strong>${pagesParsed}</strong> | Найдено боёв: <strong>${totalFights}</strong> | Время: <strong>${elapsed} s</strong></p>`;
     }
     
-    // Функция отображения результатов
+    // Функция отображения результатов с кнопками "Скопировать" и кликабельными ссылками
     function displayResults(topicTitle, totalPages, fights) {
       let html = `<h2>Результаты парсинга</h2>
                   <p>Тема: <strong>${topicTitle}</strong>. Всего страниц: <strong>${totalPages}</strong>.</p>`;
       
-      html += `<h3>Бои за бриллианты (${fights.diamonds.length})</h3>`;
-      if (fights.diamonds.length) {
-        html += `<ul>`;
-        fights.diamonds.forEach(f => html += `<li>${f.url}</li>`);
-        html += `</ul>`;
-      } else {
-        html += `<p>Нет боёв за бриллианты.</p>`;
+      // Вспомогательная функция для формирования блока группы
+      function renderGroup(title, group, groupId) {
+        let groupHtml = `<h3>${title} (${group.length}) <button class="copy-btn" onclick="copyGroup('${groupId}')">Скопировать</button></h3>`;
+        if (group.length) {
+          groupHtml += `<ul id="${groupId}">`;
+          group.forEach(f => {
+            groupHtml += `<li><a href="${f.url}" target="_blank">${f.url}</a></li>`;
+          });
+          groupHtml += `</ul>`;
+        } else {
+          groupHtml += `<p>Нет данных.</p>`;
+        }
+        return groupHtml;
       }
       
-      html += `<h3>Бои игрока (${fights.player.length})</h3>`;
-      if (fights.player.length) {
-        html += `<ul>`;
-        fights.player.forEach(f => html += `<li>${f.url}</li>`);
-        html += `</ul>`;
-      } else {
-        html += `<p>Нет боёв игрока.</p>`;
-      }
-      
-      html += `<h3>Предпросмотр (${fights.preview.length})</h3>`;
-      if (fights.preview.length) {
-        html += `<ul>`;
-        fights.preview.forEach(f => html += `<li>${f.url}</li>`);
-        html += `</ul>`;
-      } else {
-        html += `<p>Нет предпросмотра.</p>`;
-      }
+      html += renderGroup("Бои за бриллианты", fights.diamonds, "diamondsList");
+      html += renderGroup("Бои игрока", fights.player, "playerList");
+      html += renderGroup("Предпросмотр", fights.preview, "previewList");
       
       resultsDiv.innerHTML = html;
+    }
+    
+    // Функция копирования содержимого группы в буфер обмена
+    function copyGroup(groupId) {
+      const groupElement = document.getElementById(groupId);
+      if (!groupElement) {
+        alert("Нет данных для копирования");
+        return;
+      }
+      const textToCopy = Array.from(groupElement.querySelectorAll("li")).map(li => li.innerText).join("\n");
+      navigator.clipboard.writeText(textToCopy)
+        .then(() => {
+          alert("Скопировано в буфер обмена");
+        })
+        .catch(err => {
+          alert("Ошибка копирования: " + err);
+        });
     }
   </script>
 </body>
