@@ -47,17 +47,18 @@
     const statusDynamicDiv = document.getElementById('statusDynamic');
     const resultsDiv = document.getElementById('results');
 
-    // Глобальные переменные для отслеживания
+    // Глобальные переменные для отслеживания прогресса
     let totalPages = 0;
+    let pagesProcessed = 0;
+    let errorsCount = 0;
     let currentAttempt = 1;
     let startTime = 0;
     let dynamicTimer;
     let globalTopic = "";
-    // Массив состояния для каждой страницы: индекс i соответствует странице i+1
-    // 0 – не обработана, 1 – успешно, 2 – ошибка
+    // Массив состояния для каждой страницы: 0 – ещё не обработана, 1 – успешно, 2 – ошибка
     let pageStatus = [];
 
-    // Функция для подсчёта успехов и ошибок на основе pageStatus
+    // Функция подсчёта успешных и ошибочных страниц из pageStatus
     function countStatuses() {
       const successes = pageStatus.filter(s => s === 1).length;
       const errors = pageStatus.filter(s => s === 2).length;
@@ -104,7 +105,8 @@
       resultsDiv.innerHTML = "";
       startTime = performance.now();
       currentAttempt = 1;
-      pageStatus = []; // сбрасываем состояние для каждой страницы
+      pagesProcessed = 0;
+      errorsCount = 0;
 
       try {
         // Получаем общее число страниц через запрос page=last
@@ -112,26 +114,38 @@
         const titleData = parseTitleAndPages(lastPageHTML);
         globalTopic = titleData.title;
         totalPages = titleData.totalPages;
-        // Инициализируем массив состояния (индексы 0...totalPages-1, все 0)
+        // Инициализируем массив состояния (индексы 0..totalPages-1, все 0)
         pageStatus = Array(totalPages).fill(0);
         // Запускаем таймер динамичного статуса
         startStatusTimer();
 
-        // Создаём массив номеров страниц (1..totalPages)
+        // Создаём массив номеров страниц (1 .. totalPages)
         const allPages = Array.from({ length: totalPages }, (_, i) => i + 1);
         let overallFights = { diamonds: [], player: [], preview: [] };
 
-        // Пока остаются страницы, не обработанные успешно, повторяем попытки
+        // Обрабатываем страницы, у которых статус != 1 (то есть ещё не успешно обработаны)
         let pagesToProcess = allPages.filter(page => pageStatus[page - 1] !== 1);
         while (currentAttempt <= maxAttempts && pagesToProcess.length > 0) {
-          // Обрабатываем страницы, у которых status != 1 (0 или 2)
           const { successes, errors } = await processPages(pagesToProcess, tid, parallelRequests);
           overallFights = mergeFights(overallFights, successes);
-          // Обновляем список страниц для повторной обработки – только те, у которых статус не равен 1
+          // Обновляем pagesToProcess – остаются страницы с состоянием 0 или 2
           pagesToProcess = allPages.filter(page => pageStatus[page - 1] !== 1);
           currentAttempt++;
         }
+        // Перед остановкой таймера обновляем финальный статус
+        if (pagesToProcess.length === 0) {
+          // Если все страницы успешно обработаны, принудительно установим их статус = 1
+          pageStatus = Array(totalPages).fill(1);
+        }
+        const finalElapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+        const { successes, errors } = countStatuses();
+        statusDynamicDiv.innerHTML =
+          `Тема: ${globalTopic} | Попытка: ${currentAttempt} | Всего страниц: ${totalPages} | Успешно обработано: ${successes} | Ошибок: ${errors} | Время: ${finalElapsed} s`;
         clearInterval(dynamicTimer);
+        // Удаляем дубликаты по URL для каждой группы
+        overallFights.diamonds = deduplicateFights(overallFights.diamonds);
+        overallFights.player = deduplicateFights(overallFights.player);
+        overallFights.preview = deduplicateFights(overallFights.preview);
         displayResults(globalTopic, totalPages, overallFights);
       } catch (error) {
         alert("Ошибка: " + error.message);
@@ -141,20 +155,18 @@
 
     // Обработка массива страниц с параллельными запросами
     async function processPages(pageNumbers, tid, parallelRequests) {
-      // Для каждого номера страницы создаём задачу, которая возвращает {page, fights}
-      // Если успешно – обновляем pageStatus[page-1] = 1, если ошибка – = 2
       const tasks = pageNumbers.map(page => async () => {
         try {
           const html = await fetchPage(tid, page);
           const fights = parseFights(html) || [];
-          pageStatus[page - 1] = 1;
+          pageStatus[page - 1] = 1; // успешно
           return { page, fights };
         } catch(e) {
-          pageStatus[page - 1] = 2;
+          pageStatus[page - 1] = 2; // ошибка
           throw { page, error: e };
         }
       });
-      // Для простоты запускаем все задачи параллельно, разбив на чанки если необходимо
+      // Запускаем задачи параллельно по чанкам
       const chunkSize = parallelRequests;
       let successes = [];
       let errors = [];
@@ -223,7 +235,7 @@
           if (cleanValue) otherParams.push(`${key}=${cleanValue}`);
           if (ltValue === null && extra) ltValue = extra;
         } else if (key === 'lt') {
-          // пропускаем, чтобы задать lt первым
+          // Пропускаем существующий lt
         } else {
           otherParams.push(param);
         }
