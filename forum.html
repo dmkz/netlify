@@ -5,9 +5,9 @@
   <title>Парсер форумных проходок</title>
   <style>
     button.copy-btn { margin-left: 10px; }
-    /* Первое поле – достаточно широкое */
+    /* Первое поле достаточно широкое для полного placeholder */
     #tid { width: 400px; }
-    /* Второе и третье поля – узкие, примерно под 4-5 цифр */
+    /* Второе и третье поля узкие, примерно для 4-5 цифр */
     #maxAttempts, #parallelRequests { width: 60px; }
     .attempt-status { border: 1px solid #ccc; padding: 5px; margin: 5px 0; }
   </style>
@@ -15,9 +15,9 @@
 <body>
   <h1>Парсер форумных проходок</h1>
   <div>
-    <!-- Первое поле для tid или ссылки -->
+    <!-- Поле для ввода tid или ссылки -->
     <input id="tid" type="text" placeholder="Введите tid или ссылку на тему">
-    <!-- Поля для количества попыток и параллельных запросов -->
+    <!-- Поля для числа попыток и параллельных запросов -->
     <input id="maxAttempts" type="number" placeholder="Попытки" min="1" value="3">
     <input id="parallelRequests" type="number" placeholder="Запросы" min="1" value="100">
     <button id="startBtn">Старт</button>
@@ -26,7 +26,7 @@
   <div id="results"></div>
 
   <script>
-    // Загрузка сохранённых значений
+    // Загружаем сохранённые значения из localStorage
     const tidInput = document.getElementById('tid');
     const maxAttemptsInput = document.getElementById('maxAttempts');
     const parallelRequestsInput = document.getElementById('parallelRequests');
@@ -37,7 +37,7 @@
     if (storedMaxAttempts) maxAttemptsInput.value = storedMaxAttempts;
     if (storedParallel) parallelRequestsInput.value = storedParallel;
 
-    // Сохранение изменений в localStorage
+    // Сохраняем изменения при изменении значений
     tidInput.addEventListener('change', () => localStorage.setItem('tid', tidInput.value));
     maxAttemptsInput.addEventListener('change', () => localStorage.setItem('maxAttempts', maxAttemptsInput.value));
     parallelRequestsInput.addEventListener('change', () => localStorage.setItem('parallelRequests', parallelRequestsInput.value));
@@ -46,12 +46,27 @@
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
 
+    // Глобальные переменные для отслеживания прогресса
+    let totalPages = 0;
+    let pagesProcessed = 0;
+    let errorsCount = 0;
+    let currentAttempt = 1;
+    let startTime = 0;
+
+    // Функция для обновления динамичного статуса (каждые 200 мс)
+    function startStatusTimer() {
+      return setInterval(() => {
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+        statusDiv.innerHTML = `Попытка: ${currentAttempt} | Всего страниц: ${totalPages} | Успешно обработано: ${pagesProcessed} | Ошибок: ${errorsCount} | Время: ${elapsed} s`;
+      }, 200);
+    }
+
     startBtn.addEventListener('click', async () => {
       const inputVal = tidInput.value.trim();
       if (!inputVal) { alert('Введите tid или ссылку'); return; }
       localStorage.setItem('tid', inputVal);
 
-      // Если введена ссылка, извлекаем tid
+      // Извлекаем tid, если введена ссылка
       let tid;
       try {
         if (inputVal.startsWith('http')) {
@@ -73,33 +88,46 @@
 
       statusDiv.innerHTML = "";
       resultsDiv.innerHTML = "";
-      const startTime = performance.now();
+      startTime = performance.now();
+      currentAttempt = 1;
+      pagesProcessed = 0;
+      errorsCount = 0;
 
       try {
         // Определяем общее число страниц через запрос page=last
         const lastPageHTML = await fetchPage(tid, 'last');
-        const { title, totalPages } = parseTitleAndPages(lastPageHTML);
+        const titleData = parseTitleAndPages(lastPageHTML);
+        const title = titleData.title;
+        totalPages = titleData.totalPages;
+        // Выводим сразу информацию о теме
         appendStatus(`Тема: <strong>${title}</strong>. Всего страниц: <strong>${totalPages}</strong>.`);
         
-        // Массив номеров страниц от 1 до totalPages
+        const statusTimer = startStatusTimer();
+        
+        // Создаём массив номеров страниц
         const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
         let overallFights = { diamonds: [], player: [], preview: [] };
 
+        // Страницы для обработки на первой попытке – все
         let pagesToProcess = pages;
-        let attempt = 1;
-        while (attempt <= maxAttempts && pagesToProcess.length > 0) {
-          appendStatus(`<div class="attempt-status">Попытка ${attempt} (страниц для обработки: ${pagesToProcess.length})</div>`);
-          const { successes, errors } = await processPages(pagesToProcess, tid, parallelRequests, attempt);
-          // Debug: выводим данные successes
-          console.log(`Попытка ${attempt}, successes:`, successes);
+        while (currentAttempt <= maxAttempts && pagesToProcess.length > 0) {
+          appendStatus(`<div class="attempt-status">Начало попытки ${currentAttempt}. Страниц для обработки: ${pagesToProcess.length}</div>`);
+          const { successes, errors } = await processPages(pagesToProcess, tid, parallelRequests);
+          // Обновляем глобальные счётчики
+          pagesProcessed += successes.length;
+          errorsCount = errors.length;
           overallFights = mergeFights(overallFights, successes);
-          appendStatus(`Попытка ${attempt}: успешно обработано страниц: ${successes.length}, ошибок: ${errors.length}`);
+          appendStatus(`Попытка ${currentAttempt}: успешно обработано: ${successes.length}, ошибок: ${errors.length}`);
           pagesToProcess = errors.map(e => e.page);
-          attempt++;
+          currentAttempt++;
         }
         if (pagesToProcess.length > 0) {
           appendStatus(`<div class="attempt-status">После ${maxAttempts} попыток ошибки остались на страницах: ${pagesToProcess.join(', ')}</div>`);
         }
+        clearInterval(statusTimer);
+        // Итоговый статус с временем завершения
+        const finalElapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+        appendStatus(`Парсинг завершён за ${finalElapsed} s. Всего обработано страниц: ${pagesProcessed}.`);
         displayResults(title, totalPages, overallFights);
       } catch (error) {
         alert("Ошибка: " + error.message);
@@ -107,14 +135,14 @@
       }
     });
 
-    // Добавление строки в статус
+    // Функция для добавления строки в statusDiv (накапливаем отладочные сообщения)
     function appendStatus(html) {
       const div = document.createElement('div');
       div.innerHTML = html;
       statusDiv.appendChild(div);
     }
 
-    // Функция для запуска задач с ограничением параллельности
+    // Запуск задач с ограничением по параллельным запросам
     async function runTasksConcurrently(tasks, concurrency) {
       let index = 0;
       const results = [];
@@ -128,7 +156,9 @@
         const p = task().then(result => { results[current] = result; })
                         .catch(err => { errors.push({ index: current, error: err }); });
         running.push(p);
-        p.finally(() => { running.splice(running.indexOf(p), 1); });
+        p.finally(() => {
+          running.splice(running.indexOf(p), 1);
+        });
         if (running.length >= concurrency) {
           await Promise.race(running);
         }
@@ -139,8 +169,8 @@
       return { results, errors };
     }
 
-    // Обработка страниц с указанным числом параллельных запросов
-    async function processPages(pageNumbers, tid, parallelRequests, attemptNumber) {
+    // Обработка массива страниц с параллельными запросами
+    async function processPages(pageNumbers, tid, parallelRequests) {
       const tasks = pageNumbers.map(page => async () => {
         try {
           const html = await fetchPage(tid, page);
@@ -155,9 +185,8 @@
       return { successes, errors };
     }
 
-    // Функция слияния боёв: теперь successes – массив объектов { page, fights }
+    // Функция слияния результатов (принимает массив объектов { page, fights })
     function mergeFights(all, successes) {
-      console.log("mergeFights:", { all, successes });
       successes.forEach(item => {
         const fights = item.fights;
         all.diamonds = all.diamonds.concat(fights.filter(f => f.type === 'diamonds'));
@@ -167,14 +196,14 @@
       return all;
     }
 
-    // Функция запроса страницы через Netlify-функцию
+    // Запрос страницы через Netlify-функцию
     async function fetchPage(tid, page) {
       const response = await fetch(`/.netlify/functions/parser?tid=${tid}&page=${page}`);
       if (!response.ok) throw new Error('Ошибка сети: ' + response.status);
       return await response.text();
     }
 
-    // Извлечение названия темы и числа страниц из тега <title>
+    // Извлечение названия темы и общего числа страниц из тега <title>
     function parseTitleAndPages(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
@@ -189,10 +218,10 @@
       };
     }
 
-    // Функция, выполняющая первичные замены:
-    // 1. warlog.php -> war.php
-    // 2. show_for_all= -> show=
-    // 3. Если в значении встречается "<=", извлекает значение для lt и переносит его первым
+    // Функция для обработки URL: выполняет замены:
+    // 1. warlog.php → war.php,
+    // 2. show_for_all= → show=,
+    // 3. Если значение содержит "<=", извлекает значение для lt и ставит его первым.
     function fixHref(rawHref) {
       let href = rawHref.replace(/warlog\.php/g, 'war.php').replace(/show_for_all=/g, 'show=');
       if (!href.startsWith('http')) {
@@ -212,7 +241,7 @@
           if (cleanValue) otherParams.push(`${key}=${cleanValue}`);
           if (ltValue === null && extra) ltValue = extra;
         } else if (key === 'lt') {
-          // пропускаем существующий lt
+          // пропускаем, чтобы потом задать lt первым
         } else {
           otherParams.push(param);
         }
@@ -234,8 +263,8 @@
       const links = Array.from(doc.querySelectorAll('a[href*="war.php"]'));
       const fights = [];
       links.forEach(link => {
-        let rawHref = link.getAttribute('href');
-        let finalHref = fixHref(rawHref);
+        const rawHref = link.getAttribute('href');
+        const finalHref = fixHref(rawHref);
         const queryPart = finalHref.split('?')[1] || '';
         const params = new URLSearchParams(queryPart);
         if (!params.has('warid')) return;
@@ -255,17 +284,10 @@
       return fights;
     }
 
-    // Функция обновления динамичного статуса
-    function updateStatus(pagesParsed, fights, startTime) {
-      const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
-      const totalFights = fights.diamonds.length + fights.player.length + fights.preview.length;
-      statusDiv.innerHTML = `<p>Распаршено страниц: <strong>${pagesParsed}</strong> | Найдено боёв: <strong>${totalFights}</strong> | Время: <strong>${elapsed} s</strong></p>`;
-    }
-
-    // Вывод результатов
+    // Вывод итоговых результатов
     function displayResults(topicTitle, totalPages, fights) {
       let html = `<h2>Результаты парсинга</h2>
-                  <p>Тема: <strong>${topicTitle}</strong>. Всего страниц: <strong>${totalPages}</strong>.</p>`;
+                  <p>Тема: <strong>${topicTitle}</strong>. Всего страниц: <strong>${totalPages}</strong>. Всего боёв: <strong>${fights.diamonds.length + fights.player.length + fights.preview.length}</strong></p>`;
       function renderGroup(title, group, groupId) {
         let groupHtml = `<h3>${title} (${group.length}) <button class="copy-btn" onclick="copyGroup('${groupId}')">Скопировать</button></h3>`;
         if (group.length) {
@@ -279,7 +301,6 @@
         }
         return groupHtml;
       }
-      // Используем поля объекта fights
       html += renderGroup("Бои за бриллианты", fights.diamonds, "diamondsList");
       html += renderGroup("Бои игрока", fights.player, "playerList");
       html += renderGroup("Предпросмотр", fights.preview, "previewList");
