@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Парсер форумных проходок</title>
+  <style>
+    button.copy-btn { margin-left: 10px; }
+    /* Первое поле – достаточно широкое для полного текста */
+    #tid { width: 400px; }
+    /* Второе и третье поля – узкие */
+    #maxAttempts, #parallelRequests { width: 60px; }
+    /* Динамический статус – одна строка */
+    #statusDynamic { font-weight: bold; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Парсер форумных проходок</h1>
+  <div>
+    <!-- Поле для ввода tid или ссылки -->
+    <input id="tid" type="text" placeholder="Введите tid или ссылку на тему">
+    <!-- Поля для числа попыток и параллельных запросов -->
+    <input id="maxAttempts" type="number" placeholder="Попытки" min="1" value="3">
+    <input id="parallelRequests" type="number" placeholder="Запросы" min="1" value="100">
+    <button id="startBtn">Старт</button>
+  </div>
+  <!-- Динамический статус -->
+  <div id="statusDynamic"></div>
+  <div id="results"></div>
+
+  <script>
+    // Загружаем сохранённые значения из localStorage
+    const tidInput = document.getElementById('tid');
+    const maxAttemptsInput = document.getElementById('maxAttempts');
+    const parallelRequestsInput = document.getElementById('parallelRequests');
+    const storedTid = localStorage.getItem('tid');
+    const storedMaxAttempts = localStorage.getItem('maxAttempts');
+    const storedParallel = localStorage.getItem('parallelRequests');
+    if (storedTid) tidInput.value = storedTid;
+    if (storedMaxAttempts) maxAttemptsInput.value = storedMaxAttempts;
+    if (storedParallel) parallelRequestsInput.value = storedParallel;
+
+    tidInput.addEventListener('change', () => localStorage.setItem('tid', tidInput.value));
+    maxAttemptsInput.addEventListener('change', () => localStorage.setItem('maxAttempts', maxAttemptsInput.value));
+    parallelRequestsInput.addEventListener('change', () => localStorage.setItem('parallelRequests', parallelRequestsInput.value));
+
+    const startBtn = document.getElementById('startBtn');
+    const statusDynamicDiv = document.getElementById('statusDynamic');
+    const resultsDiv = document.getElementById('results');
+
+    // Глобальные переменные для отслеживания прогресса
+    let totalPages = 0;
+    let pagesProcessed = 0;
+    let errorsCount = 0;
+    let currentAttempt = 1;
+    let startTime = 0;
+    let dynamicTimer;
+    let globalTopic = "";
+
+    // Динамический статус обновляется каждые 200 мс
+    function startStatusTimer() {
+      dynamicTimer = setInterval(() => {
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+        statusDynamicDiv.innerHTML =
+          `Тема: ${globalTopic} | Попытка: ${currentAttempt} | Всего страниц: ${totalPages} | Успешно обработано: ${pagesProcessed} | Ошибок: ${errorsCount} | Время: ${elapsed} s`;
+      }, 200);
+    }
+
+    startBtn.addEventListener('click', async () => {
+      const inputVal = tidInput.value.trim();
+      if (!inputVal) { alert('Введите tid или ссылку'); return; }
+      localStorage.setItem('tid', inputVal);
+
+      // Если введена ссылка, извлекаем tid
+      let tid;
+      try {
+        if (inputVal.startsWith('http')) {
+          const url = new URL(inputVal);
+          tid = url.searchParams.get('tid');
+          if (!tid) throw new Error("В ссылке не найден параметр tid");
+        } else {
+          tid = inputVal;
+        }
+      } catch(e) {
+        alert("Ошибка разбора ввода: " + e.message);
+        return;
+      }
+
+      const maxAttempts = parseInt(maxAttemptsInput.value, 10) || 3;
+      const parallelRequests = parseInt(parallelRequestsInput.value, 10) || 100;
+      localStorage.setItem('maxAttempts', maxAttempts);
+      localStorage.setItem('parallelRequests', parallelRequests);
+
+      // Сброс предыдущего состояния
+      statusDynamicDiv.innerHTML = "";
+      resultsDiv.innerHTML = "";
+      startTime = performance.now();
+      currentAttempt = 1;
+      pagesProcessed = 0;
+      errorsCount = 0;
+
+      try {
+        // Определяем общее число страниц через запрос page=last
+        const lastPageHTML = await fetchPage(tid, 'last');
+        const titleData = parseTitleAndPages(lastPageHTML);
+        globalTopic = titleData.title;
+        totalPages = titleData.totalPages;
+        // Запускаем таймер динамичного статуса
+        startStatusTimer();
+
+        // Создаём массив номеров страниц
+        const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+        let overallFights = { diamonds: [], player: [], preview: [] };
+
+        // На первой попытке обрабатываем все страницы
+        let pagesToProcess = pages;
+        while (currentAttempt <= maxAttempts && pagesToProcess.length > 0) {
+          const { successes, errors } = await processPages(pagesToProcess, tid, parallelRequests);
+          // Обновление глобальных счётчиков уже происходит внутри processPages
+          overallFights = mergeFights(overallFights, successes);
+          pagesToProcess = errors.map(e => e.page);
+          currentAttempt++;
+        }
+        clearInterval(dynamicTimer);
+        // Перед выводом итогов удаляем дубликаты по URL
+        overallFights.diamonds = deduplicateFights(overallFights.diamonds);
+        overallFights.player = deduplicateFights(overallFights.player);
+        overallFights.preview = deduplicateFights(overallFights.preview);
+        displayResults(globalTopic, totalPages, overallFights);
+      } catch (error) {
+        alert("Ошибка: " + error.message);
+        console.error(error);
+      }
+    });
+
+    // Новый вариант runTasksConcurrently – с использованием цикла и пула
+    async function runTasksConcurrently(tasks, concurrency) {
+      const results = new Array(tasks.length);
+      const errors = [];
+      const pool = [];
+      for (let i = 0; i < tasks.length; i++) {
+        const p = tasks[i]().then(result => { results[i] = result; })
+                          .catch(err => { errors.push({ index: i, error: err }); });
+        pool.push(p);
+        if (pool.length >= concurrency) {
+          await Promise.race(pool);
+          // Убираем завершённые задачи из пула
+          for (let j = pool.length - 1; j >= 0; j--) {
+            if (pool[j].resolved) { // здесь мы не можем явно проверить resolved, поэтому просто убираем все, 
+              // если Promise.allSettled(pool) покажет, что они завершены, можно сделать проверку, 
+              // но для простоты мы не будем удалять вручную
+            }
+          }
+        }
+      }
+      await Promise.all(pool);
+      return { results, errors };
+    }
+
+    // Более простой вариант, использующий Promise.all для всех задач (так как общее число страниц не очень велико)
+    async function runAllTasks(tasks) {
+      const results = await Promise.all(tasks.map(task => task().catch(e => e)));
+      const errors = results.filter(r => r && r.error);
+      return { results, errors };
+    }
+
+    // Обработка массива страниц с параллельными запросами
+    async function processPages(pageNumbers, tid, parallelRequests) {
+      const tasks = pageNumbers.map(page => async () => {
+        try {
+          const html = await fetchPage(tid, page);
+          const fights = parseFights(html);
+          pagesProcessed++;  // увеличиваем счётчик сразу при успешной обработке
+          return { page, fights };
+        } catch(e) {
+          errorsCount++;  // увеличиваем счётчик ошибок сразу при возникновении ошибки
+          throw { page, error: e };
+        }
+      });
+      // Для упрощения (и так общее число страниц не очень велико) используем Promise.all
+      const { results, errors } = await runAllTasks(tasks);
+      const successes = results.filter(r => r && !r.error);
+      return { successes, errors };
+    }
+
+    // Слияние результатов: successes – массив объектов { page, fights }
+    function mergeFights(all, successes) {
+      successes.forEach(item => {
+        const fights = item.fights;
+        all.diamonds = all.diamonds.concat(fights.filter(f => f.type === 'diamonds'));
+        all.player = all.player.concat(fights.filter(f => f.type === 'player'));
+        all.preview = all.preview.concat(fights.filter(f => f.type === 'preview'));
+      });
+      return all;
+    }
+
+    // Функция запроса страницы через Netlify-функцию
+    async function fetchPage(tid, page) {
+      const response = await fetch(`/.netlify/functions/parser?tid=${tid}&page=${page}`);
+      if (!response.ok) throw new Error('Ошибка сети: ' + response.status);
+      return await response.text();
+    }
+
+    // Извлечение названия темы и числа страниц из тега <title>
+    function parseTitleAndPages(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const titleElement = doc.querySelector('title');
+      if (!titleElement) throw new Error("Элемент <title> не найден в HTML");
+      const titleText = titleElement.innerText;
+      const titleMatch = titleText.match(/^"([^"]+)"\s+-\s+страница/);
+      const pagesMatch = titleText.match(/из\s+(\d+)/);
+      return {
+        title: titleMatch ? titleMatch[1] : 'Неизвестная тема',
+        totalPages: pagesMatch ? parseInt(pagesMatch[1], 10) : 1
+      };
+    }
+
+    // Функция для обработки URL:
+    // 1. warlog.php → war.php, show_for_all= → show=
+    // 2. Если значение содержит "<=", извлекает значение для lt и ставит его первым
+    function fixHref(rawHref) {
+      let href = rawHref.replace(/warlog\.php/g, 'war.php').replace(/show_for_all=/g, 'show=');
+      if (!href.startsWith('http')) {
+        href = 'https://www.heroeswm.ru' + href;
+      }
+      const parts = href.split('?');
+      if (parts.length < 2) return href;
+      const base = parts[0];
+      const query = parts[1];
+      const paramsArr = query.split('&');
+      let ltValue = null;
+      const otherParams = [];
+      paramsArr.forEach(param => {
+        const [key, value = ''] = param.split('=');
+        if (value.includes('<=')) {
+          const [cleanValue, extra] = value.split('<=');
+          if (cleanValue) otherParams.push(`${key}=${cleanValue}`);
+          if (ltValue === null && extra) ltValue = extra;
+        } else if (key === 'lt') {
+          // пропускаем, чтобы задать lt первым
+        } else {
+          otherParams.push(param);
+        }
+      });
+      let newQuery = "";
+      if (ltValue !== null) {
+        newQuery = `lt=${encodeURIComponent(ltValue)}`;
+        if (otherParams.length > 0) newQuery += '&' + otherParams.join('&');
+      } else {
+        newQuery = otherParams.join('&');
+      }
+      return base + '?' + newQuery;
+    }
+
+    // Парсинг ссылок на бои
+    function parseFights(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const links = Array.from(doc.querySelectorAll('a[href*="war.php"]'));
+      const fights = [];
+      links.forEach(link => {
+        const rawHref = link.getAttribute('href');
+        const finalHref = fixHref(rawHref);
+        const queryPart = finalHref.split('?')[1] || '';
+        const params = new URLSearchParams(queryPart);
+        if (!params.has('warid')) return;
+        let type = '';
+        if (params.has('showt')) {
+          type = 'diamonds';
+        } else {
+          if (params.has('show_enemy')) {
+            type = 'preview';
+          }
+          if (params.has('show')) {
+            type = 'player';
+          }
+        }
+        fights.push({ url: finalHref, type });
+      });
+      return fights;
+    }
+
+    // Функция удаления дубликатов по URL
+    function deduplicateFights(fightsArray) {
+      const seen = new Set();
+      return fightsArray.filter(fight => {
+        if (seen.has(fight.url)) return false;
+        seen.add(fight.url);
+        return true;
+      });
+    }
+
+    // Вывод итоговых результатов
+    function displayResults(topic, totalPages, fights) {
+      const totalFights = deduplicateFights(fights.diamonds).length +
+                          deduplicateFights(fights.player).length +
+                          deduplicateFights(fights.preview).length;
+      let html = `<h2>Результаты парсинга</h2>
+                  <p>Тема: <strong>${topic}</strong>. Всего страниц: <strong>${totalPages}</strong>. Всего боёв: <strong>${totalFights}</strong></p>`;
+      function renderGroup(title, group, groupId) {
+        const uniqueGroup = deduplicateFights(group);
+        let groupHtml = `<h3>${title} (${uniqueGroup.length}) <button class="copy-btn" onclick="copyGroup('${groupId}')">Скопировать</button></h3>`;
+        if (uniqueGroup.length) {
+          groupHtml += `<ul id="${groupId}">`;
+          uniqueGroup.forEach(f => {
+            groupHtml += `<li><a href="${f.url}" target="_blank">${f.url}</a></li>`;
+          });
+          groupHtml += `</ul>`;
+        } else {
+          groupHtml += `<p>Нет данных.</p>`;
+        }
+        return groupHtml;
+      }
+      html += renderGroup("Бои за бриллианты", fights.diamonds, "diamondsList");
+      html += renderGroup("Бои игрока", fights.player, "playerList");
+      html += renderGroup("Предпросмотр", fights.preview, "previewList");
+      resultsDiv.innerHTML = html;
+    }
+
+    function copyGroup(groupId) {
+      const groupElement = document.getElementById(groupId);
+      if (!groupElement) {
+        alert("Нет данных для копирования");
+        return;
+      }
+      const textToCopy = Array.from(groupElement.querySelectorAll("li"))
+                               .map(li => li.innerText)
+                               .join("\n");
+      navigator.clipboard.writeText(textToCopy)
+        .then(() => alert("Скопировано в буфер обмена"))
+        .catch(err => alert("Ошибка копирования: " + err));
+    }
+  </script>
+</body>
+</html>
