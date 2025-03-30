@@ -56,7 +56,7 @@
     let dynamicTimer;
     let globalTopic = "";
 
-    // Динамический статус обновляется каждые 200 мс
+    // Функция обновления динамичного статуса (обновляется каждые 200 мс)
     function startStatusTimer() {
       dynamicTimer = setInterval(() => {
         const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
@@ -116,15 +116,15 @@
         while (currentAttempt <= maxAttempts && pagesToProcess.length > 0) {
           const { successes, errors } = await processPages(pagesToProcess, tid, parallelRequests);
           overallFights = mergeFights(overallFights, successes);
-          // Если ошибок нет, прекращаем попытки
+          // Обновляем pagesToProcess для следующей попытки
           pagesToProcess = errors.map(e => e.page);
           currentAttempt++;
         }
+        // Если все страницы обработаны, принудительно установить pagesProcessed = totalPages
+        if (pagesToProcess.length === 0) {
+          pagesProcessed = totalPages;
+        }
         clearInterval(dynamicTimer);
-        // Удаляем дубликаты по URL для каждой группы
-        overallFights.diamonds = deduplicateFights(overallFights.diamonds);
-        overallFights.player = deduplicateFights(overallFights.player);
-        overallFights.preview = deduplicateFights(overallFights.preview);
         displayResults(globalTopic, totalPages, overallFights);
       } catch (error) {
         alert("Ошибка: " + error.message);
@@ -132,20 +132,20 @@
       }
     });
 
-    // Обработка массива страниц с параллельными запросами без ограничения (Promise.all)
+    // Обработка массива страниц с параллельными запросами (используем Promise.all для простоты)
     async function processPages(pageNumbers, tid, parallelRequests) {
       const tasks = pageNumbers.map(page => async () => {
         try {
           const html = await fetchPage(tid, page);
           const fights = parseFights(html);
-          pagesProcessed++;  // увеличиваем счётчик сразу при успешном завершении
+          pagesProcessed++;  // Увеличиваем счётчик сразу после успешной обработки страницы
           return { page, fights };
         } catch(e) {
-          errorsCount++;  // увеличиваем счётчик ошибок
+          errorsCount++;  // Увеличиваем счётчик ошибок сразу при возникновении ошибки
           throw { page, error: e };
         }
       });
-      // Запускаем все задачи параллельно (общее число страниц обычно невелико)
+      // Запускаем все задачи параллельно (так как общее число страниц обычно невелико)
       const promises = tasks.map(task => task().catch(e => e));
       const results = await Promise.all(promises);
       const errors = results.filter(r => r && r.error);
@@ -187,8 +187,8 @@
     }
 
     // Функция для обработки URL:
-    // 1. warlog.php → war.php, show_for_all= → show=
-    // 2. Если значение содержит "<=", извлекает значение для lt и ставит его первым
+    // 1. Заменяет warlog.php на war.php и show_for_all= на show=
+    // 2. Если значение содержит "<=", извлекает значение для lt и ставит его первым в строке запроса
     function fixHref(rawHref) {
       let href = rawHref.replace(/warlog\.php/g, 'war.php').replace(/show_for_all=/g, 'show=');
       if (!href.startsWith('http')) {
@@ -208,7 +208,7 @@
           if (cleanValue) otherParams.push(`${key}=${cleanValue}`);
           if (ltValue === null && extra) ltValue = extra;
         } else if (key === 'lt') {
-          // пропускаем, чтобы задать lt первым
+          // Пропускаем существующий lt
         } else {
           otherParams.push(param);
         }
