@@ -115,15 +115,13 @@
         let pagesToProcess = pages;
         while (currentAttempt <= maxAttempts && pagesToProcess.length > 0) {
           const { successes, errors } = await processPages(pagesToProcess, tid, parallelRequests);
-          pagesProcessed += successes.length;
-          errorsCount = errors.length;
+          // Здесь не прибавляем, так как pagesProcessed обновляется внутри задач
+          // Обновляем ошибки, если нужны (они уже увеличиваются в задачах)
           overallFights = mergeFights(overallFights, successes);
           pagesToProcess = errors.map(e => e.page);
           currentAttempt++;
         }
         clearInterval(dynamicTimer);
-        const finalElapsed = ((performance.now() - startTime) / 1000).toFixed(3);
-        // Итоговый статус будет отображён в динамичной строке уже после остановки таймера
         displayResults(globalTopic, totalPages, overallFights);
       } catch (error) {
         alert("Ошибка: " + error.message);
@@ -131,7 +129,7 @@
       }
     });
 
-    // Функция для запуска задач с ограничением по параллельности
+    // Функция запуска задач с ограничением по параллельности
     async function runTasksConcurrently(tasks, concurrency) {
       let index = 0;
       const results = [];
@@ -162,8 +160,12 @@
         try {
           const html = await fetchPage(tid, page);
           const fights = parseFights(html);
+          // Обновляем глобальный счётчик сразу при успешной обработке
+          pagesProcessed++;
           return { page, fights };
         } catch(e) {
+          // Обновляем счётчик ошибок сразу при возникновении ошибки
+          errorsCount++;
           throw { page, error: e };
         }
       });
