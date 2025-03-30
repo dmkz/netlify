@@ -4,79 +4,179 @@
   <meta charset="UTF-8">
   <title>Парсер форумных проходок</title>
   <style>
-    button.copy-btn {
-      margin-left: 10px;
-    }
+    button.copy-btn { margin-left: 10px; }
+    input { margin: 5px; }
+    .attempt-status { border: 1px solid #ccc; padding: 5px; margin: 5px 0; }
   </style>
 </head>
 <body>
   <h1>Парсер форумных проходок</h1>
   <div>
-    <input id="tid" type="text" placeholder="Введите ID темы">
+    <!-- Пользователь может ввести либо tid, либо ссылку с параметром tid -->
+    <input id="tid" type="text" placeholder="Введите tid или ссылку на тему">
+    <input id="maxAttempts" type="number" placeholder="Попытки" min="1" value="3">
+    <input id="parallelRequests" type="number" placeholder="Параллельные запросы" min="1" value="100">
     <button id="startBtn">Старт</button>
   </div>
   <div id="status"></div>
   <div id="results"></div>
-  
+
   <script>
+    // Загрузка значений из localStorage
+    const tidInput = document.getElementById('tid');
+    const maxAttemptsInput = document.getElementById('maxAttempts');
+    const parallelRequestsInput = document.getElementById('parallelRequests');
+    const storedTid = localStorage.getItem('tid');
+    const storedMaxAttempts = localStorage.getItem('maxAttempts');
+    const storedParallel = localStorage.getItem('parallelRequests');
+    if (storedTid) tidInput.value = storedTid;
+    if (storedMaxAttempts) maxAttemptsInput.value = storedMaxAttempts;
+    if (storedParallel) parallelRequestsInput.value = storedParallel;
+
+    // Сохраняем изменения в localStorage
+    tidInput.addEventListener('change', () => localStorage.setItem('tid', tidInput.value));
+    maxAttemptsInput.addEventListener('change', () => localStorage.setItem('maxAttempts', maxAttemptsInput.value));
+    parallelRequestsInput.addEventListener('change', () => localStorage.setItem('parallelRequests', parallelRequestsInput.value));
+
     const startBtn = document.getElementById('startBtn');
     const statusDiv = document.getElementById('status');
     const resultsDiv = document.getElementById('results');
 
     startBtn.addEventListener('click', async () => {
-      const tid = document.getElementById('tid').value.trim();
-      if (!tid) {
-        alert('Укажите ID темы');
+      // Сохраняем текущие значения
+      const inputVal = tidInput.value.trim();
+      if (!inputVal) { alert('Введите tid или ссылку'); return; }
+      localStorage.setItem('tid', inputVal);
+
+      // Если введена ссылка, извлекаем tid из неё
+      let tid;
+      try {
+        if (inputVal.startsWith('http')) {
+          const url = new URL(inputVal);
+          tid = url.searchParams.get('tid');
+          if (!tid) throw new Error("В ссылке не найден параметр tid");
+        } else {
+          tid = inputVal;
+        }
+      } catch(e) {
+        alert("Ошибка разбора ввода: " + e.message);
         return;
       }
-      
-      statusDiv.innerHTML = '';
-      resultsDiv.innerHTML = '';
-      const startTime = performance.now();
-      
+
+      const maxAttempts = parseInt(maxAttemptsInput.value, 10) || 3;
+      const parallelRequests = parseInt(parallelRequestsInput.value, 10) || 100;
+      localStorage.setItem('maxAttempts', maxAttempts);
+      localStorage.setItem('parallelRequests', parallelRequests);
+
+      // Сброс предыдущего состояния
+      statusDiv.innerHTML = "";
+      resultsDiv.innerHTML = "";
+
       try {
+        // Определяем общее число страниц по запросу page=last
         const lastPageHTML = await fetchPage(tid, 'last');
         const { title, totalPages } = parseTitleAndPages(lastPageHTML);
-        statusDiv.innerHTML = `<p>Тема: <strong>${title}</strong>. Страниц: <strong>${totalPages}</strong>.</p>`;
+        appendStatus(`Тема: <strong>${title}</strong>. Всего страниц: <strong>${totalPages}</strong>.`);
         
-        let fights = { diamonds: [], player: [], preview: [] };
-        let pagesParsed = 0;
-        const fetchPromises = [];
-        for (let page = 1; page <= totalPages; page++) {
-          fetchPromises.push(
-            fetchPage(tid, page).then(pageHTML => {
-              pagesParsed++;
-              updateStatus(pagesParsed, fights, startTime);
-              const pageFights = parseFights(pageHTML);
-              pageFights.forEach(fight => {
-                if (fight.type === 'diamonds') {
-                  fights.diamonds.push(fight);
-                } else if (fight.type === 'player') {
-                  fights.player.push(fight);
-                } else if (fight.type === 'preview') {
-                  fights.preview.push(fight);
-                }
-              });
-            }).catch(error => {
-              console.error(`Ошибка при загрузке страницы ${page}:`, error);
-            })
-          );
+        // Массив номеров страниц от 1 до totalPages
+        const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+        let overallFights = { diamonds: [], player: [], preview: [] };
+
+        // Массив для накопления результатов каждой попытки
+        let attemptStatuses = [];
+
+        // Массив страниц, которые нужно обработать (на первой попытке – все)
+        let pagesToProcess = pages;
+        let attempt = 1;
+        while (attempt <= maxAttempts && pagesToProcess.length > 0) {
+          appendStatus(`<div class="attempt-status">Попытка ${attempt} (страниц для обработки: ${pagesToProcess.length})</div>`);
+          const { successes, errors } = await processPages(pagesToProcess, tid, parallelRequests, attempt);
+          // Объединяем успешные бои с общим результатом
+          overallFights = mergeFights(overallFights, successes.fights);
+          appendStatus(`Попытка ${attempt}: успешно обработано страниц: ${successes.pages}, ошибок: ${errors.length}`);
+          // Следующая попытка – страницы, где произошли ошибки
+          pagesToProcess = errors.map(e => e.page);
+          attempt++;
         }
-        await Promise.all(fetchPromises);
-        updateStatus(pagesParsed, fights, startTime);
-        displayResults(title, totalPages, fights);
+        
+        if (pagesToProcess.length > 0) {
+          appendStatus(`<div class="attempt-status">После ${maxAttempts} попыток остались ошибки на страницах: ${pagesToProcess.join(', ')}</div>`);
+        }
+        displayResults(title, totalPages, overallFights);
       } catch (error) {
-        alert('Ошибка: ' + error.message);
+        alert("Ошибка: " + error.message);
         console.error(error);
       }
     });
-    
+
+    // Функция для добавления статуса в statusDiv (с накоплением попыток)
+    function appendStatus(html) {
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      statusDiv.appendChild(div);
+    }
+
+    // Функция для выполнения набора задач с ограничением по параллельным запросам.
+    async function runTasksConcurrently(tasks, concurrency) {
+      let index = 0;
+      const results = [];
+      const errors = [];
+      const running = [];
+
+      async function runNext() {
+        if (index >= tasks.length) return;
+        const current = index++;
+        const task = tasks[current];
+        const p = task().then(result => { results[current] = result; })
+                        .catch(err => { errors.push({ index: current, error: err }); });
+        running.push(p);
+        p.finally(() => {
+          running.splice(running.indexOf(p), 1);
+        });
+        if (running.length >= concurrency) {
+          await Promise.race(running);
+        }
+        await runNext();
+      }
+      await runNext();
+      await Promise.all(running);
+      return { results, errors };
+    }
+
+    // Функция processPages: получает массив номеров страниц и возвращает объект с успехами и ошибками
+    async function processPages(pageNumbers, tid, parallelRequests, attemptNumber) {
+      const tasks = pageNumbers.map(page => async () => {
+        try {
+          const html = await fetchPage(tid, page);
+          const fights = parseFights(html);
+          return { page, fights };
+        } catch(e) {
+          throw { page, error: e };
+        }
+      });
+      const { results, errors } = await runTasksConcurrently(tasks, parallelRequests);
+      // Успешные результаты – те, где результат определён
+      const successes = results.filter(r => r !== undefined);
+      return { successes, errors };
+    }
+
+    // Слияние боёв из разных попыток
+    function mergeFights(all, part) {
+      return {
+        diamonds: all.diamonds.concat(part.filter(f => f.type === 'diamonds').flatMap(f => f.fights || f.fights === undefined ? [f] : [])),
+        player: all.player.concat(part.filter(f => f.type === 'player').flatMap(f => f.fights || f.fights === undefined ? [f] : [])),
+        preview: all.preview.concat(part.filter(f => f.type === 'preview').flatMap(f => f.fights || f.fights === undefined ? [f] : []))
+      };
+    }
+
+    // Функция запроса страницы через Netlify-функцию
     async function fetchPage(tid, page) {
       const response = await fetch(`/.netlify/functions/parser?tid=${tid}&page=${page}`);
       if (!response.ok) throw new Error('Ошибка сети: ' + response.status);
       return await response.text();
     }
-    
+
+    // Извлечение названия темы и общего числа страниц из тега <title>
     function parseTitleAndPages(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
@@ -90,69 +190,66 @@
         totalPages: pagesMatch ? parseInt(pagesMatch[1], 10) : 1
       };
     }
-    
-    // Функция, которая исправляет ссылку:
-    // – Приводит относительную ссылку к абсолютной (добавляет домен)
-    // – Ищет в значении параметров подстроку "<=", удаляет её из текущего параметра и извлекает значение для lt
-    // – Собирает новую строку запроса, где параметр lt (если найден) ставится первым
+
+    // Функция, которая заменяет:
+    // 1. warlog.php -> war.php
+    // 2. show_for_all= -> show=
+    // 3. Если в значении встречается "<=", извлекает значение для lt и переносит его первым
     function fixHref(rawHref) {
-      // Приводим ссылку к абсолютной, если она относительная
-      let absoluteHref = rawHref;
-      if (!absoluteHref.startsWith('http')) {
-        absoluteHref = 'https://www.heroeswm.ru' + absoluteHref;
+      // Первые замены:
+      let href = rawHref.replace(/warlog\.php/g, 'war.php').replace(/show_for_all=/g, 'show=');
+      // Приводим к абсолютной ссылке, если она относительная:
+      if (!href.startsWith('http')) {
+        href = 'https://www.heroeswm.ru' + href;
       }
-      
-      const urlObj = new URL(absoluteHref);
-      const paramsArr = [];
-      urlObj.searchParams.forEach((value, key) => {
-        paramsArr.push({ key, value });
-      });
-      
+      // Разбиваем на базовую часть и query
+      const parts = href.split('?');
+      if (parts.length < 2) return href;
+      const base = parts[0];
+      const query = parts[1];
+      const paramsArr = query.split('&');
       let ltValue = null;
-      const filteredParams = [];
+      const otherParams = [];
       paramsArr.forEach(param => {
-        if (param.value.includes('<=')) {
-          const [cleanValue, errorPart] = param.value.split('<=');
-          filteredParams.push({ key: param.key, value: cleanValue });
-          if (ltValue === null && errorPart) {
-            ltValue = errorPart;
+        const [key, value = ''] = param.split('=');
+        if (value.includes('<=')) {
+          const [cleanValue, extra] = value.split('<=');
+          // Если в этом параметре что-то осталось, добавляем его
+          if (cleanValue) otherParams.push(`${key}=${cleanValue}`);
+          if (ltValue === null && extra) {
+            ltValue = extra;
           }
-        } else if (param.key === 'lt') {
-          // Пропускаем существующий lt
+        } else if (key === 'lt') {
+          // пропускаем, чтобы потом задать lt первым
         } else {
-          filteredParams.push(param);
+          otherParams.push(param);
         }
       });
-      
-      // Собираем новую строку запроса: если найден ltValue, добавляем его первым
-      let newQueryParts = [];
+      let newQuery = "";
       if (ltValue !== null) {
-        newQueryParts.push(`lt=${encodeURIComponent(ltValue)}`);
+        newQuery = `lt=${encodeURIComponent(ltValue)}`;
+        if (otherParams.length > 0) {
+          newQuery += '&' + otherParams.join('&');
+        }
+      } else {
+        newQuery = otherParams.join('&');
       }
-      filteredParams.forEach(param => {
-        newQueryParts.push(`${encodeURIComponent(param.key)}=${encodeURIComponent(param.value)}`);
-      });
-      
-      urlObj.search = newQueryParts.join('&');
-      return urlObj.toString();
+      return base + '?' + newQuery;
     }
-    
-    // Парсинг ссылок на бои – используем fixHref для получения итогового URL-строки
+
+    // Функция парсинга боёв: исправляет ссылку и определяет тип боя
     function parseFights(html) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
-      const links = Array.from(doc.querySelectorAll('a[href*="war.php"], a[href*="warlog.php"]'));
+      const links = Array.from(doc.querySelectorAll('a[href*="war.php"]'));
       const fights = [];
-      
       links.forEach(link => {
-        const rawHref = link.getAttribute('href');
-        const finalHref = fixHref(rawHref);
-        
-        // Используем URLSearchParams для определения типа боя, но итоговая ссылка берется из fixHref
+        let rawHref = link.getAttribute('href');
+        let finalHref = fixHref(rawHref);
+        // Определяем параметры для типа боя
         const queryPart = finalHref.split('?')[1] || '';
         const params = new URLSearchParams(queryPart);
         if (!params.has('warid')) return;
-        
         let type = '';
         if (params.has('showt')) {
           type = 'diamonds';
@@ -168,17 +265,11 @@
       });
       return fights;
     }
-    
-    function updateStatus(pagesParsed, fights, startTime) {
-      const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
-      const totalFights = fights.diamonds.length + fights.player.length + fights.preview.length;
-      statusDiv.innerHTML = `<p>Распаршено страниц: <strong>${pagesParsed}</strong> | Найдено боёв: <strong>${totalFights}</strong> | Время: <strong>${elapsed} s</strong></p>`;
-    }
-    
+
+    // Вывод результатов: ссылки кликабельны, для каждой группы есть кнопка "Скопировать"
     function displayResults(topicTitle, totalPages, fights) {
       let html = `<h2>Результаты парсинга</h2>
                   <p>Тема: <strong>${topicTitle}</strong>. Всего страниц: <strong>${totalPages}</strong>.</p>`;
-      
       function renderGroup(title, group, groupId) {
         let groupHtml = `<h3>${title} (${group.length}) <button class="copy-btn" onclick="copyGroup('${groupId}')">Скопировать</button></h3>`;
         if (group.length) {
@@ -192,14 +283,12 @@
         }
         return groupHtml;
       }
-      
-      html += renderGroup("Бои за бриллианты", fights.diamonds, "diamondsList");
-      html += renderGroup("Бои игрока", fights.player, "playerList");
-      html += renderGroup("Предпросмотр", fights.preview, "previewList");
-      
+      html += renderGroup("Бои за бриллианты", fights.filter(f => f.type === 'diamonds'), "diamondsList");
+      html += renderGroup("Бои игрока", fights.filter(f => f.type === 'player'), "playerList");
+      html += renderGroup("Предпросмотр", fights.filter(f => f.type === 'preview'), "previewList");
       resultsDiv.innerHTML = html;
     }
-    
+
     function copyGroup(groupId) {
       const groupElement = document.getElementById(groupId);
       if (!groupElement) {
