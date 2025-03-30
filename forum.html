@@ -279,9 +279,10 @@
         }
         return groupHtml;
       }
-      html += renderGroup("Бои за бриллианты", fights.filter(f => f.type === 'diamonds'), "diamondsList");
-      html += renderGroup("Бои игрока", fights.filter(f => f.type === 'player'), "playerList");
-      html += renderGroup("Предпросмотр", fights.filter(f => f.type === 'preview'), "previewList");
+      // Используем поля объекта fights
+      html += renderGroup("Бои за бриллианты", fights.diamonds, "diamondsList");
+      html += renderGroup("Бои игрока", fights.player, "playerList");
+      html += renderGroup("Предпросмотр", fights.preview, "previewList");
       resultsDiv.innerHTML = html;
     }
 
