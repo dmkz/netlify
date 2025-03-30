@@ -107,21 +107,21 @@
         // Запускаем таймер динамичного статуса
         startStatusTimer();
 
-        // Создаём массив номеров страниц
+        // Создаём массив номеров страниц (от 1 до totalPages)
         const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
         let overallFights = { diamonds: [], player: [], preview: [] };
 
-        // На первой попытке обрабатываем все страницы
+        // Обработка страниц с повторными попытками
         let pagesToProcess = pages;
         while (currentAttempt <= maxAttempts && pagesToProcess.length > 0) {
           const { successes, errors } = await processPages(pagesToProcess, tid, parallelRequests);
-          // Обновление глобальных счётчиков уже происходит внутри processPages
           overallFights = mergeFights(overallFights, successes);
+          // Если ошибок нет, прекращаем попытки
           pagesToProcess = errors.map(e => e.page);
           currentAttempt++;
         }
         clearInterval(dynamicTimer);
-        // Перед выводом итогов удаляем дубликаты по URL
+        // Удаляем дубликаты по URL для каждой группы
         overallFights.diamonds = deduplicateFights(overallFights.diamonds);
         overallFights.player = deduplicateFights(overallFights.player);
         overallFights.preview = deduplicateFights(overallFights.preview);
@@ -132,52 +132,23 @@
       }
     });
 
-    // Новый вариант runTasksConcurrently – с использованием цикла и пула
-    async function runTasksConcurrently(tasks, concurrency) {
-      const results = new Array(tasks.length);
-      const errors = [];
-      const pool = [];
-      for (let i = 0; i < tasks.length; i++) {
-        const p = tasks[i]().then(result => { results[i] = result; })
-                          .catch(err => { errors.push({ index: i, error: err }); });
-        pool.push(p);
-        if (pool.length >= concurrency) {
-          await Promise.race(pool);
-          // Убираем завершённые задачи из пула
-          for (let j = pool.length - 1; j >= 0; j--) {
-            if (pool[j].resolved) { // здесь мы не можем явно проверить resolved, поэтому просто убираем все, 
-              // если Promise.allSettled(pool) покажет, что они завершены, можно сделать проверку, 
-              // но для простоты мы не будем удалять вручную
-            }
-          }
-        }
-      }
-      await Promise.all(pool);
-      return { results, errors };
-    }
-
-    // Более простой вариант, использующий Promise.all для всех задач (так как общее число страниц не очень велико)
-    async function runAllTasks(tasks) {
-      const results = await Promise.all(tasks.map(task => task().catch(e => e)));
-      const errors = results.filter(r => r && r.error);
-      return { results, errors };
-    }
-
-    // Обработка массива страниц с параллельными запросами
+    // Обработка массива страниц с параллельными запросами без ограничения (Promise.all)
     async function processPages(pageNumbers, tid, parallelRequests) {
       const tasks = pageNumbers.map(page => async () => {
         try {
           const html = await fetchPage(tid, page);
           const fights = parseFights(html);
-          pagesProcessed++;  // увеличиваем счётчик сразу при успешной обработке
+          pagesProcessed++;  // увеличиваем счётчик сразу при успешном завершении
           return { page, fights };
         } catch(e) {
-          errorsCount++;  // увеличиваем счётчик ошибок сразу при возникновении ошибки
+          errorsCount++;  // увеличиваем счётчик ошибок
           throw { page, error: e };
         }
       });
-      // Для упрощения (и так общее число страниц не очень велико) используем Promise.all
-      const { results, errors } = await runAllTasks(tasks);
+      // Запускаем все задачи параллельно (общее число страниц обычно невелико)
+      const promises = tasks.map(task => task().catch(e => e));
+      const results = await Promise.all(promises);
+      const errors = results.filter(r => r && r.error);
       const successes = results.filter(r => r && !r.error);
       return { successes, errors };
     }
@@ -193,7 +164,7 @@
       return all;
     }
 
-    // Функция запроса страницы через Netlify-функцию
+    // Запрос страницы через Netlify-функцию
     async function fetchPage(tid, page) {
       const response = await fetch(`/.netlify/functions/parser?tid=${tid}&page=${page}`);
       if (!response.ok) throw new Error('Ошибка сети: ' + response.status);
@@ -292,17 +263,17 @@
 
     // Вывод итоговых результатов
     function displayResults(topic, totalPages, fights) {
-      const totalFights = deduplicateFights(fights.diamonds).length +
-                          deduplicateFights(fights.player).length +
-                          deduplicateFights(fights.preview).length;
+      const uniqueDiamonds = deduplicateFights(fights.diamonds);
+      const uniquePlayer = deduplicateFights(fights.player);
+      const uniquePreview = deduplicateFights(fights.preview);
+      const totalFights = uniqueDiamonds.length + uniquePlayer.length + uniquePreview.length;
       let html = `<h2>Результаты парсинга</h2>
                   <p>Тема: <strong>${topic}</strong>. Всего страниц: <strong>${totalPages}</strong>. Всего боёв: <strong>${totalFights}</strong></p>`;
       function renderGroup(title, group, groupId) {
-        const uniqueGroup = deduplicateFights(group);
-        let groupHtml = `<h3>${title} (${uniqueGroup.length}) <button class="copy-btn" onclick="copyGroup('${groupId}')">Скопировать</button></h3>`;
-        if (uniqueGroup.length) {
+        let groupHtml = `<h3>${title} (${group.length}) <button class="copy-btn" onclick="copyGroup('${groupId}')">Скопировать</button></h3>`;
+        if (group.length) {
           groupHtml += `<ul id="${groupId}">`;
-          uniqueGroup.forEach(f => {
+          group.forEach(f => {
             groupHtml += `<li><a href="${f.url}" target="_blank">${f.url}</a></li>`;
           });
           groupHtml += `</ul>`;
@@ -311,9 +282,9 @@
         }
         return groupHtml;
       }
-      html += renderGroup("Бои за бриллианты", fights.diamonds, "diamondsList");
-      html += renderGroup("Бои игрока", fights.player, "playerList");
-      html += renderGroup("Предпросмотр", fights.preview, "previewList");
+      html += renderGroup("Бои за бриллианты", uniqueDiamonds, "diamondsList");
+      html += renderGroup("Бои игрока", uniquePlayer, "playerList");
+      html += renderGroup("Предпросмотр", uniquePreview, "previewList");
       resultsDiv.innerHTML = html;
     }
 
