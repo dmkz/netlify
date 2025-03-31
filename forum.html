@@ -5,11 +5,11 @@
   <title>Парсер форумных проходок</title>
   <style>
     button.copy-btn { margin-left: 10px; }
-    /* Первое поле достаточно широкое для полного текста */
+    /* Первое поле – достаточно широкое для полного текста */
     #tid { width: 400px; }
     /* Второе и третье поля – узкие */
     #maxAttempts, #parallelRequests { width: 60px; }
-    /* Динамический статус – одна строка */
+    /* Динамичный статус – одна строка */
     #statusDynamic { font-weight: bold; margin-bottom: 10px; }
   </style>
 </head>
@@ -23,7 +23,7 @@
     <input id="parallelRequests" type="number" placeholder="Запросы" min="1" value="100">
     <button id="startBtn">Старт</button>
   </div>
-  <!-- Динамический статус -->
+  <!-- Динамичный статус -->
   <div id="statusDynamic"></div>
   <div id="results"></div>
 
@@ -55,13 +55,23 @@
     let startTime = 0;
     let dynamicTimer;
     let globalTopic = "";
+    // Массив состояния для каждой страницы: 0 – ещё не обработана, 1 – успешно, 2 – ошибка
+    let pageStatus = [];
 
-    // Динамический статус обновляется каждые 200 мс
+    // Функция подсчёта успешных и ошибочных страниц из pageStatus
+    function countStatuses() {
+      const successes = pageStatus.filter(s => s === 1).length;
+      const errors = pageStatus.filter(s => s === 2).length;
+      return { successes, errors };
+    }
+
+    // Динамичный статус обновляется каждые 200 мс
     function startStatusTimer() {
       dynamicTimer = setInterval(() => {
         const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+        const { successes, errors } = countStatuses();
         statusDynamicDiv.innerHTML =
-          `Тема: ${globalTopic} | Попытка: ${currentAttempt} | Всего страниц: ${totalPages} | Успешно обработано: ${pagesProcessed} | Ошибок: ${errorsCount} | Время: ${elapsed} s`;
+          `Тема: ${globalTopic} | Попытка: ${currentAttempt} | Всего страниц: ${totalPages} | Успешно обработано: ${successes} | Ошибок: ${errors} | Время: ${elapsed} s`;
       }, 200);
     }
 
@@ -99,29 +109,43 @@
       errorsCount = 0;
 
       try {
-        // Определяем общее число страниц через запрос page=last
+        // Получаем общее число страниц через запрос page=last
         const lastPageHTML = await fetchPage(tid, 'last');
         const titleData = parseTitleAndPages(lastPageHTML);
         globalTopic = titleData.title;
         totalPages = titleData.totalPages;
+        // Инициализируем массив состояния (индексы 0..totalPages-1, все 0)
+        pageStatus = Array(totalPages).fill(0);
         // Запускаем таймер динамичного статуса
         startStatusTimer();
 
-        // Создаём массив номеров страниц
-        const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+        // Создаём массив номеров страниц (1 .. totalPages)
+        const allPages = Array.from({ length: totalPages }, (_, i) => i + 1);
         let overallFights = { diamonds: [], player: [], preview: [] };
 
-        // На первой попытке обрабатываем все страницы
-        let pagesToProcess = pages;
+        // Обрабатываем страницы, у которых статус != 1 (то есть ещё не успешно обработаны)
+        let pagesToProcess = allPages.filter(page => pageStatus[page - 1] !== 1);
         while (currentAttempt <= maxAttempts && pagesToProcess.length > 0) {
           const { successes, errors } = await processPages(pagesToProcess, tid, parallelRequests);
-          // Здесь не прибавляем, так как pagesProcessed обновляется внутри задач
-          // Обновляем ошибки, если нужны (они уже увеличиваются в задачах)
           overallFights = mergeFights(overallFights, successes);
-          pagesToProcess = errors.map(e => e.page);
+          // Обновляем pagesToProcess – остаются страницы с состоянием 0 или 2
+          pagesToProcess = allPages.filter(page => pageStatus[page - 1] !== 1);
           currentAttempt++;
         }
+        // Перед остановкой таймера обновляем финальный статус
+        if (pagesToProcess.length === 0) {
+          // Если все страницы успешно обработаны, принудительно установим их статус = 1
+          pageStatus = Array(totalPages).fill(1);
+        }
+        const finalElapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+        const { successes, errors } = countStatuses();
+        statusDynamicDiv.innerHTML =
+          `Тема: ${globalTopic} | Попытка: ${currentAttempt} | Всего страниц: ${totalPages} | Успешно обработано: ${successes} | Ошибок: ${errors} | Время: ${finalElapsed} s`;
         clearInterval(dynamicTimer);
+        // Удаляем дубликаты по URL для каждой группы
+        overallFights.diamonds = deduplicateFights(overallFights.diamonds);
+        overallFights.player = deduplicateFights(overallFights.player);
+        overallFights.preview = deduplicateFights(overallFights.preview);
         displayResults(globalTopic, totalPages, overallFights);
       } catch (error) {
         alert("Ошибка: " + error.message);
@@ -129,48 +153,30 @@
       }
     });
 
-    // Функция запуска задач с ограничением по параллельности
-    async function runTasksConcurrently(tasks, concurrency) {
-      let index = 0;
-      const results = [];
-      const errors = [];
-      const running = [];
-
-      async function runNext() {
-        if (index >= tasks.length) return;
-        const current = index++;
-        const task = tasks[current];
-        const p = task().then(result => { results[current] = result; })
-                        .catch(err => { errors.push({ index: current, error: err }); });
-        running.push(p);
-        p.finally(() => { running.splice(running.indexOf(p), 1); });
-        if (running.length >= concurrency) {
-          await Promise.race(running);
-        }
-        await runNext();
-      }
-      await runNext();
-      await Promise.all(running);
-      return { results, errors };
-    }
-
     // Обработка массива страниц с параллельными запросами
     async function processPages(pageNumbers, tid, parallelRequests) {
       const tasks = pageNumbers.map(page => async () => {
         try {
           const html = await fetchPage(tid, page);
-          const fights = parseFights(html);
-          // Обновляем глобальный счётчик сразу при успешной обработке
-          pagesProcessed++;
+          const fights = parseFights(html) || [];
+          pageStatus[page - 1] = 1; // успешно
           return { page, fights };
         } catch(e) {
-          // Обновляем счётчик ошибок сразу при возникновении ошибки
-          errorsCount++;
+          pageStatus[page - 1] = 2; // ошибка
           throw { page, error: e };
         }
       });
-      const { results, errors } = await runTasksConcurrently(tasks, parallelRequests);
-      const successes = results.filter(r => r !== undefined);
+      // Запускаем задачи параллельно по чанкам
+      const chunkSize = parallelRequests;
+      let successes = [];
+      let errors = [];
+      for (let i = 0; i < tasks.length; i += chunkSize) {
+        const chunk = tasks.slice(i, i + chunkSize);
+        const promises = chunk.map(task => task().catch(e => e));
+        const results = await Promise.all(promises);
+        successes = successes.concat(results.filter(r => r && !r.error));
+        errors = errors.concat(results.filter(r => r && r.error));
+      }
       return { successes, errors };
     }
 
@@ -208,8 +214,8 @@
     }
 
     // Функция для обработки URL:
-    // 1. warlog.php → war.php, show_for_all= → show=
-    // 2. Если значение содержит "<=", извлекает значение для lt и ставит его первым
+    // 1. Заменяет warlog.php на war.php, show_for_all= на show=
+    // 2. Если значение содержит "<=", извлекает значение для lt и ставит его первым в строке запроса
     function fixHref(rawHref) {
       let href = rawHref.replace(/warlog\.php/g, 'war.php').replace(/show_for_all=/g, 'show=');
       if (!href.startsWith('http')) {
@@ -229,7 +235,7 @@
           if (cleanValue) otherParams.push(`${key}=${cleanValue}`);
           if (ltValue === null && extra) ltValue = extra;
         } else if (key === 'lt') {
-          // пропускаем, чтобы задать lt первым
+          // Пропускаем существующий lt
         } else {
           otherParams.push(param);
         }
@@ -272,9 +278,22 @@
       return fights;
     }
 
+    // Функция удаления дубликатов по URL
+    function deduplicateFights(fightsArray) {
+      const seen = new Set();
+      return fightsArray.filter(fight => {
+        if (seen.has(fight.url)) return false;
+        seen.add(fight.url);
+        return true;
+      });
+    }
+
     // Вывод итоговых результатов
     function displayResults(topic, totalPages, fights) {
-      const totalFights = fights.diamonds.length + fights.player.length + fights.preview.length;
+      const uniqueDiamonds = deduplicateFights(fights.diamonds);
+      const uniquePlayer = deduplicateFights(fights.player);
+      const uniquePreview = deduplicateFights(fights.preview);
+      const totalFights = uniqueDiamonds.length + uniquePlayer.length + uniquePreview.length;
       let html = `<h2>Результаты парсинга</h2>
                   <p>Тема: <strong>${topic}</strong>. Всего страниц: <strong>${totalPages}</strong>. Всего боёв: <strong>${totalFights}</strong></p>`;
       function renderGroup(title, group, groupId) {
@@ -290,22 +309,10 @@
         }
         return groupHtml;
       }
-      html += renderGroup("Бои за бриллианты", fights.diamonds, "diamondsList");
-      html += renderGroup("Бои игрока", fights.player, "playerList");
-      html += renderGroup("Предпросмотр", fights.preview, "previewList");
+      html += renderGroup("Бои за бриллианты", uniqueDiamonds, "diamondsList");
+      html += renderGroup("Бои игрока", uniquePlayer, "playerList");
+      html += renderGroup("Предпросмотр", uniquePreview, "previewList");
       resultsDiv.innerHTML = html;
-    }
-
-    function copyGroup(groupId) {
-      const groupElement = document.getElementById(groupId);
-      if (!groupElement) {
-        alert("Нет данных для копирования");
-        return;
-      }
-      const textToCopy = Array.from(groupElement.querySelectorAll("li")).map(li => li.innerText).join("\n");
-      navigator.clipboard.writeText(textToCopy)
-        .then(() => alert("Скопировано в буфер обмена"))
-        .catch(err => alert("Ошибка копирования: " + err));
     }
   </script>
 </body>
