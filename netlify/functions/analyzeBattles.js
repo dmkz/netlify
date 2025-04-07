@@ -1,5 +1,5 @@
 // analyzeBattles.js
-// Для работы в Netlify установите node-fetch:
+// Для работы в Netlify установите node-fetch: 
 //   npm install node-fetch
 // и запустите функцию через Netlify.
 
@@ -22,23 +22,28 @@ function runTasksWithConcurrency(tasks, limit, taskUpdateCallback) {
   let results = new Array(tasks.length);
   let currentIndex = 0;
   let running = 0;
+  console.log(`Запуск runTasksWithConcurrency с ${tasks.length} задачами, лимит ${limit}`);
   return new Promise(resolve => {
     function runNext() {
       if (currentIndex >= tasks.length && running === 0) {
+        console.log(`Все задачи завершены`);
         resolve(results);
         return;
       }
       while (running < limit && currentIndex < tasks.length) {
         let taskIndex = currentIndex++;
         running++;
+        console.log(`Запускаем задачу №${taskIndex}`);
         tasks[taskIndex]()
           .then(result => {
+            console.log(`Задача №${taskIndex} завершена успешно`);
             results[taskIndex] = result;
             running--;
             if (taskUpdateCallback) taskUpdateCallback(taskIndex, result);
             runNext();
           })
           .catch(err => {
+            console.log(`Задача №${taskIndex} завершилась с ошибкой: ${err.message}`);
             results[taskIndex] = { link: tasks[taskIndex].link, result: null, status: "error", error: err.message };
             running--;
             if (taskUpdateCallback) taskUpdateCallback(taskIndex, { error: err.message });
@@ -54,17 +59,21 @@ function runTasksWithConcurrency(tasks, limit, taskUpdateCallback) {
 // Функция fetchProtocolPage – для получения страницы протокола.
 // (В этом примере она может не использоваться, но включена для полноты.)
 function fetchProtocolPage(url) {
+  console.log(`fetchProtocolPage: ${url}`);
   return getFetch()(url)
     .then(response => response.arrayBuffer())
     .then(buffer => {
       let decoder = new TextDecoder("windows-1251");
-      return decoder.decode(Buffer.from(buffer));
+      let decoded = decoder.decode(Buffer.from(buffer));
+      console.log(`Страница протокола получена, длина: ${decoded.length}`);
+      return decoded;
     });
 }
 
 // --------------------------
 // Функция fetchBattlePage – получает страницу battle.php как текст.
 function fetchBattlePage(url) {
+  console.log(`fetchBattlePage: ${url}`);
   return getFetch()(url).then(response => response.text());
 }
 
@@ -73,12 +82,14 @@ function fetchBattlePage(url) {
 function splitSideText(sideText) {
   let cleaned = sideText.replace(/(\d),(\d)/g, "$1$2");
   let lines = cleaned.split(/<br\s*\/?>/gi).map(line => line.trim()).filter(line => line !== "");
+  console.log(`splitSideText: получено ${lines.length} строк`);
   return lines;
 }
 
 // --------------------------
 // processReserveLines – разбирает каждую строку и возвращает объект { tokensByLine, reserve }
 function processReserveLines(lines, sideName, battleId) {
+  console.log(`processReserveLines: Обработка ${lines.length} строк для ${sideName} боя ${battleId}`);
   let reserveInfo = [];
   let tokensByLine = [];
   lines.forEach(line => {
@@ -88,7 +99,7 @@ function processReserveLines(lines, sideName, battleId) {
                            .replace(/( золота)(?![,.:])/g, "$1,");
     let tokens = normalized.split(", ").map(t => t.trim());
     tokensByLine.push({ originalLine: line, tokens: tokens.slice() });
-    // Пример: если ваш ник "oxotnik102rus", то можно так:
+    // Если строка содержит ваш ник – замените "oxotnik102rus" на ваш реальный ник.
     if (tokens.some(token => token.includes("oxotnik102rus"))) {
       tokens.forEach(token => {
         if (token.includes("(+") && token.includes("в резерв")) {
@@ -108,12 +119,14 @@ function processReserveLines(lines, sideName, battleId) {
       });
     }
   });
+  console.log(`processReserveLines: Найдено ${reserveInfo.length} резервов`);
   return { tokensByLine, reserve: reserveInfo };
 }
 
 // --------------------------
 // parseArmyInfo – парсит строку с информацией об армии.
 function parseArmyInfo(armyString) {
+  console.log(`parseArmyInfo: Длина строки = ${armyString.length}`);
   if (armyString.length < 144) return null;
   let rawBlock = armyString.substring(0, 144);
   let groups = [];
@@ -164,12 +177,14 @@ function parseArmyInfo(armyString) {
       extra.type = "unit";
     }
   }
+  console.log(`parseArmyInfo: extra.type = ${extra.type}`);
   return { params, extra };
 }
 
 // --------------------------
 // buildMoments – группирует данные из armyMatches в моменты.
 function buildMoments(armyMatches) {
+  console.log(`buildMoments: Всего armyMatches: ${armyMatches.length}`);
   let moments = [];
   let currentMoment = null;
   let previousId = null;
@@ -229,6 +244,7 @@ function buildMoments(armyMatches) {
       }
     }
   });
+  console.log(`buildMoments: получено ${moments.length} моментов`);
   return moments;
 }
 
@@ -455,7 +471,7 @@ function transformHeroBlock(heroBlock, isWinner, opts) {
     }
     paramsBlock = tmp;
   }
-  let result = (nickname + (levelBlock ? "["+levelBlock+"]" : "") + paramsBlock).trim();
+  let result = (nickname + (levelBlock ? "[" + levelBlock + "]" : "") + paramsBlock).trim();
   return result;
 }
 
@@ -518,12 +534,14 @@ function transformTokensText(inputText, opts) {
 exports.handler = async function(event, context) {
   const TIMEOUT = 10000;
   try {
+    console.log("Начало обработки запроса");
     let body = JSON.parse(event.body);
     let links = body.links;
     if (!Array.isArray(links)) {
       return { statusCode: 400, body: JSON.stringify({ error: "Параметр 'links' должен быть массивом." }) };
     }
     links = [...new Set(links)];
+    console.log("Получено ссылок: ", links.length);
     let tasks = links.map(link => {
       let task = () => analyzeBattleByLink(link);
       task.link = link;
@@ -536,17 +554,20 @@ exports.handler = async function(event, context) {
     let analysisPromise = runTasksWithConcurrency(tasks, concurrencyLimit);
     let results = await Promise.race([analysisPromise, timeoutPromise])
       .catch(async err => {
+        console.error("Ошибка или таймаут в runTasksWithConcurrency:", err.message);
         let settled = await Promise.allSettled(tasks.map(t => t()));
         return settled.map((res, idx) => {
           if (res.status === "fulfilled") return res.value;
           else return { link: links[idx], result: null, status: "error", error: "Таймаут или ошибка" };
         });
       });
+    console.log("Задачи завершены, результатов: ", results.length);
     return {
       statusCode: 200,
       body: JSON.stringify({ results })
     };
   } catch (err) {
+    console.error("Фатальная ошибка в handler:", err.message);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
@@ -555,15 +576,20 @@ exports.handler = async function(event, context) {
 // Функция analyzeBattleByLink – использует ваш анализ боёв.
 async function analyzeBattleByLink(link) {
   try {
+    console.log(`Начало анализа: ${link}`);
     let battle = { battleLink: link };
     let data = await fetchBattleData(battle);
+    console.log(`Данные для ${link}: success=${data.success}`);
     if (data.success) {
       let resultStr = tokensToLine(data.reserve.winners.tokensByLine, data.reserve.losers.tokensByLine);
+      console.log(`Анализ успешно завершён для ${link}`);
       return { link, result: resultStr, status: "success" };
     } else {
+      console.log(`Анализ неуспешен для ${link}`);
       return { link, result: null, status: "error", error: "Анализ неуспешен" };
     }
   } catch (err) {
+    console.error(`Ошибка анализа для ${link}:`, err.message);
     return { link, result: null, status: "error", error: err.message };
   }
 }
@@ -586,11 +612,15 @@ function fetchBattleData(battle) {
   }
   let warid = linkUrl.searchParams.get("warid");
   let show_enemy = linkUrl.searchParams.get("show_enemy") || "";
-  let secretCode = linkUrl.searchParams.get("show") || linkUrl.searchParams.get("show_for_all") || linkUrl.searchParams.get("showt") || "";
+  let secretCode = linkUrl.searchParams.get("show") ||
+                   linkUrl.searchParams.get("show_for_all") ||
+                   linkUrl.searchParams.get("showt") || "";
   let rand = Date.now();
   const url = `https://www.heroeswm.ru/battle.php?warid=${encodeURIComponent(warid)}&lastturn=-2&lastmess=-1&lastmess2=-1&rand=${rand}&showinsertion=1&pl_id=0&lastdata=1&show_for_all=${encodeURIComponent(secretCode)}&show_enemy=${encodeURIComponent(show_enemy)}`;
+  console.log(`Запрос к battle.php: ${url}`);
   return fetchBattlePage(url)
     .then(html => {
+      console.log(`Получен HTML для боя ${battle.battleLink}, длина: ${html.length}`);
       let start = html.indexOf("turns=>");
       let turnsStr = null;
       if (start !== -1) {
@@ -620,6 +650,7 @@ function fetchBattleData(battle) {
       if (html.indexOf(losersMarkerStart) !== -1 && losersEndIdx !== -1) {
         losersBlock = html.substring(html.indexOf(losersMarkerStart) + losersMarkerStart.length, losersEndIdx);
       }
+      console.log(`winnersBlock длина: ${winnersBlock.length}, losersBlock длина: ${losersBlock.length}`);
       let winnersLines = splitSideText(winnersBlock);
       let losersLines = splitSideText(losersBlock);
       let winnersData = processReserveLines(winnersLines, "Winners", warid);
@@ -635,6 +666,7 @@ function fetchBattleData(battle) {
         }
         armyMatches.push({ id: match[1], armyData: armyData, raw: rawArmyString });
       }
+      console.log(`Найдено ${armyMatches.length} armyMatches`);
       let moments = buildMoments(armyMatches);
       enrichTokensByLine(winnersData.tokensByLine, moments);
       enrichTokensByLine(losersData.tokensByLine, moments);
@@ -648,6 +680,7 @@ function fetchBattleData(battle) {
         rawHtml: html,
         army: armyMatches
       };
+      console.log(`fetchBattleData: Анализ боя ${battle.battleLink} завершён успешно.`);
       return battleData;
     })
     .catch(err => {
