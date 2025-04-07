@@ -3,7 +3,12 @@
 //   npm install node-fetch
 // и запустите функцию через Netlify.
 
-const fetch = require("node-fetch");
+async function getFetch() {
+  const fetchModule = await import("node-fetch");
+  return fetchModule.default;
+}
+
+//const fetch = require("node-fetch");
 const { TextDecoder } = require("util");
 
 // --------------------------
@@ -50,7 +55,7 @@ function runTasksWithConcurrency(tasks, limit, taskUpdateCallback) {
 // Функция fetchProtocolPage – для получения страницы протокола.
 // (В этом примере она может не использоваться, но включена для полноты.)
 function fetchProtocolPage(url) {
-  return fetch(url)
+  return getFetch()(url)
     .then(response => response.arrayBuffer())
     .then(buffer => {
       let decoder = new TextDecoder("windows-1251");
@@ -61,7 +66,7 @@ function fetchProtocolPage(url) {
 // --------------------------
 // Функция fetchBattlePage – получает страницу battle.php как текст.
 function fetchBattlePage(url) {
-  return fetch(url).then(response => response.text());
+  return getFetch()(url).then(response => response.text());
 }
 
 // --------------------------
@@ -557,7 +562,7 @@ exports.handler = async function(event, context) {
 async function analyzeBattleByLink(link) {
   try {
     let battle = { battleLink: link };
-    let data = await fetchBattleData(battle);
+    let data = await getFetch()BattleData(battle);
     if (data.success) {
       let resultStr = tokensToLine(data.reserve.winners.tokensByLine, data.reserve.losers.tokensByLine);
       return { link, result: resultStr, status: "success" };
