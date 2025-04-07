@@ -1,5 +1,5 @@
 // analyzeBattles.js
-// Для работы в Netlify установите node-fetch: 
+// Для работы в Netlify установите node-fetch:
 //   npm install node-fetch
 // и запустите функцию через Netlify.
 
@@ -8,7 +8,6 @@ async function getFetch() {
   return fetchModule.default;
 }
 
-//const fetch = require("node-fetch");
 const { TextDecoder } = require("util");
 
 // --------------------------
@@ -89,8 +88,7 @@ function processReserveLines(lines, sideName, battleId) {
                            .replace(/( золота)(?![,.:])/g, "$1,");
     let tokens = normalized.split(", ").map(t => t.trim());
     tokensByLine.push({ originalLine: line, tokens: tokens.slice() });
-    // Если строка содержит ваш ник – здесь можно вставить условие по вашему нику.
-    // Например, если ваш ник равен "oxotnik102rus":
+    // Пример: если ваш ник "oxotnik102rus", то можно так:
     if (tokens.some(token => token.includes("oxotnik102rus"))) {
       tokens.forEach(token => {
         if (token.includes("(+") && token.includes("в резерв")) {
@@ -98,7 +96,6 @@ function processReserveLines(lines, sideName, battleId) {
           let closeIdx = token.indexOf(")", plusIdx);
           if (plusIdx !== -1 && closeIdx !== -1) {
             let creatureRaw = token.substring(0, plusIdx).trim();
-            // Используем регулярное выражение для извлечения имени существа:
             let creatureMatch = creatureRaw.match(/\p{Lu}[\p{Ll}\s\-]*/u);
             let creature = creatureMatch ? creatureMatch[0].trim() : creatureRaw;
             let countStr = token.substring(plusIdx + 2, closeIdx).trim().replace(/,/g, '');
@@ -176,7 +173,6 @@ function buildMoments(armyMatches) {
   let moments = [];
   let currentMoment = null;
   let previousId = null;
-
   armyMatches.forEach(match => {
     let currentId = parseInt(match.id, 10);
     if (currentMoment === null || (previousId !== null && currentId < previousId)) {
@@ -190,7 +186,6 @@ function buildMoments(armyMatches) {
       currentMoment.sides[sideIndex] = {};
     }
     let sideGroup = currentMoment.sides[sideIndex];
-
     let itemName = "";
     let itemCount = 0;
     let initialHealth = 0;
@@ -517,7 +512,6 @@ function transformTokensText(inputText, opts) {
   return transformed.join("\n");
 }
 
-
 // --------------------------
 // Netlify Handler
 // --------------------------
@@ -562,7 +556,7 @@ exports.handler = async function(event, context) {
 async function analyzeBattleByLink(link) {
   try {
     let battle = { battleLink: link };
-    let data = await getFetch()BattleData(battle);
+    let data = await fetchBattleData(battle);
     if (data.success) {
       let resultStr = tokensToLine(data.reserve.winners.tokensByLine, data.reserve.losers.tokensByLine);
       return { link, result: resultStr, status: "success" };
