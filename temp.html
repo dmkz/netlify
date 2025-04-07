@@ -2,85 +2,245 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Анализ ссылок на бои с фильтрацией</title>
+  <title>Анализ ссылок на бои с фильтрацией (2025)</title>
   <style>
-    /* Стили для основной формы и фильтра */
+    /* Базовый сброс */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f5f5;
+      color: #333;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Контейнер, делящий страницу на две половины */
+    .container {
+      display: flex;
+      height: 100vh;
+      width: 100%;
+    }
+    
+    /* Левая панель */
+    .left-panel {
+      width: 50%;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      border-right: 2px solid #ddd;
+    }
+    
+    /* Правая панель */
+    .right-panel {
+      width: 50%;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      background: #fafafa;
+    }
+    
+    /* Текстовые поля занимают оставшееся пространство и скроллятся */
     textarea {
+      width: 100%;
+      resize: none;
+      padding: 8px;
       font-family: monospace;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
-    #statusDisplay {
+    
+    /* Текстовое поле ввода занимает всю оставшуюся высоту левой панели */
+    #inputText {
+      flex: 1;
+      margin-bottom: 8px;
+    }
+    
+    /* Вывод результата также растягивается */
+    #outputArea {
+      flex: 1;
+    }
+    
+    /* Кнопка Анализировать */
+    #analyzeButton {
+      padding: 10px;
+      font-size: 16px;
       font-weight: bold;
-      margin: 10px 0;
+      border: none;
+      border-radius: 4px;
+      background-color: #007bff;
+      color: #fff;
+      cursor: pointer;
+      margin-bottom: 8px;
+      transition: background-color 0.2s ease-in-out;
     }
-    /* Стили для блока опций фильтрации */
+    
+    #analyzeButton:hover {
+      background-color: #0056b3;
+    }
+    
+    /* Статус анализа */
+    #statusDisplay {
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    /* Фильтр — контейнер для опций */
     .filter-container {
-      padding: 5px;
+      background: rgba(240, 230, 210, 0.9); /* прозрачность */
       border: 2px solid #8b4513;
-      background: #f0e6d2;
-      margin-bottom: 10px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out, padding 0.3s ease-out;
     }
-    .filter-container div {
-      margin-bottom: 4px;
+    
+    /* Заголовок фильтра — область для сворачивания/разворачивания */
+    .filter-header {
+      background: #deb887;
+      padding: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .filter-header:hover {
+      background: #d2a679;
+    }
+    
+    /* Контент фильтра с опциями в две колонки */
+    .filter-content {
+      padding: 8px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    
+    .filter-content div {
+      background: rgba(255, 255, 255, 0.8);
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    /* Состояние свёрнутого фильтра */
+    .collapsed {
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border: none;
+    }
+    
+    /* Дополнительный современный вид: небольшая тень */
+    .left-panel, .right-panel, .filter-container {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
   </style>
 </head>
 <body>
-  <textarea id="inputText" rows="10" cols="80" placeholder="Вставьте сюда текст с ссылками на бои..."></textarea>
-  <br>
-  <button id="analyzeButton">Анализировать ссылки</button>
-  <div id="statusDisplay"></div>
+  <div class="container">
+    <!-- Левая панель: фильтр, ввод и кнопка -->
+    <div class="left-panel">
+      <!-- Фильтр, располагающийся над полем ввода -->
+      <div class="filter-container" id="filterContainer">
+        <div class="filter-header" id="filterToggle">
+          Фильтры <span id="toggleIcon">&#9660;</span>
+        </div>
+        <div class="filter-content" id="filterContent">
+          <!-- Пример размещения опций по две колонки -->
+          <div>
+            <input type="checkbox" id="shortenMarkers" data-option="shortenMarkers">
+            <label for="shortenMarkers">Сокращать маркеры</label>
+          </div>
+          <div>
+            <input type="checkbox" id="showWinningSideName" data-option="showWinningSideName">
+            <label for="showWinningSideName">Победители: сторона</label>
+          </div>
+          <div>
+            <input type="checkbox" id="showWinningHP" data-option="showWinningHP">
+            <label for="showWinningHP">Победители: ХП</label>
+          </div>
+          <div>
+            <input type="checkbox" id="showWinningPercent" data-option="showWinningPercent">
+            <label for="showWinningPercent">Победители: % выживших</label>
+          </div>
+          <div>
+            <input type="checkbox" id="showWinningFaction" data-option="showWinningFaction">
+            <label for="showWinningFaction">Победители: фракция</label>
+          </div>
+          <div>
+            <input type="checkbox" id="showWinningHeroInfo" data-option="showWinningHeroInfo">
+            <label for="showWinningHeroInfo">Победители: герои</label>
+          </div>
+          <div>
+            <input type="checkbox" id="showLosingSideName" data-option="showLosingSideName">
+            <label for="showLosingSideName">Проигравшие: сторона</label>
+          </div>
+          <div>
+            <input type="checkbox" id="showLosingHP" data-option="showLosingHP">
+            <label for="showLosingHP">Проигравшие: ХП</label>
+          </div>
+          <div>
+            <input type="checkbox" id="showLosingPercent" data-option="showLosingPercent">
+            <label for="showLosingPercent">Проигравшие: % выживших</label>
+          </div>
+          <div>
+            <input type="checkbox" id="showLosingFaction" data-option="showLosingFaction">
+            <label for="showLosingFaction">Проигравшие: фракция</label>
+          </div>
+          <div>
+            <input type="checkbox" id="showLosingHeroInfo" data-option="showLosingHeroInfo">
+            <label for="showLosingHeroInfo">Проигравшие: герои</label>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Текстовое поле ввода -->
+      <textarea id="inputText" placeholder="Вставьте сюда текст с ссылками на бои..."></textarea>
+      <!-- Кнопка анализа -->
+      <button id="analyzeButton">Анализировать ссылки</button>
+      <!-- Вывод статуса -->
+      <div id="statusDisplay"></div>
+    </div>
+    
+    <!-- Правая панель: вывод результата -->
+    <div class="right-panel">
+      <textarea id="outputArea" placeholder="Здесь появится модифицированный текст..."></textarea>
+    </div>
+  </div>
   
-  <!-- Контейнер для чекбоксов фильтрации -->
-  <div id="filterOptions" class="filter-container"></div>
-  
-  <textarea id="outputArea" rows="10" cols="80" placeholder="Здесь появится модифицированный текст..."></textarea>
-
   <script>
-    // -----------------------------------------------------------
-    // Основая логика анализа ссылок (без фильтрации)
-    // -----------------------------------------------------------
-    // Функция для извлечения ссылок вида https://www.heroeswm.ru/war.php?warid=...
-    function extractBattleLinks(text) {
-      let regex = /https:\/\/www\.heroeswm\.ru\/war\.php\?warid=\d+/g;
-      let links = text.match(regex) || [];
-      return [...new Set(links)];
-    }
-
-    // -----------------------------------------------------------
-    // Фильтрация – настройки и функции преобразования
-    // -----------------------------------------------------------
+    /* Инициализация настроек фильтра */
     const defaultFilterOptions = {
       shortenMarkers: true,
       showWinningSideName: true,
-      showLosingSideName: true,
       showWinningHP: true,
-      showLosingHP: true,
       showWinningPercent: true,
-      showLosingPercent: true,
       showWinningFaction: true,
-      showLosingFaction: true,
       showWinningHeroInfo: true,
-      showLosingHeroInfo: true,
-      showWinningHeroNickname: true,
-      showLosingHeroNickname: true,
-      showWinningHeroLevel: true,
-      showLosingHeroLevel: true,
-      showWinningHeroParams: true,
-      showLosingHeroParams: true,
-      shortenWinningHeroParams: true,
-      shortenLosingHeroParams: true,
-      showWinningArmy: true,
-      showLosingArmy: true,
-      showWinningBonuses: true,
-      showLosingBonuses: true
+      showLosingSideName: true,
+      showLosingHP: true,
+      showLosingPercent: true,
+      showLosingFaction: true,
+      showLosingHeroInfo: true
     };
-
     function loadFilterOptions() {
       let stored = localStorage.getItem("battleFilterOptions");
       if (stored) {
         try {
           return JSON.parse(stored);
-        } catch(e) {
+        } catch (e) {
           return Object.assign({}, defaultFilterOptions);
         }
       }
@@ -90,223 +250,75 @@
       localStorage.setItem("battleFilterOptions", JSON.stringify(options));
     }
     let filterOptions = loadFilterOptions();
-
-    // Глобальная переменная для хранения исходного (неотфильтрованного) вывода
-    let originalOutput = "";
-
-    // Функция для создания чекбокса с меткой
-    function createCheckbox(labelText, optionName, checked) {
-      let container = document.createElement("div");
-      let checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = checked;
-      checkbox.setAttribute("data-option", optionName);
-      let label = document.createElement("label");
-      label.textContent = labelText;
-      label.style.marginLeft = "4px";
-      container.appendChild(checkbox);
-      container.appendChild(label);
-      return { container, checkbox, label };
-    }
-
-    // Создание интерфейса для опций фильтрации в контейнере #filterOptions
-    function createFilterOptionsUI() {
-      let optionsContainer = document.getElementById("filterOptions");
-      optionsContainer.innerHTML = "<strong>Фильтр результатов:</strong>";
-
-      // Общая опция
-      let common = createCheckbox("Сокращать маркеры (win/lose)", "shortenMarkers", filterOptions.shortenMarkers);
-      optionsContainer.appendChild(common.container);
-
-      // Опции для победителей
-      let winnersTitle = document.createElement("div");
-      winnersTitle.textContent = "Победители";
-      winnersTitle.style.fontWeight = "bold";
-      winnersTitle.style.marginTop = "8px";
-      optionsContainer.appendChild(winnersTitle);
-      optionsContainer.appendChild(createCheckbox("Название стороны", "showWinningSideName", filterOptions.showWinningSideName).container);
-      optionsContainer.appendChild(createCheckbox("Суммарное ХП", "showWinningHP", filterOptions.showWinningHP).container);
-      optionsContainer.appendChild(createCheckbox("% выживших", "showWinningPercent", filterOptions.showWinningPercent).container);
-      optionsContainer.appendChild(createCheckbox("Фракция", "showWinningFaction", filterOptions.showWinningFaction).container);
-      optionsContainer.appendChild(createCheckbox("Информация о героях", "showWinningHeroInfo", filterOptions.showWinningHeroInfo).container);
-      optionsContainer.appendChild(createCheckbox("Никнейм героев", "showWinningHeroNickname", filterOptions.showWinningHeroNickname).container);
-      optionsContainer.appendChild(createCheckbox("Уровень героев", "showWinningHeroLevel", filterOptions.showWinningHeroLevel).container);
-      optionsContainer.appendChild(createCheckbox("Параметры героев", "showWinningHeroParams", filterOptions.showWinningHeroParams).container);
-      optionsContainer.appendChild(createCheckbox("Сокращать параметры героев", "shortenWinningHeroParams", filterOptions.shortenWinningHeroParams).container);
-      optionsContainer.appendChild(createCheckbox("Армия", "showWinningArmy", filterOptions.showWinningArmy).container);
-      optionsContainer.appendChild(createCheckbox("Бонусы", "showWinningBonuses", filterOptions.showWinningBonuses).container);
-
-      // Опции для проигравших
-      let losersTitle = document.createElement("div");
-      losersTitle.textContent = "Проигравшие";
-      losersTitle.style.fontWeight = "bold";
-      losersTitle.style.marginTop = "8px";
-      optionsContainer.appendChild(losersTitle);
-      optionsContainer.appendChild(createCheckbox("Название стороны", "showLosingSideName", filterOptions.showLosingSideName).container);
-      optionsContainer.appendChild(createCheckbox("Суммарное ХП", "showLosingHP", filterOptions.showLosingHP).container);
-      optionsContainer.appendChild(createCheckbox("% выживших", "showLosingPercent", filterOptions.showLosingPercent).container);
-      optionsContainer.appendChild(createCheckbox("Фракция", "showLosingFaction", filterOptions.showLosingFaction).container);
-      optionsContainer.appendChild(createCheckbox("Информация о героях", "showLosingHeroInfo", filterOptions.showLosingHeroInfo).container);
-      optionsContainer.appendChild(createCheckbox("Никнейм героев", "showLosingHeroNickname", filterOptions.showLosingHeroNickname).container);
-      optionsContainer.appendChild(createCheckbox("Уровень героев", "showLosingHeroLevel", filterOptions.showLosingHeroLevel).container);
-      optionsContainer.appendChild(createCheckbox("Параметры героев", "showLosingHeroParams", filterOptions.showLosingHeroParams).container);
-      optionsContainer.appendChild(createCheckbox("Сокращать параметры героев", "shortenLosingHeroParams", filterOptions.shortenLosingHeroParams).container);
-      optionsContainer.appendChild(createCheckbox("Армия", "showLosingArmy", filterOptions.showLosingArmy).container);
-      optionsContainer.appendChild(createCheckbox("Бонусы", "showLosingBonuses", filterOptions.showLosingBonuses).container);
-
-      // При изменении любого чекбокса обновляем опции и перерисовываем вывод
-      optionsContainer.querySelectorAll("input[type=checkbox]").forEach(checkbox => {
-        checkbox.addEventListener("change", function() {
-          let name = this.getAttribute("data-option");
-          filterOptions[name] = this.checked;
-          saveFilterOptions(filterOptions);
-          updateFilteredOutput();
-        });
+    
+    // Установка значений чекбоксов по сохранённым опциям
+    document.querySelectorAll(".filter-content input[type=checkbox]").forEach(cb => {
+      let option = cb.getAttribute("data-option");
+      cb.checked = !!filterOptions[option];
+      cb.addEventListener("change", function() {
+        filterOptions[option] = this.checked;
+        saveFilterOptions(filterOptions);
+        updateFilteredOutput();
       });
+    });
+    
+    // Глобальная переменная для хранения исходного вывода (без фильтрации)
+    let originalOutput = "";
+    
+    // Функция для извлечения ссылок
+    function extractBattleLinks(text) {
+      let regex = /https:\/\/www\.heroeswm\.ru\/war\.php\?warid=\d+/g;
+      let links = text.match(regex) || [];
+      return [...new Set(links)];
     }
-
-    // Функция для сокращения параметров героя (например, "Нападение:" → "Н:")
-    function shortenHeroParams(paramsBlock) {
-      const mapping = {
-        "Нападение:": "Н:",
-        "Защита:": "З:",
-        "Сила магии:": "СМ:",
-        "Знания:": "ЗН:",
-        "Удача:": "Уд:",
-        "Боевой Дух:": "БД:",
-        "Уровень:": "У:"
-      };
-      for (let key in mapping) {
-        let regex = new RegExp(key, "gi");
-        paramsBlock = paramsBlock.replace(regex, mapping[key]);
-      }
-      return paramsBlock.replace(/\s+/g, "");
-    }
-
-    // Функция для преобразования информации о герое
-    function transformHeroBlock(heroBlock, isWinner, opts) {
-      if ((isWinner && !opts.showWinningHeroInfo) || (!isWinner && !opts.showLosingHeroInfo)) {
-        return "";
-      }
-      let firstBracket = heroBlock.indexOf("[");
-      let nickname = "";
-      let blocks = [];
-      if (firstBracket !== -1) {
-        nickname = heroBlock.substring(0, firstBracket).trim();
-        let regex = /\[([^\]]+)\]/g;
-        let m;
-        while ((m = regex.exec(heroBlock)) !== null) {
-          blocks.push(m[1]);
-        }
-      } else {
-        nickname = heroBlock.trim();
-      }
-      let levelBlock = "";
-      let paramsBlock = "";
-      if (blocks.length > 0) {
-        if (/Уровень:|^У:/i.test(blocks[0])) {
-          levelBlock = blocks[0];
-          if (blocks.length > 1) {
-            paramsBlock = blocks.slice(1).join("][");
-          }
-        } else {
-          paramsBlock = blocks.join("][");
-        }
-      }
-      if ((isWinner && !opts.showWinningHeroNickname) || (!isWinner && !opts.showLosingHeroNickname)) {
-        nickname = "";
-      }
-      if (!((isWinner && opts.showWinningHeroLevel) || (!isWinner && opts.showLosingHeroLevel))) {
-        levelBlock = "";
-      } else if (levelBlock) {
-        if ((isWinner && opts.shortenWinningHeroParams) || (!isWinner && opts.shortenLosingHeroParams)) {
-          levelBlock = levelBlock.replace(/Уровень:/gi, "У:").replace(/\s+/g, "");
-        }
-        levelBlock = "[" + levelBlock + "]";
-      }
-      if (!((isWinner && opts.showWinningHeroParams) || (!isWinner && opts.showLosingHeroParams))) {
-        paramsBlock = "";
-      } else if (paramsBlock) {
-        let tmp = "[" + paramsBlock + "]";
-        if ((isWinner && opts.shortenWinningHeroParams) || (!isWinner && opts.shortenLosingHeroParams)) {
-          tmp = shortenHeroParams(tmp);
-        }
-        paramsBlock = tmp;
-      }
-      return (nickname + levelBlock + paramsBlock).trim();
-    }
-
-    // Функция преобразования одной строки результата (предполагается, что строка разбита на блоки в квадратных скобках)
+    
+    // Пример трансформации строки результата (реализуйте свою логику при необходимости)
     function transformLine(line, opts) {
       let trimmed = line.trim();
-      if (!trimmed) return "";
+      let firstBracket = trimmed.indexOf("[");
+      if (firstBracket > 0) {
+        trimmed = trimmed.slice(firstBracket);
+      }
       if (!trimmed.startsWith("[")) return line;
       let inner = trimmed.substring(1, trimmed.length - 1);
       let blocks = inner.split("] [");
       let marker = blocks[0];
       let isWinner = (marker.toLowerCase().includes("win") || marker.indexOf("+") !== -1);
       let isLoser = (marker.toLowerCase().includes("lose") || marker.indexOf("-") !== -1);
-      // Блок 0 – маркер
+    
       if (isWinner || isLoser) {
         if (opts.shortenMarkers) {
           blocks[0] = isWinner ? "+" : "-";
         }
       }
-      // Блок 1 – название стороны
       if ((isWinner && !opts.showWinningSideName) || (!isWinner && !opts.showLosingSideName)) {
         blocks[1] = "";
       }
-      // Блок 2 – суммарное ХП
       if ((isWinner && !opts.showWinningHP) || (!isWinner && !opts.showLosingHP)) {
         blocks[2] = "";
       }
-      // Блок 3 – % выживших
       if ((isWinner && !opts.showWinningPercent) || (!isWinner && !opts.showLosingPercent)) {
         blocks[3] = "";
       }
-      // Блок 4 – фракция
       if ((isWinner && !opts.showWinningFaction) || (!isWinner && !opts.showLosingFaction)) {
         blocks[4] = "";
       }
-      // Блок 5 – информация о героях
-      if (blocks.length > 5) {
-        blocks[5] = transformHeroBlock(blocks[5], isWinner, opts);
-      }
-      // Блок 6 – армия
-      if (blocks.length > 6) {
-        if ((isWinner && !opts.showWinningArmy) || (!isWinner && !opts.showLosingArmy)) {
-          blocks[6] = "";
-        }
-      }
-      // Блок 7 – бонусы
-      if (blocks.length > 7) {
-        if ((isWinner && !opts.showWinningBonuses) || (!isWinner && !opts.showLosingBonuses)) {
-          blocks[7] = "";
-        }
-      }
       return blocks.filter(b => b !== "").map(b => "[" + b + "]").join(" ");
     }
-
-    // Функция для преобразования многострочного текста
+    
     function transformTokensText(inputText, opts) {
       let lines = inputText.split("\n");
       let transformed = lines.map(line => transformLine(line, opts));
       return transformed.join("\n");
     }
-
-    // Обновление вывода в textarea согласно текущим настройкам
+    
     function updateFilteredOutput() {
       if (!originalOutput) return;
       let newText = transformTokensText(originalOutput, filterOptions);
       document.getElementById("outputArea").value = newText;
     }
-
-    // Создаем UI опций фильтрации при загрузке страницы
-    createFilterOptionsUI();
-
-    // -----------------------------------------------------------
-    // Основной обработчик анализа ссылок
-    // -----------------------------------------------------------
+    
+    /* Обработчик анализа ссылок */
     document.getElementById("analyzeButton").addEventListener("click", async () => {
       let inputText = document.getElementById("inputText").value;
       let links = extractBattleLinks(inputText);
@@ -319,7 +331,6 @@
       
       statusDisplay.textContent = `Найдено ${links.length} ссылок. Отправляем бои на анализ...`;
       
-      // Функция вызова API анализа (предполагается функция на сервере)
       async function callAnalyze(linksArray) {
         let response = await fetch("/.netlify/functions/analyzeBattles", {
           method: "POST",
@@ -333,7 +344,6 @@
       let finalResults = [];
       let retryRound = 1;
       let secondsElapsed = 0;
-      
       let intervalId = setInterval(() => {
         secondsElapsed++;
         statusDisplay.textContent = `Ждём ${secondsElapsed} сек... (Попытка ${retryRound}. Осталось анализировать ${remainingLinks.length} ссылок)`;
@@ -360,15 +370,28 @@
       clearInterval(intervalId);
       statusDisplay.textContent = `Анализ завершён. Всего успешно: ${finalResults.length}.`;
       
-      // Формируем оригинальный вывод: для каждой ссылки записываем строку вида "ссылка: результат анализа"
+      // Формируем исходный вывод: каждая ссылка отделена от результата переводом строки
       originalOutput = "";
       finalResults.forEach(r => {
         let analysisStr = r.result ? r.result : "Ошибка анализа";
         originalOutput += `${r.link}:\n${analysisStr}\n`;
       });
       
-      // Обновляем отображение с учётом выбранных фильтров
       updateFilteredOutput();
+    });
+    
+    /* Функция для сворачивания/разворачивания блока фильтра */
+    let filterToggle = document.getElementById("filterToggle");
+    let filterContent = document.getElementById("filterContent");
+    let toggleIcon = document.getElementById("toggleIcon");
+    filterToggle.addEventListener("click", () => {
+      if (filterContent.classList.contains("collapsed")) {
+        filterContent.classList.remove("collapsed");
+        toggleIcon.innerHTML = "&#9660;";
+      } else {
+        filterContent.classList.add("collapsed");
+        toggleIcon.innerHTML = "&#9654;";
+      }
     });
   </script>
 </body>
