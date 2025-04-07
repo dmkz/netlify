@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Анализ ссылок на бои</title>
+  <style>
+    /* Добавьте сюда стили, если необходимо */
+  </style>
+</head>
+<body>
+  <textarea id="inputText" rows="10" cols="80" placeholder="Вставьте сюда текст с ссылками на бои..."></textarea>
+  <br>
+  <button id="analyzeButton">Анализировать ссылки</button>
+  <div id="statusDisplay" style="font-weight: bold; margin: 10px 0;"></div>
+  <textarea id="outputArea" rows="10" cols="80" placeholder="Здесь появится модифицированный текст..."></textarea>
+
+  <script>
+    // Функция извлечения ссылок вида https://www.heroeswm.ru/war.php?warid=...
+    function extractBattleLinks(text) {
+      let regex = /https:\/\/www\.heroeswm\.ru\/war\.php\?warid=\d+/g;
+      let links = text.match(regex) || [];
+      return [...new Set(links)];
+    }
+
+    document.getElementById("analyzeButton").addEventListener("click", async () => {
+      let inputText = document.getElementById("inputText").value;
+      let links = extractBattleLinks(inputText);
+      let statusDisplay = document.getElementById("statusDisplay");
+      let outputArea = document.getElementById("outputArea");
+      
+      if (links.length === 0) {
+        statusDisplay.textContent = "Ссылки не найдены.";
+        return;
+      }
+      
+      statusDisplay.textContent = `Найдено ${links.length} ссылок. Отправляем бои на анализ...`;
+      
+      async function callAnalyze(linksArray) {
+        let response = await fetch("/.netlify/functions/analyzeBattles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ links: linksArray })
+        });
+        return response.json();
+      }
+      
+      let remainingLinks = links;
+      let finalResults = [];
+      let retryRound = 1;
+      let secondsElapsed = 0;
+      
+      let statusInterval = setInterval(() => {
+        secondsElapsed++;
+        statusDisplay.textContent = `Ждём ${secondsElapsed} сек... (Попытка ${retryRound}. Осталось анализировать ${remainingLinks.length} ссылок)`;
+      }, 1000);
+      
+      while (remainingLinks.length > 0) {
+        statusDisplay.textContent += `; Попытка ${retryRound}, отправляем ${remainingLinks.length} ссылок...`;
+        let result = await callAnalyze(remainingLinks);
+        let errorLinks = [];
+        result.results.forEach(r => {
+          if (r.status === "success") {
+            finalResults.push(r);
+          } else {
+            errorLinks.push(r.link);
+          }
+        });
+        remainingLinks = errorLinks;
+        if (remainingLinks.length > 0) {
+          statusDisplay.textContent += `; Повторная отправка для ${remainingLinks.length} ссылок.`;
+        }
+        retryRound++;
+      }
+      
+      clearInterval(statusInterval);
+      statusDisplay.textContent = `Анализ завершён. Всего успешно: ${finalResults.filter(r => r.status==="success").length}.`;
+      
+      // Модификация исходного текста: после каждой ссылки добавляется результат анализа.
+      finalResults.forEach(r => {
+        let analysisStr = r.result ? r.result : "Ошибка анализа";
+        let escapedLink = r.link.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        let linkRegex = new RegExp("(" + escapedLink + ")", "g");
+        inputText = inputText.replace(linkRegex, "$1: " + analysisStr + "\n");
+      });
+      
+      outputArea.value = inputText;
+    });
+  </script>
+</body>
+</html>
