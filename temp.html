@@ -136,130 +136,146 @@
     .left-panel, .right-panel, .filter-container {
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
+    /* Стили для нового макета фильтрации с двумя колонками */
+.filter-content {
+  padding: 8px;
+}
+.two-columns {
+  display: flex;
+  gap: 16px;
+}
+.two-columns .column {
+  flex: 1;
+}
+.option {
+  margin-bottom: 4px;
+}
+.group-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+  text-align: center;
+}
   </style>
 </head>
 <body>
   <div class="container">
     <!-- Левая панель -->
     <div class="left-panel">
-      <!-- Сворачиваемый блок фильтрации -->
-      <div class="filter-container" id="filterContainer">
-        <div class="filter-header" id="filterToggle">
-          Фильтры <span id="toggleIcon">&#9660;</span>
-        </div>
-        <div class="filter-content" id="filterContent">
-          <!-- Общие опции -->
-          <div class="filter-group">
-            <div class="group-title">Общие опции</div>
-            <div class="group-content">
-              <div>
-                <input type="checkbox" id="shortenMarkers" data-option="shortenMarkers">
-                <label for="shortenMarkers">Сокращать маркеры</label>
-              </div>
-            </div>
-          </div>
-          <!-- Опции для победителей -->
-          <div class="filter-group">
-            <div class="group-title">Победители</div>
-            <div class="group-content">
-              <div>
-                <input type="checkbox" id="showWinningSideName" data-option="showWinningSideName">
-                <label for="showWinningSideName">Название стороны</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showWinningHP" data-option="showWinningHP">
-                <label for="showWinningHP">Суммарное ХП</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showWinningPercent" data-option="showWinningPercent">
-                <label for="showWinningPercent">% выживших</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showWinningFaction" data-option="showWinningFaction">
-                <label for="showWinningFaction">Фракция</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showWinningHeroInfo" data-option="showWinningHeroInfo">
-                <label for="showWinningHeroInfo">Информация о героях</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showWinningHeroNickname" data-option="showWinningHeroNickname">
-                <label for="showWinningHeroNickname">Никнейм героев</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showWinningHeroLevel" data-option="showWinningHeroLevel">
-                <label for="showWinningHeroLevel">Уровень героев</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showWinningHeroParams" data-option="showWinningHeroParams">
-                <label for="showWinningHeroParams">Параметры героев</label>
-              </div>
-              <div>
-                <input type="checkbox" id="shortenWinningHeroParams" data-option="shortenWinningHeroParams">
-                <label for="shortenWinningHeroParams">Сокращать параметры героев</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showWinningArmy" data-option="showWinningArmy">
-                <label for="showWinningArmy">Армия</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showWinningBonuses" data-option="showWinningBonuses">
-                <label for="showWinningBonuses">Бонусы</label>
-              </div>
-            </div>
-          </div>
-          <!-- Опции для проигравших -->
-          <div class="filter-group">
-            <div class="group-title">Проигравшие</div>
-            <div class="group-content">
-              <div>
-                <input type="checkbox" id="showLosingSideName" data-option="showLosingSideName">
-                <label for="showLosingSideName">Название стороны</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showLosingHP" data-option="showLosingHP">
-                <label for="showLosingHP">Суммарное ХП</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showLosingPercent" data-option="showLosingPercent">
-                <label for="showLosingPercent">% выживших</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showLosingFaction" data-option="showLosingFaction">
-                <label for="showLosingFaction">Фракция</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showLosingHeroInfo" data-option="showLosingHeroInfo">
-                <label for="showLosingHeroInfo">Информация о героях</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showLosingHeroNickname" data-option="showLosingHeroNickname">
-                <label for="showLosingHeroNickname">Никнейм героев</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showLosingHeroLevel" data-option="showLosingHeroLevel">
-                <label for="showLosingHeroLevel">Уровень героев</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showLosingHeroParams" data-option="showLosingHeroParams">
-                <label for="showLosingHeroParams">Параметры героев</label>
-              </div>
-              <div>
-                <input type="checkbox" id="shortenLosingHeroParams" data-option="shortenLosingHeroParams">
-                <label for="shortenLosingHeroParams">Сокращать параметры героев</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showLosingArmy" data-option="showLosingArmy">
-                <label for="showLosingArmy">Армия</label>
-              </div>
-              <div>
-                <input type="checkbox" id="showLosingBonuses" data-option="showLosingBonuses">
-                <label for="showLosingBonuses">Бонусы</label>
-              </div>
-            </div>
-          </div>
+<!-- Сворачиваемый блок фильтрации -->
+<div class="filter-container" id="filterContainer">
+  <div class="filter-header" id="filterToggle">
+    Фильтры <span id="toggleIcon">&#9660;</span>
+  </div>
+  <div class="filter-content" id="filterContent">
+    <!-- Общие опции можно расположить сверху -->
+    <div class="filter-group common-options">
+      <div class="group-title">Общие опции</div>
+      <div class="group-content">
+        <div>
+          <input type="checkbox" id="shortenMarkers" data-option="shortenMarkers">
+          <label for="shortenMarkers">Сокращать маркеры</label>
         </div>
       </div>
+    </div>
+    <!-- Теперь создаём контейнер с двумя колонками -->
+    <div class="two-columns">
+      <div class="column">
+        <div class="group-title">Победители</div>
+        <div class="option">
+          <input type="checkbox" id="showWinningSideName" data-option="showWinningSideName">
+          <label for="showWinningSideName">Название стороны</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showWinningHP" data-option="showWinningHP">
+          <label for="showWinningHP">Суммарное ХП</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showWinningPercent" data-option="showWinningPercent">
+          <label for="showWinningPercent">% выживших</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showWinningFaction" data-option="showWinningFaction">
+          <label for="showWinningFaction">Фракция</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showWinningHeroInfo" data-option="showWinningHeroInfo">
+          <label for="showWinningHeroInfo">Информация о героях</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showWinningHeroNickname" data-option="showWinningHeroNickname">
+          <label for="showWinningHeroNickname">Никнейм героев</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showWinningHeroLevel" data-option="showWinningHeroLevel">
+          <label for="showWinningHeroLevel">Уровень героев</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showWinningHeroParams" data-option="showWinningHeroParams">
+          <label for="showWinningHeroParams">Параметры героев</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="shortenWinningHeroParams" data-option="shortenWinningHeroParams">
+          <label for="shortenWinningHeroParams">Сокращать параметры героев</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showWinningArmy" data-option="showWinningArmy">
+          <label for="showWinningArmy">Армия</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showWinningBonuses" data-option="showWinningBonuses">
+          <label for="showWinningBonuses">Бонусы</label>
+        </div>
+      </div>
+      <div class="column">
+        <div class="group-title">Проигравшие</div>
+        <div class="option">
+          <input type="checkbox" id="showLosingSideName" data-option="showLosingSideName">
+          <label for="showLosingSideName">Название стороны</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showLosingHP" data-option="showLosingHP">
+          <label for="showLosingHP">Суммарное ХП</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showLosingPercent" data-option="showLosingPercent">
+          <label for="showLosingPercent">% выживших</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showLosingFaction" data-option="showLosingFaction">
+          <label for="showLosingFaction">Фракция</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showLosingHeroInfo" data-option="showLosingHeroInfo">
+          <label for="showLosingHeroInfo">Информация о героях</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showLosingHeroNickname" data-option="showLosingHeroNickname">
+          <label for="showLosingHeroNickname">Никнейм героев</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showLosingHeroLevel" data-option="showLosingHeroLevel">
+          <label for="showLosingHeroLevel">Уровень героев</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showLosingHeroParams" data-option="showLosingHeroParams">
+          <label for="showLosingHeroParams">Параметры героев</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="shortenLosingHeroParams" data-option="shortenLosingHeroParams">
+          <label for="shortenLosingHeroParams">Сокращать параметры героев</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showLosingArmy" data-option="showLosingArmy">
+          <label for="showLosingArmy">Армия</label>
+        </div>
+        <div class="option">
+          <input type="checkbox" id="showLosingBonuses" data-option="showLosingBonuses">
+          <label for="showLosingBonuses">Бонусы</label>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
       <!-- Текстовое поле ввода -->
       <textarea id="inputText" placeholder="Вставьте сюда текст с ссылками на бои..."></textarea>
       <!-- Кнопка анализа -->
