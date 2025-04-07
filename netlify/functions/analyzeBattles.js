@@ -58,23 +58,18 @@ function runTasksWithConcurrency(tasks, limit, taskUpdateCallback) {
 // --------------------------
 // Функция fetchProtocolPage – для получения страницы протокола.
 // (В этом примере она может не использоваться, но включена для полноты.)
-function fetchProtocolPage(url) {
-  console.log(`fetchProtocolPage: ${url}`);
-  return getFetch()(url)
-    .then(response => response.arrayBuffer())
-    .then(buffer => {
-      let decoder = new TextDecoder("windows-1251");
-      let decoded = decoder.decode(Buffer.from(buffer));
-      console.log(`Страница протокола получена, длина: ${decoded.length}`);
-      return decoded;
-    });
+async function fetchProtocolPage(url) {
+  const fetchFn = await getFetch();
+  const response = await fetchFn(url);
+  const buffer = await response.arrayBuffer();
+  let decoder = new TextDecoder("windows-1251");
+  return decoder.decode(Buffer.from(buffer));
 }
 
-// --------------------------
-// Функция fetchBattlePage – получает страницу battle.php как текст.
-function fetchBattlePage(url) {
-  console.log(`fetchBattlePage: ${url}`);
-  return getFetch()(url).then(response => response.text());
+async function fetchBattlePage(url) {
+  const fetchFn = await getFetch();
+  const response = await fetchFn(url);
+  return response.text();
 }
 
 // --------------------------
