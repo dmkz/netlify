@@ -364,7 +364,7 @@
       originalOutput = "";
       finalResults.forEach(r => {
         let analysisStr = r.result ? r.result : "Ошибка анализа";
-        originalOutput += `${r.link}: ${analysisStr}\n`;
+        originalOutput += `${r.link}:\n${analysisStr}\n`;
       });
       
       // Обновляем отображение с учётом выбранных фильтров
