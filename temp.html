@@ -348,7 +348,7 @@
     
     /* --- Функция извлечения ссылок --- */
     function extractBattleLinks(text) {
-      let regex = /https:\/\/www\.heroeswm\.ru\/war\.php\?warid=\d+/g;
+      let regex = /https:\/\/(?:(?:www\.)?(?:heroeswm\.ru|mirror\.heroeswm\.ru)|(?:(?:www\.)?lordswm\.com|my\.lordswm\.com))\/war(?:log)?\.php\?warid=\d+/gi;
       let links = text.match(regex) || [];
       return [...new Set(links)];
     }
