@@ -4,157 +4,157 @@
   <meta charset="UTF-8">
   <title>Анализ ссылок на бои с фильтрацией (2025)</title>
   <style>
-    /* Базовый сброс стилей */
-    *, *::before, *::after {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f5f5f5;
-      color: #333;
-      height: 100vh;
-      overflow: hidden;
-    }
-    /* Контейнер, делящий страницу на две половины */
-    .container {
-      display: flex;
-      height: 100vh;
-      width: 100%;
-    }
-    /* Левая панель */
-    .left-panel {
-      width: 50%;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      background: #ffffff;
-      border-right: 2px solid #ddd;
-    }
-    /* Правая панель */
-    .right-panel {
-      width: 50%;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      background: #fafafa;
-    }
-    /* Текстовые поля */
-    textarea {
-      width: 100%;
-      resize: none;
-      padding: 8px;
-      font-family: monospace;
-      font-size: 14px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    /* Поле ввода занимает оставшуюся высоту левой панели */
-    #inputText {
-      flex: 1;
-      margin-bottom: 8px;
-    }
-    /* Область вывода результата */
-    #outputArea {
-      flex: 1;
-    }
-    /* Кнопка "Анализировать ссылки" */
-    #analyzeButton {
-      padding: 10px;
-      font-size: 16px;
-      font-weight: bold;
-      border: none;
-      border-radius: 4px;
-      background-color: #007bff;
-      color: #fff;
-      cursor: pointer;
-      margin-bottom: 8px;
-      transition: background-color 0.2s ease-in-out;
-    }
-    #analyzeButton:hover {
-      background-color: #0056b3;
-    }
-    /* Статус анализа */
-    #statusDisplay {
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-    /* Сворачиваемый блок фильтрации */
-    .filter-container {
-      background: rgba(240, 230, 210, 0.9);
-      border: 2px solid #8b4513;
-      border-radius: 8px;
-      margin-bottom: 8px;
-      overflow: hidden;
-      transition: max-height 0.3s ease-out, padding 0.3s ease-out;
-    }
-    .filter-header {
-      background: #deb887;
-      padding: 8px;
-      cursor: pointer;
-      font-size: 16px;
-      font-weight: bold;
-      user-select: none;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .filter-header:hover {
-      background: #d2a679;
-    }
-    /* Контент фильтров */
-    .filter-content {
-      padding: 8px;
-      max-height: 70vh;
-      overflow-y: auto;
-    }
-    /* Правило для свёрнутого состояния (обязательно ниже и с !important) */
-    .filter-content.collapsed {
-      max-height: 0 !important;
-      padding-top: 0;
-      padding-bottom: 0;
-      border: none;
-    }
-    /* Группировка опций фильтрации */
-    .filter-group {
-      margin-bottom: 8px;
-    }
-    .filter-group > .group-title {
-      font-weight: bold;
-      margin-bottom: 4px;
-    }
-    .filter-group .group-content {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    .filter-group label {
-      font-size: 14px;
-    }
-    .filter-group input[type="checkbox"] {
-      margin-right: 4px;
-    }
-    /* Стили для макета с двумя колонками */
-    .two-columns {
-      display: flex;
-      gap: 16px;
-    }
-    .two-columns .column {
-      flex: 1;
-    }
-    .option {
-      margin-bottom: 4px;
-    }
-    .group-title {
-      font-weight: bold;
-      margin-bottom: 4px;
-      text-align: center;
-    }
-    /* Современные тени */
-    .left-panel, .right-panel, .filter-container {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
+  /* Базовый сброс стилей */
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    height: 100vh;
+    overflow: hidden;
+  }
+  /* Контейнер, делящий страницу на две половины */
+  .container {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+  }
+  /* Левая панель */
+  .left-panel {
+    width: 50%;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border-right: 2px solid #ddd;
+  }
+  /* Правая панель */
+  .right-panel {
+    width: 50%;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    background: #fafafa;
+  }
+  /* Текстовые поля */
+  textarea {
+    width: 100%;
+    resize: none;
+    padding: 8px;
+    font-family: monospace;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  /* Поле ввода занимает оставшуюся высоту левой панели */
+  #inputText {
+    flex: 1;
+    margin-bottom: 8px;
+  }
+  /* Область вывода результата */
+  #outputArea {
+    flex: 1;
+  }
+  /* Кнопка "Анализировать ссылки" */
+  #analyzeButton {
+    padding: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    background-color: #007bff;
+    color: #fff;
+    cursor: pointer;
+    margin-bottom: 8px;
+    transition: background-color 0.2s ease-in-out;
+  }
+  #analyzeButton:hover {
+    background-color: #0056b3;
+  }
+  /* Статус анализа */
+  #statusDisplay {
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+  /* Сворачиваемый блок фильтрации */
+  .filter-container {
+    background: rgba(240, 230, 210, 0.9);
+    border: 2px solid #8b4513;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+  }
+  .filter-header {
+    background: #deb887;
+    padding: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .filter-header:hover {
+    background: #d2a679;
+  }
+  /* Контент фильтров */
+  .filter-content {
+    padding: 8px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  /* Правило для свёрнутого состояния (обязательно ниже и с !important) */
+  .filter-content.collapsed {
+    max-height: 0 !important;
+    padding-top: 0;
+    padding-bottom: 0;
+    border: none;
+  }
+  /* Группировка опций фильтрации */
+  .filter-group {
+    margin-bottom: 8px;
+  }
+  .filter-group > .group-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  .filter-group .group-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .filter-group label {
+    font-size: 14px;
+  }
+  .filter-group input[type="checkbox"] {
+    margin-right: 4px;
+  }
+  /* Стили для макета с двумя колонками */
+  .two-columns {
+    display: flex;
+    gap: 16px;
+  }
+  .two-columns .column {
+    flex: 1;
+  }
+  .option {
+    margin-bottom: 4px;
+  }
+  .group-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+  /* Современные тени */
+  .left-panel, .right-panel, .filter-container {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
   </style>
 </head>
 <body>
@@ -357,7 +357,10 @@
     function insertAnalysisResults(inputText, analysisMap) {
       let regex = /https:\/\/(?:(?:www\.)?(?:heroeswm\.ru|mirror\.heroeswm\.ru)|(?:(?:www\.)?lordswm\.com|my\.lordswm\.com))\/war(?:log)?\.php\?warid=\d+/gi;
       return inputText.replace(regex, function(match) {
-        let analysis = analysisMap[match] ? ("\n" + analysisMap[match] + "\n") : "";
+        // Обрезаем результат анализа, чтобы убрать лишние переносы строк.
+        let analysisResult = analysisMap[match] ? analysisMap[match].trim() : "";
+        // Вставляем ровно один перенос строки до и после результата.
+        let analysis = analysisResult ? ("\n" + analysisResult + "\n") : "";
         return match + analysis;
       });
     }
