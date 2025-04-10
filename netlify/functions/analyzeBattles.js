@@ -290,10 +290,12 @@ function determineFaction(sideAggregate, threshold = 0.5) {
   });
   validKeys.forEach(name => {
     let lowerName = name.toLowerCase().trim();
+    console.log("lowerName " + lowerName);
     factionSets.forEach(mapping => {
       let score = 0;
       mapping.creatures.forEach(mappedName => {
         if (lowerName === mappedName.toLowerCase()) {
+          console.log("found " + mappedName);
           let cnt = (sideAggregate[name] && sideAggregate[name].count) ? sideAggregate[name].count : 1;
           score += cnt;
         }
