@@ -297,7 +297,7 @@ function determineFaction(sideAggregate, threshold = 0.5) {
         if (lowerName === mappedName.toLowerCase()) {
           console.log("found " + mappedName);
           let cnt = (sideAggregate[name] && sideAggregate[name].count) ? sideAggregate[name].count : 1;
-          score += cnt;
+          score += 1;
         }
       });
       if (score > bestScore) {
@@ -307,7 +307,7 @@ function determineFaction(sideAggregate, threshold = 0.5) {
     });
   });
   let total = validKeys.reduce((sum, name) => {
-    return sum + ((sideAggregate[name] && sideAggregate[name].count) ? sideAggregate[name].count : 1);
+    return sum + ((sideAggregate[name] && sideAggregate[name].count) ? 1 : 0);
   }, 0);
   if (bestMatch) {
     console.log("Faction" + bestMatch.faction + ", score: " + bestScore + ", total: " + total);
