@@ -309,7 +309,9 @@ function determineFaction(sideAggregate, threshold = 0.5) {
   let total = validKeys.reduce((sum, name) => {
     return sum + ((sideAggregate[name] && sideAggregate[name].count) ? sideAggregate[name].count : 1);
   }, 0);
-  console.log("Faction" + bestMatch.faction + ", score: " + bestScore + ", total: " + total);
+  if (bestMatch) {
+    console.log("Faction" + bestMatch.faction + ", score: " + bestScore + ", total: " + total);
+  }
   if (bestMatch && total > 0 && (bestScore / total) >= threshold) {
     return bestMatch.faction;
   }
