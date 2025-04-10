@@ -288,23 +288,24 @@ function determineFaction(sideAggregate, threshold = 0.5) {
     const obj = sideAggregate[name];
     return !(obj.initialHealth === 0 && obj.remainingHealth === 0);
   });
-  validKeys.forEach(name => {
-    let lowerName = name.toLowerCase().trim();
-    console.log("lowerName " + lowerName);
-    factionSets.forEach(mapping => {
-      let score = 0;
-      mapping.creatures.forEach(mappedName => {
+  factionSets.forEach(mapping => {
+    let score = 0;
+    validKeys.forEach(name => {
+        let lowerName = name.toLowerCase().trim();
+        console.log("lowerName " + lowerName);
+        mapping.creatures.forEach(mappedName => {
         if (lowerName === mappedName.toLowerCase()) {
           console.log("found " + mappedName);
           let cnt = (sideAggregate[name] && sideAggregate[name].count) ? sideAggregate[name].count : 1;
           score += 1;
+          break;
         }
       });
-      if (score > bestScore) {
+    });
+    if (score > bestScore) {
         bestScore = score;
         bestMatch = mapping;
-      }
-    });
+    }
   });
   let total = validKeys.reduce((sum, name) => {
     return sum + ((sideAggregate[name] && sideAggregate[name].count) ? 1 : 0);
