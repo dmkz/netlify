@@ -298,7 +298,6 @@ function determineFaction(sideAggregate, threshold = 0.5) {
           console.log("found " + mappedName);
           let cnt = (sideAggregate[name] && sideAggregate[name].count) ? sideAggregate[name].count : 1;
           score += 1;
-          break;
         }
       });
     });
