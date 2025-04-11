@@ -357,7 +357,7 @@ function extractBattleLinks(text) {
 function insertAnalysisResults(inputText, analysisMap) {
   let regex = /https:\/\/(?:(?:www\.)?(?:heroeswm\.ru|mirror\.heroeswm\.ru)|(?:(?:www\.)?lordswm\.com|my\.lordswm\.com))\/war(?:log)?\.php\?[^\s]+/gi;
   return inputText.replace(regex, function(match) {
-    let analysis = analysisMap[match] ? ("\n" + analysisMap[match] + "\n") : "";
+    let analysis = analysisMap[match] ? ("\n" + analysisMap[match]) : "";
     return match + analysis;
   });
 }
