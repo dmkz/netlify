@@ -389,7 +389,7 @@ function insertAnalysisResults(inputText, analysisMap) {
       let levelBlock = "";
       let paramsBlock = "";
       if (blocks.length > 0) {
-        if (/Уровень:|^У:/i.test(blocks[0])) {
+        if (/Уровень:|^Ур:/i.test(blocks[0])) {
           levelBlock = blocks[0];
           if (blocks.length > 1) {
             paramsBlock = blocks.slice(1).join("][");
@@ -409,7 +409,7 @@ function insertAnalysisResults(inputText, analysisMap) {
         levelBlock = "";
       } else if (levelBlock) {
         if ((isWinner && opts.shortenWinningHeroParams) || (!isWinner && opts.shortenLosingHeroParams)) {
-          levelBlock = levelBlock.replace(/Уровень:/gi, "У:");
+          levelBlock = levelBlock.replace(/Уровень:/gi, "Ур:");
           levelBlock = levelBlock.replace(/\s+/g, "");
         }
         levelBlock = "[" + levelBlock + "]";
