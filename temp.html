@@ -437,13 +437,13 @@ function insertAnalysisResults(inputText, analysisMap) {
      */
     function shortenHeroParams(paramsBlock) {
       const mapping = {
-        "Нападение:": "Н:",
-        "Защита:": "З:",
+        "Нападение:": "Нап:",
+        "Защита:": "Защ:",
         "Сила магии:": "СМ:",
         "Знания:": "ЗН:",
         "Удача:": "Уд:",
         "Боевой Дух:": "БД:",
-        "Уровень:": "У:"
+        "Уровень:": "Ур:"
       };
       for (let key in mapping) {
         let shortKey = mapping[key];
@@ -455,10 +455,10 @@ function insertAnalysisResults(inputText, analysisMap) {
     
     function transformLine(line, opts) {
       let trimmed = line.trim();
-      let firstBracket = trimmed.indexOf("[");
-      if (firstBracket > 0) {
-        trimmed = trimmed.slice(firstBracket);
-      }
+      //let firstBracket = trimmed.indexOf("[");
+      //if (firstBracket > 0) {
+      //  trimmed = trimmed.slice(firstBracket);
+      //}
       if (!trimmed.startsWith("[")) return line;
       let inner = trimmed.substring(1, trimmed.length - 1);
       let blocks = inner.split("] [");
