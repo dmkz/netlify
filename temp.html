@@ -453,6 +453,13 @@ function insertAnalysisResults(inputText, analysisMap) {
       return paramsBlock.replace(/\s+/g, "");
     }
     
+    function replacePrefix(str, prefix, replacement) {
+      if (str.startsWith(prefix)) {
+        return replacement + str.slice(prefix.length);
+      }
+      return str;
+    }
+    
     function transformLine(line, opts) {
       let trimmed = line.trim();
       //let firstBracket = trimmed.indexOf("[");
@@ -468,7 +475,8 @@ function insertAnalysisResults(inputText, analysisMap) {
       
       if (isWinner || isLoser) {
         if (opts.shortenMarkers) {
-          blocks[0] = isWinner ? "+" : "-";
+          blocks[0] = replacePrefix(blocks[0], "win!", "+");
+          blocks[0] = replacePrefix(blocks[0], "lose", "-");
         }
       }
       if ((isWinner && !opts.showWinningSideName) || (!isWinner && !opts.showLosingSideName)) {
