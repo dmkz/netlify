@@ -129,6 +129,7 @@ function parseArmyInfo(armyString) {
     groups.push(rawBlock.substr(i * 6, 6));
   }
   let numbers = groups.map(g => parseFloat(g));
+  let isSummoned = (armyString.indexOf("sum100000000001") !== -1);
   let params = {
     sideNumber: numbers[0],
     healthPerUnit: numbers[2],
@@ -148,7 +149,8 @@ function parseArmyInfo(armyString) {
     attack: numbers[17],
     defense: numbers[18],
     morale: numbers[19],
-    luck: numbers[20]
+    luck: numbers[20],
+    summoned: isSummoned
   };
   let extraInfo = armyString.substring(144).trim();
   let extra = {};
@@ -214,10 +216,14 @@ function buildMoments(armyMatches) {
         } else {
           itemName = match.armyData.extra.shortName || "";
         }
+        let summoned = match.armyData.params.summoned;
         itemCount = match.armyData.params.magicOrCount;
         let unitHealth = match.armyData.params.healthPerUnit;
         initialHealth = itemCount * unitHealth;
         remainingHealth = Math.max(0, (match.armyData.params.survivors - 1) * unitHealth + match.armyData.params.totalHealth);
+        if (summoned) {
+            itemName = `${itemName} (призваны)`;
+        }
         details = `${itemName} (${itemCount})`;
       }
     }
@@ -313,10 +319,14 @@ function determineFaction(sideAggregate, threshold = 0.5) {
     let score = 0;
     validKeys.forEach(name => {
         let lowerName = name.toLowerCase().trim();
-        console.log("lowerName " + lowerName);
+        let index = lowerName.indexOf(" (призваны)");
+        if (index !== -1) {
+            lowerName = lowerName.substr(0, index);
+        }
+        //console.log("lowerName " + lowerName);
         mapping.creatures.forEach(mappedName => {
         if (lowerName === mappedName.toLowerCase()) {
-          console.log("found " + mappedName);
+          //console.log("found " + mappedName);
           let cnt = (sideAggregate[name] && sideAggregate[name].count) ? sideAggregate[name].count : 1;
           score += 1;
         }
@@ -410,14 +420,21 @@ function formatTokenLine(tokenLine, isWinner) {
   if (tokenLine.sideAggregate) {
     let totalInitial = 0;
     let totalRemaining = 0;
+    let totalInitialSummoning = 0;
+    let totalRemainingSummoning = 0;
     let heroesDetails = [];
     let unitsDetails = [];
     for (let unit in tokenLine.sideAggregate) {
       if (unit === "faction") continue;
       let data = tokenLine.sideAggregate[unit];
       if (typeof data === "object") {
-        totalInitial += data.initialHealth || 0;
-        totalRemaining += data.remainingHealth || 0;
+        if (data.details.indexOf("(призваны)") !== -1) {
+            totalInitialSummoning += data.initialHealth || 0;
+            totalRemainingSummoning += data.remainingHealth || 0;
+        } else {
+            totalInitial += data.initialHealth || 0;
+            totalRemaining += data.remainingHealth || 0;
+        }
         if (data.details) {
           if (data.details.indexOf("Нападение:") !== -1) {
             heroesDetails.push(data.details);
@@ -428,11 +445,16 @@ function formatTokenLine(tokenLine, isWinner) {
       }
     }
     let percent = totalInitial > 0 ? ((totalRemaining / totalInitial) * 100).toFixed(2) + "%" : "N/A";
+    let percentSummoning = totalInitialSummoning > 0 ? ((totalRemainingSummoning / totalInitialSummoning) * 100).toFixed(2) + "%" : "N/A";
     let faction = tokenLine.sideAggregate.faction || "Не определена";
     result += isWinner ? "[win!] " : "[lose] ";
     result += "[" + firstToken + "] ";
     result += "[" + totalInitial + " ХП] ";
-    result += "[" + percent + " выжило] ";
+    if (totalInitialSummoning > 0) {
+        result += "[" + percent + " выжило, " + percentSummoning + " призванных] ";
+    } else {
+        result += "[" + percent + " выжило] ";
+    }
     result += "[" + faction + "] ";
     if (heroesDetails.length > 0) { result += "[" + heroesDetails.join(", ") + "] "; }
     if (unitsDetails.length > 0) { result += "[" + unitsDetails.join(", ") + "] "; }
