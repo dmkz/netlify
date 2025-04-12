@@ -983,6 +983,26 @@
         filterToggleIcon.innerHTML = "&#9654;";
       }
     });
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        // Запрашиваем данные из базы
+        const res = await fetch('/.netlify/functions/getBattles');
+        if (res.ok) {
+          const dbBattles = await res.json();
+          // Если данные получены, выводим их на страницу:
+          displayBattles(dbBattles);
+          updateFilteredOutput();
+          statusBar.textContent = `Статус: загружено из базы ${dbBattles.length} боёв`;
+        } else {
+          console.error("Ошибка получения боёв из базы");
+          statusBar.textContent = 'Статус: ошибка загрузки базы';
+        }
+      } catch (error) {
+        console.error("Ошибка при запросе к базе:", error);
+        statusBar.textContent = 'Статус: ошибка запроса к базе';
+      }
+    });
+
   </script>
 </body>
 </html>
