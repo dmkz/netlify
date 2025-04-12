@@ -402,6 +402,29 @@
   </div>
 
   <script>
+  // Функция для начала "активного" состояния статус-бара
+  function startStatusUpdate() {
+    console.log("startStatusUpdate вызвана в " + new Date().toLocaleTimeString());
+    statusBar.classList.add('status-update');
+  }
+
+  // Функция для остановки анимации обновления
+  function stopStatusUpdate() {
+    console.log("stopStatusUpdate вызвана в " + new Date().toLocaleTimeString());
+    statusBar.classList.remove('status-update');
+  }
+
+  // Пример использования: перед началом долгой операции
+  console.log("Запуск операции загрузки боёв в " + new Date().toLocaleTimeString());
+  startStatusUpdate();
+  statusBar.textContent = 'Загружаем бои, подождите. Прошло 0.000 сек';
+
+  // Затем, когда операция закончена – для проверки поставил 10 секунд (10000 мс)
+  setTimeout(() => {
+    console.log("setTimeout сработал в " + new Date().toLocaleTimeString());
+    stopStatusUpdate();
+    statusBar.textContent = 'Всё готово. Сгруппировано N боёв за 1.234 сек';
+  }, 10000); // изменено с 60000 на 10000 для тестирования
     /* ========= Общие переменные и элементы ========= */
     const collapsible = document.querySelector('.collapsible');
     const content = document.querySelector('.content');
@@ -1063,25 +1086,6 @@
         statusBar.textContent = "Статус: ошибка запроса к базе";
       }
     });
-    // Функция для начала "активного" состояния статус-бара
-    function startStatusUpdate() {
-      statusBar.classList.add('status-update');
-    }
-
-    // Функция для остановки анимации обновления
-    function stopStatusUpdate() {
-      statusBar.classList.remove('status-update');
-    }
-
-    // Пример использования: перед началом долгой операции
-    startStatusUpdate();
-    statusBar.textContent = 'Загружаем бои, подождите. Прошло 0.000 сек';
-
-    // Затем, когда операция закончена
-    setTimeout(() => {
-      stopStatusUpdate();
-      statusBar.textContent = 'Всё готово. Сгруппировано N боёв за 1.234 сек';
-    }, 60000);
   </script>
 </body>
 </html>
