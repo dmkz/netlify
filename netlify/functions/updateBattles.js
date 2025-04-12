@@ -2,7 +2,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // Используем service_role для полного доступа
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // используем service_role для полного доступа
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 exports.handler = async (event, context) => {
@@ -10,25 +10,37 @@ exports.handler = async (event, context) => {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
 
-  let battles;
+  let payload;
   try {
-    battles = JSON.parse(event.body); // ожидается массив объектов боёв
+    // Ожидается, что в теле запроса придёт объект вида: { battles: [...], markers: "..." }
+    payload = JSON.parse(event.body);
   } catch (error) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) };
   }
 
-  try {
-    // Вставляем новые боевые записи (обратите внимание: если нужно выполнить обновление существующих,
-    // это можно сделать через upsert, см. документацию Supabase)
-    const { data, error } = await supabase
-      .from('battles')
-      .upsert(battles, { onConflict: 'warid' }); // если во входном массиве есть записи с уже существующим warid, они будут обновлены
+  const battles = payload.battles || [];
+  const markers = payload.markers || '';
 
-    if (error) {
-      throw error;
+  try {
+    // Обновляем или вставляем боевые записи (upsert по полю "warid")
+    const { data: battlesData, error: battlesError } = await supabase
+      .from('battles')
+      .upsert(battles, { onConflict: 'warid' });
+    if (battlesError) {
+      throw battlesError;
     }
 
-    return { statusCode: 200, body: JSON.stringify(data) };
+    // Обновляем значение маркеров в таблице "settings", если значение передано
+    if (markers !== '') {
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('settings')
+        .upsert({ key: 'eventMarkers', value: markers });
+      if (settingsError) {
+        throw settingsError;
+      }
+    }
+
+    return { statusCode: 200, body: JSON.stringify({ battlesData }) };
   } catch (error) {
     console.error('Ошибка добавления данных:', error);
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };

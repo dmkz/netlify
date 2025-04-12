@@ -454,19 +454,24 @@
 
       // Если есть новые бои – отправляем их пачкой в базу данных
       if (newInDB.length > 0) {
-        try {
-          const updateRes = await fetch('/.netlify/functions/updateBattles', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newInDB)
-          });
-          if (!updateRes.ok) {
-            console.error("Ошибка обновления базы");
+          try {
+            // Формируем объект с полями: battles и markers
+            const payload = {
+              battles: newInDB,
+              markers: markersInput.value  // текущее значение из поля ввода
+            };
+            const updateRes = await fetch('/.netlify/functions/updateBattles', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (!updateRes.ok) {
+              console.error("Ошибка обновления базы");
+            }
+          } catch (error) {
+            console.error("Ошибка при обновлении базы:", error);
           }
-        } catch (error) {
-          console.error("Ошибка при обновлении базы:", error);
         }
-      }
 
       // Отображаем объединённый результат (группировка без изменений)
       displayBattles(allBattles);
@@ -985,14 +990,16 @@
     });
     document.addEventListener('DOMContentLoaded', async () => {
       try {
-        // Запрашиваем данные из базы
         const res = await fetch('/.netlify/functions/getBattles');
         if (res.ok) {
-          const dbBattles = await res.json();
-          // Если данные получены, выводим их на страницу:
+          const data = await res.json();
+          const dbBattles = data.battles;
+          const markers = data.markers || '';
+          // Устанавливаем полученное значение маркеров в поле ввода
+          markersInput.value = markers;
           displayBattles(dbBattles);
           updateFilteredOutput();
-          statusBar.textContent = `Статус: загружено из базы ${dbBattles.length} боёв`;
+          statusBar.textContent = `Статус: загружено ${dbBattles.length} боёв, маркеры: ${markers}`;
         } else {
           console.error("Ошибка получения боёв из базы");
           statusBar.textContent = 'Статус: ошибка загрузки базы';
@@ -1002,6 +1009,7 @@
         statusBar.textContent = 'Статус: ошибка запроса к базе';
       }
     });
+
 
   </script>
 </body>
