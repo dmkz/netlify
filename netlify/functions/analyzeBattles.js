@@ -568,7 +568,7 @@ exports.handler = async function(event, context) {
       task.link = link;
       return task;
     });
-    let concurrencyLimit = 50;
+    let concurrencyLimit = 200;
     let timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error("Время ожидания истекло")), TIMEOUT);
     });
