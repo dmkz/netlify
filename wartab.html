@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Анализ боёв</title>
+  <title>Анализ боёв с фильтрами</title>
   <style>
-    /* Стили для современного, адаптивного дизайна */
+    /* Общие стили */
     body {
       font-family: Arial, sans-serif;
       background: #f2f2f2;
@@ -17,6 +17,8 @@
       margin: auto;
       padding: 20px;
     }
+    
+    /* Блок отправки боёв */
     .collapsible {
       background-color: #333;
       color: #fff;
@@ -29,9 +31,16 @@
       font-size: 20px;
       border-radius: 4px;
       margin-bottom: 10px;
+      position: relative;
     }
-    .active, .collapsible:hover {
-      background-color: #555;
+    .collapsible::after {
+      content: "\25B6"; /* стрелка вправо */
+      position: absolute;
+      right: 20px;
+      font-size: 20px;
+    }
+    .collapsible.active::after {
+      content: "\25BC"; /* стрелка вниз */
     }
     .content {
       padding: 0 18px;
@@ -79,27 +88,109 @@
       margin-top: 10px;
       font-size: 16px;
     }
+    
+    /* Фильтр – стили из примера */
+    .filter-container {
+      background: rgba(240, 230, 210, 0.9);
+      border: 2px solid #8b4513;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+    }
+    .filter-header {
+      background: #deb887;
+      padding: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .filter-header:hover {
+      background: #d2a679;
+    }
+    .filter-content {
+      padding: 8px;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .filter-content.collapsed {
+      max-height: 0 !important;
+      padding-top: 0;
+      padding-bottom: 0;
+      border: none;
+    }
+    .filter-group {
+      margin-bottom: 8px;
+    }
+    .filter-group > .group-title {
+      font-weight: bold;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+    .filter-group .group-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .filter-group label {
+      font-size: 14px;
+    }
+    .filter-group input[type="checkbox"] {
+      margin-right: 4px;
+    }
+    .two-columns {
+      display: flex;
+      gap: 16px;
+    }
+    .two-columns .column {
+      flex: 1;
+    }
+    .option {
+      margin-bottom: 4px;
+    }
+    
+    /* Стили для группировки боёв */
     .result-group {
       border: 1px solid #ccc;
       background: #fff;
       border-radius: 4px;
       margin-bottom: 20px;
-      padding: 10px;
+      overflow: hidden;
     }
-    .group-title {
+    .collapsible-group {
+      background-color: #e0e0e0;
+      cursor: pointer;
+      padding: 10px;
       font-size: 18px;
       font-weight: bold;
-      margin-bottom: 10px;
+      border-bottom: 1px solid #ccc;
+      position: relative;
     }
+    .collapsible-group::after {
+      content: "\25B6";
+      position: absolute;
+      right: 10px;
+      font-size: 18px;
+    }
+    .collapsible-group.active::after {
+      content: "\25BC";
+    }
+    .group-content {
+      display: none;
+      padding: 10px;
+    }
+    
+    /* Стили для отображения боёв */
     .battle {
       border-bottom: 1px dashed #ccc;
       padding: 10px 0;
     }
     .battle:last-child {
       border-bottom: none;
-    }
-    .battle-link {
-      margin-bottom: 5px;
     }
     .battle-link a {
       color: #007bff;
@@ -108,30 +199,150 @@
     .battle-link a:hover {
       text-decoration: underline;
     }
-    .battle-result {
-      margin-left: 20px;
-    }
+    
+    /* Фоны для строк анализа */
     .result-line {
+      padding: 5px;
+      border-radius: 4px;
       margin-bottom: 3px;
+    }
+    .result-line.win {
+      background-color: #d4edda;
+    }
+    .result-line.lose {
+      background-color: #f8d7da;
+    }
+    .result-line.unknown {
+      background-color: #fff3cd;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- Контейнер отправки боёв (с возможностью сворачивания/разворачивания) -->
+    <!-- Блок отправки боёв -->
     <button type="button" class="collapsible">Отправка боёв</button>
     <div class="content">
-      <!-- Большое текстовое поле для вставки данных боёв -->
       <textarea id="battleInput" placeholder="Вставьте сюда текст с боями..."></textarea>
-      <!-- Поле для ввода маркеров ивента -->
       <input type="text" id="markersInput" placeholder="Маркеры ивента (через запятую)">
-      <!-- Кнопки отправки и очистки -->
       <div>
         <button class="send" id="sendButton">Отправить</button>
         <button class="clear" id="clearButton">Очистить</button>
       </div>
-      <!-- Статусная строка -->
       <div class="status-bar" id="statusBar">Статус: ожидаем ввода</div>
+    </div>
+    
+    <!-- Блок фильтрации (изначально свернут) -->
+    <div class="filter-container" id="filterContainer">
+      <div class="filter-header" id="filterToggle">
+        Фильтры <span id="filterToggleIcon">&#9654;</span>
+      </div>
+      <div class="filter-content collapsed" id="filterContent">
+        <div class="filter-group common-options">
+          <div class="group-title">Общие опции</div>
+          <div class="group-content">
+            <div>
+              <input type="checkbox" id="shortenMarkers" data-option="shortenMarkers">
+              <label for="shortenMarkers">Сокращать маркеры</label>
+            </div>
+          </div>
+        </div>
+        <div class="two-columns">
+          <div class="column">
+            <div class="group-title">Победители</div>
+            <div class="option">
+              <input type="checkbox" id="showWinningSideName" data-option="showWinningSideName">
+              <label for="showWinningSideName">Название стороны</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHP" data-option="showWinningHP">
+              <label for="showWinningHP">Суммарное ХП</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningPercent" data-option="showWinningPercent">
+              <label for="showWinningPercent">% выживших</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningFaction" data-option="showWinningFaction">
+              <label for="showWinningFaction">Фракция</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroInfo" data-option="showWinningHeroInfo">
+              <label for="showWinningHeroInfo">Информация о героях</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroNickname" data-option="showWinningHeroNickname">
+              <label for="showWinningHeroNickname">Никнейм героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroLevel" data-option="showWinningHeroLevel">
+              <label for="showWinningHeroLevel">Уровень героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroParams" data-option="showWinningHeroParams">
+              <label for="showWinningHeroParams">Параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="shortenWinningHeroParams" data-option="shortenWinningHeroParams">
+              <label for="shortenWinningHeroParams">Сокращать параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningArmy" data-option="showWinningArmy">
+              <label for="showWinningArmy">Армия</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningBonuses" data-option="showWinningBonuses">
+              <label for="showWinningBonuses">Бонусы</label>
+            </div>
+          </div>
+          <div class="column">
+            <div class="group-title">Проигравшие</div>
+            <div class="option">
+              <input type="checkbox" id="showLosingSideName" data-option="showLosingSideName">
+              <label for="showLosingSideName">Название стороны</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHP" data-option="showLosingHP">
+              <label for="showLosingHP">Суммарное ХП</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingPercent" data-option="showLosingPercent">
+              <label for="showLosingPercent">% выживших</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingFaction" data-option="showLosingFaction">
+              <label for="showLosingFaction">Фракция</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroInfo" data-option="showLosingHeroInfo">
+              <label for="showLosingHeroInfo">Информация о героях</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroNickname" data-option="showLosingHeroNickname">
+              <label for="showLosingHeroNickname">Никнейм героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroLevel" data-option="showLosingHeroLevel">
+              <label for="showLosingHeroLevel">Уровень героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroParams" data-option="showLosingHeroParams">
+              <label for="showLosingHeroParams">Параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="shortenLosingHeroParams" data-option="shortenLosingHeroParams">
+              <label for="shortenLosingHeroParams">Сокращать параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingArmy" data-option="showLosingArmy">
+              <label for="showLosingArmy">Армия</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingBonuses" data-option="showLosingBonuses">
+              <label for="showLosingBonuses">Бонусы</label>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     
     <!-- Контейнер для отображения результатов -->
@@ -139,7 +350,7 @@
   </div>
   
   <script>
-    // Элементы страницы
+    /* ====== Блок управления отправкой боёв ====== */
     const collapsible = document.querySelector('.collapsible');
     const content = document.querySelector('.content');
     const battleInput = document.getElementById('battleInput');
@@ -149,19 +360,16 @@
     const statusBar = document.getElementById('statusBar');
     const resultsContainer = document.getElementById('resultsContainer');
     
-    // Переключение видимости контейнера отправки боёв
     collapsible.addEventListener('click', function() {
       this.classList.toggle("active");
       content.style.display = (content.style.display === "block") ? "none" : "block";
     });
     
-    // Очистка поля ввода
     clearButton.addEventListener('click', function() {
       battleInput.value = '';
       statusBar.textContent = 'Статус: очищено';
     });
     
-    // Обработка нажатия на кнопку «Отправить»
     sendButton.addEventListener('click', async function() {
       statusBar.textContent = 'Статус: обработка ввода...';
       const inputText = battleInput.value;
@@ -170,24 +378,19 @@
         return;
       }
       
-      // Извлечение ссылок на бои (ищутся все ссылки с war.php или warlog.php)
       let battleLinks = extractBattleLinks(inputText);
       if (battleLinks.length === 0) {
         statusBar.textContent = 'Статус: не найдено ссылок на бои';
         return;
       }
       
-      // Нормализация ссылок и извлечение warid
       let battles = battleLinks.map(link => {
         const normalized = normalizeBattleLink(link);
         const warid = extractWarId(normalized);
         return { warid, link: normalized, result: null };
       }).filter(b => b.warid);
       
-      // Загрузка ранее сохранённых боёв из localStorage
       let storedBattles = JSON.parse(localStorage.getItem('battles') || '[]');
-      
-      // Объединение новых и сохранённых боёв по уникальному warid
       let battlesMap = {};
       storedBattles.forEach(b => { battlesMap[b.warid] = b; });
       battles.forEach(b => {
@@ -197,26 +400,22 @@
       
       statusBar.textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
       
-      // Отправка на анализ тех боёв, для которых ещё не получен результат
       allBattles = await analyzeBattles(allBattles);
       
-      // Фильтрация боёв по маркерам (если поле маркеров заполнено)
+      // Фильтрация боёв по маркерам, если введены маркеры
       const markers = markersInput.value.split(',').map(m => m.trim()).filter(m => m);
       if (markers.length > 0) {
         allBattles = allBattles.filter(b => battleHasMarkers(b.result, markers));
       }
       
-      // Сохранение итоговой таблицы боёв в localStorage
       localStorage.setItem('battles', JSON.stringify(allBattles));
       
-      // Отображение результатов на странице
       displayBattles(allBattles);
+      updateFilteredOutput(); // сразу применяем фильтрацию после отрисовки
       statusBar.textContent = `Статус: обработка завершена. Всего боёв: ${allBattles.length}`;
     });
     
-    // Функция для извлечения ссылок на бои из текста
     function extractBattleLinks(text) {
-      // Регулярное выражение ищет варианты ссылок (абсолютные и относительные) с war.php или warlog.php
       const regex = /(?:https?:\/\/[^\s'"]+)?\/?(war(?:log)?\.php\?[^"'\s]+)/gi;
       let links = [];
       let match;
@@ -226,10 +425,6 @@
       return links;
     }
     
-    // Функция нормализации ссылки:
-    // – Если ссылка относительная, делаем её абсолютной (базовый URL – https://www.heroeswm.ru)
-    // – Заменяем домены на www.heroeswm.ru и warlog.php на war.php
-    // – Удаляем параметр lt
     function normalizeBattleLink(link) {
       if (!link.startsWith('http')) {
         link = 'https://www.heroeswm.ru/' + link;
@@ -247,7 +442,6 @@
       }
     }
     
-    // Функция извлечения параметра warid из ссылки
     function extractWarId(link) {
       try {
         let url = new URL(link);
@@ -258,22 +452,19 @@
       }
     }
     
-    // Функция анализа боёв через Netlify функцию analyzeBattles.js
     async function analyzeBattles(battles) {
-      // Отбираем те бои, для которых результат анализа ещё не получен
       let pendingBattles = battles.filter(b => !b.result);
       let attempt = 1;
       while (pendingBattles.length > 0) {
         statusBar.textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
         const startTime = performance.now();
         try {
-          let response = await fetch(          'https://hwm-nightly.netlify.app/.netlify/functions/analyzeBattles', {
+          let response = await fetch('https://hwm-nightly.netlify.app/.netlify/functions/analyzeBattles', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ links: pendingBattles.map(b => b.link) })
           });
           let data = await response.json();
-          // Обновляем данные анализа для каждого боя
           data.results.forEach(res => {
             let b = battles.find(battle => battle.link === res.link);
             if (b) {
@@ -291,7 +482,6 @@
         let successCount = battles.filter(b => b.result).length;
         let errorCount = battles.filter(b => !b.result).length;
         statusBar.textContent = `Анализ: ${battles.length} боёв. Успех: ${successCount}. Ошибка: ${errorCount}. Время: ${elapsed} с. Попытка ${attempt}`;
-        
         pendingBattles = battles.filter(b => !b.result);
         if (pendingBattles.length > 0) {
           await new Promise(r => setTimeout(r, 1000));
@@ -301,7 +491,6 @@
       return battles;
     }
     
-    // Функция проверки наличия хотя бы одного маркера в результате анализа
     function battleHasMarkers(result, markers) {
       if (!result) return false;
       return markers.some(marker => {
@@ -310,12 +499,224 @@
       });
     }
     
-    // Функция отображения боёв, сгруппированных по маркеру
+    /* ====== Фильтрация результатов анализа ====== */
+    const defaultFilterOptions = {
+      shortenMarkers: true,
+      showWinningSideName: true,
+      showLosingSideName: true,
+      showWinningHP: true,
+      showLosingHP: true,
+      showWinningPercent: true,
+      showLosingPercent: true,
+      showWinningFaction: true,
+      showLosingFaction: true,
+      showWinningHeroInfo: true,
+      showLosingHeroInfo: true,
+      showWinningHeroNickname: true,
+      showLosingHeroNickname: true,
+      showWinningHeroLevel: true,
+      showLosingHeroLevel: true,
+      showWinningHeroParams: true,
+      showLosingHeroParams: true,
+      shortenWinningHeroParams: true,
+      shortenLosingHeroParams: true,
+      showWinningArmy: true,
+      showLosingArmy: true,
+      showWinningBonuses: true,
+      showLosingBonuses: true
+    };
+    function loadFilterOptions() {
+      let stored = localStorage.getItem("battleFilterOptions");
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch (e) {
+          return Object.assign({}, defaultFilterOptions);
+        }
+      }
+      return Object.assign({}, defaultFilterOptions);
+    }
+    function saveFilterOptions(options) {
+      localStorage.setItem("battleFilterOptions", JSON.stringify(options));
+    }
+    let filterOptions = loadFilterOptions();
+    
+    // Установка состояния чекбоксов фильтра
+    document.querySelectorAll("#filterContent input[type=checkbox]").forEach(cb => {
+      let option = cb.getAttribute("data-option");
+      cb.checked = !!filterOptions[option];
+      cb.addEventListener("change", function() {
+        filterOptions[option] = this.checked;
+        saveFilterOptions(filterOptions);
+        updateFilteredOutput();
+      });
+    });
+    
+    // Функция для сокращения параметров героя
+    function shortenHeroParams(paramsBlock) {
+      const mapping = {
+        "Нападение:": "Н:",
+        "Защита:": "З:",
+        "Сила магии:": "СМ:",
+        "Знания:": "ЗН:",
+        "Удача:": "Уд:",
+        "Боевой Дух:": "БД:",
+        "Уровень:": "У:"
+      };
+      for (let key in mapping) {
+        let shortKey = mapping[key];
+        let regex = new RegExp(key, "gi");
+        paramsBlock = paramsBlock.replace(regex, shortKey);
+      }
+      return paramsBlock.replace(/\s+/g, "");
+    }
+    
+    // Функция преобразования блока информации о героях
+    function transformHeroBlock(heroBlock, isWinner, opts) {
+      if ((isWinner && !opts.showWinningHeroInfo) || (!isWinner && !opts.showLosingHeroInfo))
+        return "";
+      let firstBracket = heroBlock.indexOf("[");
+      let nickname = "";
+      let blocks = [];
+      if (firstBracket !== -1) {
+        nickname = heroBlock.substring(0, firstBracket).trim();
+        let regex = /\[([^\]]+)\]/g;
+        let m;
+        while ((m = regex.exec(heroBlock)) !== null) {
+          blocks.push(m[1]);
+        }
+      } else {
+        nickname = heroBlock.trim();
+      }
+      let levelBlock = "";
+      let paramsBlock = "";
+      if (blocks.length > 0) {
+        if (/Уровень:|^Ур:/i.test(blocks[0])) {
+          levelBlock = blocks[0];
+          if (blocks.length > 1) {
+            paramsBlock = blocks.slice(1).join("][");
+          }
+        } else {
+          paramsBlock = blocks.join("][");
+        }
+      }
+      if ((isWinner && !opts.showWinningHeroNickname) || (!isWinner && !opts.showLosingHeroNickname))
+        nickname = "";
+      if (!((isWinner && opts.showWinningHeroLevel) || (!isWinner && opts.showLosingHeroLevel))) {
+        levelBlock = "";
+      } else if (levelBlock) {
+        if ((isWinner && opts.shortenWinningHeroParams) || (!isWinner && opts.shortenLosingHeroParams)) {
+          levelBlock = levelBlock.replace(/Уровень:/gi, "Ур:").replace(/\s+/g, "");
+        }
+        levelBlock = "[" + levelBlock + "]";
+      }
+      if (!((isWinner && opts.showWinningHeroParams) || (!isWinner && opts.showLosingHeroParams))) {
+        paramsBlock = "";
+      } else if (paramsBlock) {
+        let tmp = "[" + paramsBlock + "]";
+        if ((isWinner && opts.shortenWinningHeroParams) || (!isWinner && opts.shortenLosingHeroParams)) {
+          tmp = shortenHeroParams(tmp);
+        }
+        paramsBlock = tmp;
+      }
+      let result = (nickname + levelBlock + paramsBlock).trim();
+      return result;
+    }
+    
+    // Функция преобразования одной строки анализа
+    function transformLine(line, opts) {
+      let trimmed = line.trim();
+      if (!trimmed.startsWith("[")) return line;
+      let inner = trimmed.substring(1, trimmed.length - 1);
+      let blocks = inner.split("] [");
+      let marker = blocks[0];
+      let isWinner = (marker.toLowerCase().includes("win") || marker.indexOf("+") !== -1);
+      if (isWinner) {
+        if (opts.shortenMarkers) {
+          if (marker.toLowerCase().startsWith("win!")) {
+            blocks[0] = replacePrefix(marker, "win!", "+");
+          }
+        }
+      } else {
+        if (opts.shortenMarkers && marker.toLowerCase().startsWith("lose")) {
+          blocks[0] = replacePrefix(marker, "lose", "-");
+        }
+      }
+      if ((isWinner && !opts.showWinningSideName) || (!isWinner && !opts.showLosingSideName)) {
+        blocks[1] = "";
+      }
+      if ((isWinner && !opts.showWinningHP) || (!isWinner && !opts.showLosingHP)) {
+        blocks[2] = "";
+      }
+      if ((isWinner && !opts.showWinningPercent) || (!isWinner && !opts.showLosingPercent)) {
+        blocks[3] = "";
+      }
+      if ((isWinner && !opts.showWinningFaction) || (!isWinner && !opts.showLosingFaction)) {
+        blocks[4] = "";
+      }
+      let heroBlockExists = false;
+      let heroIdx = 5;
+      if (blocks.length > heroIdx && blocks[heroIdx].includes("Уровень:")) {
+        heroBlockExists = true;
+        blocks[heroIdx] = transformHeroBlock(blocks[heroIdx], isWinner, opts);
+      }
+      let armyIdx = heroBlockExists ? 6 : 5;
+      if (blocks.length > armyIdx) {
+        if ((isWinner && !opts.showWinningArmy) || (!isWinner && !opts.showLosingArmy)) {
+          blocks[armyIdx] = "";
+        }
+      }
+      let bonusIdx = heroBlockExists ? 7 : 6;
+      if (blocks.length > bonusIdx) {
+        if ((isWinner && !opts.showWinningBonuses) || (!isWinner && !opts.showLosingBonuses)) {
+          blocks[bonusIdx] = "";
+        }
+      }
+      let newLine = blocks.filter(b => b !== "").map(b => "[" + b + "]").join(" ");
+      return newLine;
+    }
+    
+    function replacePrefix(str, prefix, replacement) {
+      if (str.toLowerCase().startsWith(prefix.toLowerCase())) {
+        return replacement + str.slice(prefix.length);
+      }
+      return str;
+    }
+    
+    // Обновление фильтрованного вывода для всех боёв
+    function updateFilteredOutput() {
+      document.querySelectorAll('.battle-result').forEach(resultDiv => {
+        // Каждый родительский контейнер боя имеет data-originalResult с полным текстом
+        let original = resultDiv.parentNode.dataset.originalResult;
+        if (!original) return;
+        resultDiv.innerHTML = "";
+        let lines = original.split('\n');
+        lines.forEach(line => {
+          let newLine = transformLine(line, filterOptions);
+          let lineDiv = document.createElement('div');
+          lineDiv.className = 'result-line';
+          lineDiv.textContent = newLine;
+          if (newLine.startsWith('[win!]') || newLine.startsWith('[+]')) {
+            lineDiv.classList.add('win');
+          } else if (newLine.startsWith('[lose]') || newLine.startsWith('[-]')) {
+            lineDiv.classList.add('lose');
+          } else if (newLine.startsWith('[?]')) {
+            lineDiv.classList.add('unknown');
+          }
+          resultDiv.appendChild(lineDiv);
+        });
+      });
+    }
+    
+    /* ====== Отображение результатов (группировка) ====== */
     function displayBattles(battles) {
+      // Получаем маркеры для группировки (но они используются в determineGroupKey)
+      const markers = markersInput.value.split(',')
+                          .map(m => m.trim())
+                          .filter(m => m);
       resultsContainer.innerHTML = '';
       let groups = {};
       battles.forEach(battle => {
-        const markers = markersInput.value.split(',').map(m => m.trim()).filter(m => m);
         let groupKey = determineGroupKey(battle.result, markers);
         if (!groups[groupKey]) groups[groupKey] = [];
         groups[groupKey].push(battle);
@@ -323,15 +724,18 @@
       for (let key in groups) {
         let groupDiv = document.createElement('div');
         groupDiv.className = 'result-group';
-        let title = document.createElement('div');
-        title.className = 'group-title';
-        title.textContent = key;
-        groupDiv.appendChild(title);
+        let header = document.createElement('div');
+        header.className = 'collapsible-group';
+        header.textContent = key;
+        groupDiv.appendChild(header);
+        let groupContent = document.createElement('div');
+        groupContent.className = 'group-content';
         groups[key].forEach(battle => {
           let battleDiv = document.createElement('div');
           battleDiv.className = 'battle';
+          // Сохраняем оригинальный результат в data-атрибуте родительского контейнера
+          battleDiv.dataset.originalResult = battle.result;
           
-          // Контейнер для кликабельной ссылки на бой
           let linkDiv = document.createElement('div');
           linkDiv.className = 'battle-link';
           let linkA = document.createElement('a');
@@ -341,7 +745,6 @@
           linkDiv.appendChild(linkA);
           battleDiv.appendChild(linkDiv);
           
-          // Контейнер для результата анализа (разбиваем результат по строкам)
           let resultDiv = document.createElement('div');
           resultDiv.className = 'battle-result';
           if (battle.result) {
@@ -349,68 +752,78 @@
               let lineDiv = document.createElement('div');
               lineDiv.className = 'result-line';
               lineDiv.textContent = line;
+              if (line.startsWith('[win!]') || line.startsWith('[+]')) {
+                lineDiv.classList.add('win');
+              } else if (line.startsWith('[lose]') || line.startsWith('[-]')) {
+                lineDiv.classList.add('lose');
+              } else if (line.startsWith('[?]')) {
+                lineDiv.classList.add('unknown');
+              }
               resultDiv.appendChild(lineDiv);
             });
           }
           battleDiv.appendChild(resultDiv);
-          groupDiv.appendChild(battleDiv);
+          groupContent.appendChild(battleDiv);
         });
+        groupDiv.appendChild(groupContent);
         resultsContainer.appendChild(groupDiv);
       }
+      
+      // Обработчики для сворачивания/разворачивания групп
+      document.querySelectorAll('.collapsible-group').forEach(header => {
+        header.addEventListener('click', function() {
+          this.classList.toggle('active');
+          const content = this.nextElementSibling;
+          content.style.display = (content.style.display === 'block') ? 'none' : 'block';
+        });
+      });
     }
     
-    /**
- * Функция определяет заголовок для группировки боёв.
- * @param {string} result - Результат анализа боя (многострочный текст, в котором данные разбиты на блоки в квадратных скобках).
- * @param {Array<string>} eventMarkers - Массив маркеров ивента (например, ["Цель контракта"]).
- * @returns {string} - Заголовок группировки.
- */
-function determineGroupKey(result, eventMarkers) {
-  if (!result) return 'Без группы';
-
-  // Разбиваем результат на строки и убираем пустые
-  const lines = result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-
-  // Проходим по строкам
-  for (const line of lines) {
-    // Извлекаем все блоки, заключённые в квадратные скобки
-    let blocks = [];
-    const regex = /\[([^\]]+)\]/g;
-    let match;
-    while ((match = regex.exec(line)) !== null) {
-      blocks.push(match[1].trim());
-    }
-    if (!blocks.length) continue;
-
-    // Ищем среди блоков тот, который начинается с одного из заданных маркеров
-    for (let i = 0; i < blocks.length; i++) {
-      for (const marker of eventMarkers) {
-        // Если текст блока начинается с маркера (без учёта регистра)
-        if (blocks[i].toLowerCase().startsWith(marker.toLowerCase())) {
-          // Определяем наличие дополнительной информации:
-          // Получаем остаток строки после маркера
-          const remainder = blocks[i].substring(marker.length).trim();
-          if (remainder && (remainder.startsWith('(') || remainder.startsWith('{'))) {
-            // Дополнительная информация присутствует – заголовок сразу равен найденному блоку
-            return blocks[i];
-          } else {
-            // Доп. информации нет – если справа от маркера есть хотя бы три блока, берем третий справа
-            if (i + 3 < blocks.length) {
-              return marker + ": " + blocks[i + 3];
-            } else {
-              // Если блоков недостаточно – просто возвращаем маркер
-              return marker;
+    // Функция определения заголовка группы по результату анализа
+    function determineGroupKey(result, eventMarkers) {
+      if (!result) return 'Без группы';
+      const lines = result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      for (const line of lines) {
+        let blocks = [];
+        const regex = /\[([^\]]+)\]/g;
+        let match;
+        while ((match = regex.exec(line)) !== null) {
+          blocks.push(match[1].trim());
+        }
+        if (!blocks.length) continue;
+        for (let i = 0; i < blocks.length; i++) {
+          for (const marker of eventMarkers) {
+            if (blocks[i].toLowerCase().startsWith(marker.toLowerCase())) {
+              const remainder = blocks[i].substring(marker.length).trim();
+              if (remainder && (remainder.startsWith('(') || remainder.startsWith('{'))) {
+                return blocks[i];
+              } else {
+                if (i + 3 < blocks.length) {
+                  return marker + ": " + blocks[i + 3];
+                } else {
+                  return marker;
+                }
+              }
             }
           }
         }
       }
+      return 'Без группы';
     }
-  }
-  // Если ни одна строка не содержит заданного маркера, возвращаем значение по умолчанию
-  return 'Без группы';
-}
-
     
+    /* ====== Обработчик сворачивания фильтра ====== */
+    const filterToggle = document.getElementById("filterToggle");
+    const filterContent = document.getElementById("filterContent");
+    const filterToggleIcon = document.getElementById("filterToggleIcon");
+    filterToggle.addEventListener("click", () => {
+      if (filterContent.classList.contains("collapsed")) {
+        filterContent.classList.remove("collapsed");
+        filterToggleIcon.innerHTML = "&#9660;"; // стрелка вниз
+      } else {
+        filterContent.classList.add("collapsed");
+        filterToggleIcon.innerHTML = "&#9654;"; // стрелка вправо
+      }
+    });
   </script>
 </body>
 </html>
