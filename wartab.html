@@ -315,7 +315,8 @@
       resultsContainer.innerHTML = '';
       let groups = {};
       battles.forEach(battle => {
-        let groupKey = determineGroupKey(battle.result);
+        const markers = markersInput.value.split(',').map(m => m.trim()).filter(m => m);
+        let groupKey = determineGroupKey(battle.result, markers);
         if (!groups[groupKey]) groups[groupKey] = [];
         groups[groupKey].push(battle);
       });
@@ -358,21 +359,57 @@
       }
     }
     
-    // Функция определения ключа группировки боёв по результату анализа.
-    // Если первая квадратная скобка содержит дополнительную информацию (круглые или фигурные скобки) – группируем по ней.
-    // Если нет, то группировка производится по комбинации маркера и фракции (например, "Цель контракта: Гноллы").
-    function determineGroupKey(result) {
-      if (!result) return 'Без группы';
-      let parts = result.match(/\[([^\]]+)\]/g);
-      if (!parts || parts.length < 2) return 'Без группы';
-      parts = parts.map(p => p.replace(/^\[|\]$/g, ''));
-      if (/\(.*\)|\{.*\}/.test(parts[0])) {
-        return parts[0];
-      } else if (parts.length >= 5) {
-        return parts[0] + ': ' + parts[4];
-      }
-      return parts[0] || 'Без группы';
+    /**
+ * Функция определяет заголовок для группировки боёв.
+ * @param {string} result - Результат анализа боя (многострочный текст, в котором данные разбиты на блоки в квадратных скобках).
+ * @param {Array<string>} eventMarkers - Массив маркеров ивента (например, ["Цель контракта"]).
+ * @returns {string} - Заголовок группировки.
+ */
+function determineGroupKey(result, eventMarkers) {
+  if (!result) return 'Без группы';
+
+  // Разбиваем результат на строки и убираем пустые
+  const lines = result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+  // Проходим по строкам
+  for (const line of lines) {
+    // Извлекаем все блоки, заключённые в квадратные скобки
+    let blocks = [];
+    const regex = /\[([^\]]+)\]/g;
+    let match;
+    while ((match = regex.exec(line)) !== null) {
+      blocks.push(match[1].trim());
     }
+    if (!blocks.length) continue;
+
+    // Ищем среди блоков тот, который начинается с одного из заданных маркеров
+    for (let i = 0; i < blocks.length; i++) {
+      for (const marker of eventMarkers) {
+        // Если текст блока начинается с маркера (без учёта регистра)
+        if (blocks[i].toLowerCase().startsWith(marker.toLowerCase())) {
+          // Определяем наличие дополнительной информации:
+          // Получаем остаток строки после маркера
+          const remainder = blocks[i].substring(marker.length).trim();
+          if (remainder && (remainder.startsWith('(') || remainder.startsWith('{'))) {
+            // Дополнительная информация присутствует – заголовок сразу равен найденному блоку
+            return blocks[i];
+          } else {
+            // Доп. информации нет – если справа от маркера есть хотя бы три блока, берем третий справа
+            if (i + 3 < blocks.length) {
+              return marker + ": " + blocks[i + 3];
+            } else {
+              // Если блоков недостаточно – просто возвращаем маркер
+              return marker;
+            }
+          }
+        }
+      }
+    }
+  }
+  // Если ни одна строка не содержит заданного маркера, возвращаем значение по умолчанию
+  return 'Без группы';
+}
+
     
   </script>
 </body>
