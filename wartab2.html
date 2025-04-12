@@ -17,14 +17,8 @@
       margin: auto;
       padding: 20px;
     }
-
-    /* Плавающие (sticky) панели отправки и фильтра */
-    .collapsible, .filter-container {
-      position: sticky;
-      z-index: 1000;
-    }
+    /* Заставляем только заголовки быть sticky, а не содержимое блока */
     .collapsible {
-      top: 0;
       background-color: #333;
       color: #fff;
       cursor: pointer;
@@ -35,9 +29,10 @@
       outline: none;
       font-size: 20px;
       border-radius: 4px;
-      margin-bottom: 10px;
+      margin-bottom: 5px;
       position: sticky;
       top: 0;
+      z-index: 1000;
     }
     .collapsible::after {
       content: "\25B6"; /* стрелка вправо */
@@ -48,6 +43,7 @@
     .collapsible.active::after {
       content: "\25BC"; /* стрелка вниз */
     }
+    /* Контент блока отправки боёв – обычное положение, но с небольшим отступом сверху */
     .content {
       padding: 0 18px;
       display: none;
@@ -56,6 +52,7 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       margin-bottom: 20px;
+      margin-top: 5px;
     }
     textarea {
       width: 100%;
@@ -94,11 +91,10 @@
       margin-top: 10px;
       font-size: 16px;
     }
-
-    /* Фильтр – блок после отправки боёв, изначально свернут */
+    /* Фильтр – контейнер после блока отправки, sticky (только заголовок) */
     .filter-container {
       position: sticky;
-      top: 70px; /* отступ ниже блока отправки */
+      top: 70px; /* ниже блока отправки */
       z-index: 990;
       background: rgba(240, 230, 210, 0.9);
       border: 2px solid #8b4513;
@@ -161,8 +157,7 @@
     .option {
       margin-bottom: 4px;
     }
-
-    /* Группировка результатов боёв */
+    /* Группировка результатов */
     .result-group {
       border: 1px solid #ccc;
       background: #fff;
@@ -177,7 +172,9 @@
       font-size: 18px;
       font-weight: bold;
       border-bottom: 1px solid #ccc;
-      position: relative;
+      position: sticky;
+      top: 0;
+      z-index: 900;
     }
     .collapsible-group::after {
       content: "\25B6";
@@ -199,8 +196,7 @@
       background: #f0f0f0;
       border-radius: 4px;
     }
-
-    /* Стили отображения боёв */
+    /* Отображение боёв */
     .battle {
       border-bottom: 1px dashed #ccc;
       padding: 10px 0;
@@ -216,8 +212,7 @@
     .battle-link a:hover {
       text-decoration: underline;
     }
-    
-    /* Стили для строк анализа – моноширинный шрифт и улучшенная читаемость */
+    /* Стили строк анализа – моноширинный шрифт и улучшенная читаемость */
     .result-line {
       padding: 5px;
       border-radius: 4px;
@@ -225,16 +220,16 @@
       font-family: Consolas, "Courier New", monospace;
     }
     .result-line.win {
-      background-color: #d4edda; /* светло-зелёный фон */
-      color: #155724; /* тёмно-зелёный текст */
+      background-color: #d4edda;
+      color: #155724;
     }
     .result-line.lose {
-      background-color: #f8d7da; /* светло-красный фон */
-      color: #721c24; /* тёмно-красный текст */
+      background-color: #f8d7da;
+      color: #721c24;
     }
     .result-line.unknown {
-      background-color: #fff3cd; /* светло-жёлтый фон */
-      color: #856404; /* тёмно-жёлтый текст */
+      background-color: #fff3cd;
+      color: #856404;
     }
   </style>
 </head>
@@ -366,7 +361,7 @@
       </div>
     </div>
 
-    <!-- Контейнер результатов -->
+    <!-- Контейнер для результатов -->
     <div id="resultsContainer"></div>
   </div>
 
@@ -383,7 +378,13 @@
 
     collapsible.addEventListener('click', function() {
       this.classList.toggle("active");
-      content.style.display = (content.style.display === "block") ? "none" : "block";
+      // Если элемент сейчас скрыт, то показываем его и скроллим в него
+      if (content.style.display === "block") {
+        content.style.display = "none";
+      } else {
+        content.style.display = "block";
+        content.scrollIntoView({behavior:"smooth", block:"start"});
+      }
     });
 
     clearButton.addEventListener('click', function() {
@@ -423,14 +424,16 @@
 
       allBattles = await analyzeBattles(allBattles);
 
-      const markers = markersInput.value.split(',').map(m => m.trim()).filter(m => m);
+      const markers = markersInput.value.split(',')
+                          .map(m => m.trim())
+                          .filter(m => m);
       if (markers.length > 0) {
         allBattles = allBattles.filter(b => battleHasMarkers(b.result, markers));
       }
 
       localStorage.setItem('battles', JSON.stringify(allBattles));
       displayBattles(allBattles);
-      updateFilteredOutput(); // применяем фильтрацию к уже отрисованным результатам
+      updateFilteredOutput();
       statusBar.textContent = `Статус: обработка завершена. Всего боёв: ${allBattles.length}`;
     });
 
@@ -569,45 +572,42 @@
       });
     });
 
-    /* ========== Функции группировки по уровню и фракции ========== */
-    // Извлекает уровень победившей стороны из первой строки, где встречается "[win" или "[+]"
+    /* ===== Функции для дополнительной группировки ===== */
+    // Извлекает уровень победившей стороны из строки, например [Уровень: 15]
     function extractWinningLevel(result) {
       if (!result) return "Без уровня";
       let lines = result.split('\n').map(l => l.trim());
       for (let line of lines) {
-        if (line.toLowerCase().startsWith('[win') || line.startsWith('[+')) {
-          // Попытаемся найти подстроку [Уровень: XX]
+        if (line.toLowerCase().startsWith('[win') || line.startsWith('[+]')) {
           let match = line.match(/\[Уровень:\s*(\d+)\]/i);
           if (match) return "[Уровень: " + match[1] + "]";
         }
       }
       return "Без уровня";
     }
-    // Извлекает фракцию из первой строки победителя.
+    // Извлекает фракцию из первой строки победителя (из 5-го блока)
     function extractFaction(result) {
       if (!result) return "Без фракции";
       let lines = result.split('\n').map(l => l.trim());
       for (let line of lines) {
-        if (line.toLowerCase().startsWith('[win') || line.startsWith('[+')) {
-          // Разбиваем строку на блоки по квадратным скобкам
+        if (line.toLowerCase().startsWith('[win') || line.startsWith('[+]')) {
           let blocks = [];
           const regex = /\[([^\]]+)\]/g;
           let match;
           while ((match = regex.exec(line)) !== null) {
             blocks.push(match[1].trim());
           }
-          // Ожидаем, что фракция – это 5-й блок (индекс 4)
           if (blocks.length >= 5) return blocks[4];
         }
       }
       return "Без фракции";
     }
-    // Извлекает процент выживших (числовое значение) из первой строки победителя.
+    // Извлекает процент выживших (число) из 4-го блока строки победителя
     function extractSurvivalPercent(result) {
       if (!result) return 0;
       let lines = result.split('\n').map(l => l.trim());
       for (let line of lines) {
-        if (line.toLowerCase().startsWith('[win') || line.startsWith('[+')) {
+        if (line.toLowerCase().startsWith('[win') || line.startsWith('[+]')) {
           let blocks = [];
           const regex = /\[([^\]]+)\]/g;
           let match;
@@ -615,7 +615,6 @@
             blocks.push(match[1].trim());
           }
           if (blocks.length >= 4) {
-            // Предполагаем, что 4-й блок содержит процент, например, "90.45% выжило"
             let percentMatch = blocks[3].match(/(\d+(\.\d+)?)%/);
             if (percentMatch) return parseFloat(percentMatch[1]);
           }
@@ -624,7 +623,7 @@
       return 0;
     }
 
-    /* ========== Обновление отфильтрованного вывода ========== */
+    /* ========= Обновление фильтрованного вывода ========= */
     function updateFilteredOutput() {
       document.querySelectorAll('.battle-result').forEach(resultDiv => {
         let original = resultDiv.parentNode.dataset.originalResult;
@@ -648,152 +647,7 @@
       });
     }
 
-    /* ========== Отображение результатов с дополнительной группировкой ========== */
-    function displayBattles(battles) {
-      const markers = markersInput.value.split(',')
-                          .map(m => m.trim())
-                          .filter(m => m);
-      resultsContainer.innerHTML = '';
-      let overallGroups = {};
-      // Группировка по общему ключу (определяется функцией determineGroupKey)
-      battles.forEach(battle => {
-        let key = determineGroupKey(battle.result, markers);
-        if (!overallGroups[key]) overallGroups[key] = [];
-        overallGroups[key].push(battle);
-      });
-      for (let overallKey in overallGroups) {
-        // Общая группа (например, по событию)
-        let overallDiv = document.createElement('div');
-        overallDiv.className = 'result-group';
-        let overallHeader = document.createElement('div');
-        overallHeader.className = 'collapsible-group';
-        overallHeader.textContent = overallKey;
-        overallDiv.appendChild(overallHeader);
-        let overallContent = document.createElement('div');
-        overallContent.className = 'group-content';
-
-        // Дополнительная группировка по уровню
-        let levelGroups = {};
-        overallGroups[overallKey].forEach(battle => {
-          let lvl = extractWinningLevel(battle.result);
-          if (!levelGroups[lvl]) levelGroups[lvl] = [];
-          levelGroups[lvl].push(battle);
-        });
-
-        for (let levelKey in levelGroups) {
-          let levelDiv = document.createElement('div');
-          let levelHeader = document.createElement('div');
-          levelHeader.className = 'collapsible-group';
-          levelHeader.textContent = levelKey;
-          levelDiv.appendChild(levelHeader);
-          let levelContent = document.createElement('div');
-          levelContent.className = 'group-content';
-
-          // Группировка по фракции внутри уровня
-          let factionGroups = {};
-          levelGroups[levelKey].forEach(battle => {
-            let faction = extractFaction(battle.result);
-            if (!factionGroups[faction]) factionGroups[faction] = [];
-            factionGroups[faction].push(battle);
-          });
-
-          for (let factionKey in factionGroups) {
-            // Заголовок фракции (обычный, без сворачивания)
-            let factionHeader = document.createElement('div');
-            factionHeader.className = 'group-title';
-            factionHeader.textContent = factionKey;
-            levelContent.appendChild(factionHeader);
-            // Сортировка боёв внутри фракции по убыванию % выживших
-            factionGroups[factionKey].sort((a, b) => {
-              return extractSurvivalPercent(b.result) - extractSurvivalPercent(a.result);
-            });
-            factionGroups[factionKey].forEach(battle => {
-              let battleDiv = document.createElement('div');
-              battleDiv.className = 'battle';
-              battleDiv.dataset.originalResult = battle.result;
-              let linkDiv = document.createElement('div');
-              linkDiv.className = 'battle-link';
-              let linkA = document.createElement('a');
-              linkA.href = battle.link;
-              linkA.target = '_blank';
-              linkA.textContent = battle.link;
-              linkDiv.appendChild(linkA);
-              battleDiv.appendChild(linkDiv);
-              let resultDiv = document.createElement('div');
-              resultDiv.className = 'battle-result';
-              if (battle.result) {
-                battle.result.split('\n').forEach(line => {
-                  let lineDiv = document.createElement('div');
-                  lineDiv.className = 'result-line';
-                  lineDiv.textContent = line;
-                  if (line.startsWith('[win!]') || line.startsWith('[+]')) {
-                    lineDiv.classList.add('win');
-                  } else if (line.startsWith('[lose]') || line.startsWith('[-]')) {
-                    lineDiv.classList.add('lose');
-                  } else if (line.startsWith('[?]')) {
-                    lineDiv.classList.add('unknown');
-                  }
-                  resultDiv.appendChild(lineDiv);
-                });
-              }
-              battleDiv.appendChild(resultDiv);
-              levelContent.appendChild(battleDiv);
-            });
-          }
-          levelDiv.appendChild(levelContent);
-          overallContent.appendChild(levelDiv);
-
-          levelHeader.addEventListener('click', function() {
-            this.classList.toggle('active');
-            let content = this.nextElementSibling;
-            content.style.display = (content.style.display === 'block') ? 'none' : 'block';
-          });
-        }
-        overallDiv.appendChild(overallContent);
-        resultsContainer.appendChild(overallDiv);
-
-        overallHeader.addEventListener('click', function() {
-          this.classList.toggle('active');
-          let content = this.nextElementSibling;
-          content.style.display = (content.style.display === 'block') ? 'none' : 'block';
-        });
-      }
-      updateFilteredOutput();
-    }
-
-    // Функция определения общего ключа группировки (без изменений из предыдущей версии)
-    function determineGroupKey(result, eventMarkers) {
-      if (!result) return 'Без группы';
-      const lines = result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-      for (const line of lines) {
-        let blocks = [];
-        const regex = /\[([^\]]+)\]/g;
-        let match;
-        while ((match = regex.exec(line)) !== null) {
-          blocks.push(match[1].trim());
-        }
-        if (!blocks.length) continue;
-        for (let i = 0; i < blocks.length; i++) {
-          for (const marker of eventMarkers) {
-            if (blocks[i].toLowerCase().startsWith(marker.toLowerCase())) {
-              const remainder = blocks[i].substring(marker.length).trim();
-              if (remainder && (remainder.startsWith('(') || remainder.startsWith('{'))) {
-                return blocks[i];
-              } else {
-                if (i + 3 < blocks.length) {
-                  return marker + ": " + blocks[i + 3];
-                } else {
-                  return marker;
-                }
-              }
-            }
-          }
-        }
-      }
-      return 'Без группы';
-    }
-
-    /* ========== Функции для трансформации строк анализа ========== */
+    /* ========= Функции для трансформации строк анализа ========= */
     function shortenHeroParams(paramsBlock) {
       const mapping = {
         "Нападение:": "Н:",
@@ -924,7 +778,7 @@
       return transformed.join("\n");
     }
 
-    /* ========== Отображение результатов с вложенной группировкой ========== */
+    /* ========= Отображение результатов с дополнительной группировкой ========= */
     function displayBattles(battles) {
       const markers = markersInput.value.split(',')
                           .map(m => m.trim())
@@ -946,7 +800,7 @@
         let overallContent = document.createElement('div');
         overallContent.className = 'group-content';
 
-        // Группируем по уровню победившей стороны
+        // Группировка по уровню победившей стороны
         let levelGroups = {};
         overallGroups[overallKey].forEach(battle => {
           let lvl = extractWinningLevel(battle.result);
@@ -969,12 +823,20 @@
             if (!factionGroups[faction]) factionGroups[faction] = [];
             factionGroups[faction].push(battle);
           });
-          for (let factionKey in factionGroups) {
+          // Сортируем блоки фракций по лучшему % выживших в группе
+          let factionKeys = Object.keys(factionGroups);
+          factionKeys.sort((a, b) => {
+            let bestA = Math.max(...factionGroups[a].map(battle => extractSurvivalPercent(battle.result)));
+            let bestB = Math.max(...factionGroups[b].map(battle => extractSurvivalPercent(battle.result)));
+            return bestB - bestA;
+          });
+          factionKeys.forEach(factionKey => {
+            let best = Math.max(...factionGroups[factionKey].map(battle => extractSurvivalPercent(battle.result)));
             let factionHeader = document.createElement('div');
             factionHeader.className = 'group-title';
-            factionHeader.textContent = factionKey;
+            factionHeader.textContent = factionKey + " [выжило " + best.toFixed(2) + "% у лучшего игрока]";
             levelContent.appendChild(factionHeader);
-            // Сортировка по убыванию % выживших
+            // Сортировка боёв внутри фракции по убыванию % выживших
             factionGroups[factionKey].sort((a, b) => {
               return extractSurvivalPercent(b.result) - extractSurvivalPercent(a.result);
             });
@@ -1010,9 +872,10 @@
               battleDiv.appendChild(resultDiv);
               levelContent.appendChild(battleDiv);
             });
-          }
+          });
           levelDiv.appendChild(levelContent);
           overallContent.appendChild(levelDiv);
+
           levelHeader.addEventListener('click', function() {
             this.classList.toggle('active');
             let content = this.nextElementSibling;
@@ -1021,6 +884,7 @@
         }
         overallDiv.appendChild(overallContent);
         resultsContainer.appendChild(overallDiv);
+
         overallHeader.addEventListener('click', function() {
           this.classList.toggle('active');
           let content = this.nextElementSibling;
@@ -1061,55 +925,7 @@
       return 'Без группы';
     }
 
-    /* ========== Функции для группировки дополнительных данных ========== */
-    function extractWinningLevel(result) {
-      if (!result) return "Без уровня";
-      let lines = result.split('\n').map(l => l.trim());
-      for (let line of lines) {
-        if (line.toLowerCase().startsWith('[win') || line.startsWith('[+]')) {
-          let match = line.match(/\[Уровень:\s*(\d+)\]/i);
-          if (match) return "[Уровень: " + match[1] + "]";
-        }
-      }
-      return "Без уровня";
-    }
-    function extractFaction(result) {
-      if (!result) return "Без фракции";
-      let lines = result.split('\n').map(l => l.trim());
-      for (let line of lines) {
-        if (line.toLowerCase().startsWith('[win') || line.startsWith('[+]')) {
-          let blocks = [];
-          const regex = /\[([^\]]+)\]/g;
-          let match;
-          while ((match = regex.exec(line)) !== null) {
-            blocks.push(match[1].trim());
-          }
-          if (blocks.length >= 5) return blocks[4];
-        }
-      }
-      return "Без фракции";
-    }
-    function extractSurvivalPercent(result) {
-      if (!result) return 0;
-      let lines = result.split('\n').map(l => l.trim());
-      for (let line of lines) {
-        if (line.toLowerCase().startsWith('[win') || line.startsWith('[+]')) {
-          let blocks = [];
-          const regex = /\[([^\]]+)\]/g;
-          let match;
-          while ((match = regex.exec(line)) !== null) {
-            blocks.push(match[1].trim());
-          }
-          if (blocks.length >= 4) {
-            let percentMatch = blocks[3].match(/(\d+(\.\d+)?)%/);
-            if (percentMatch) return parseFloat(percentMatch[1]);
-          }
-        }
-      }
-      return 0;
-    }
-
-    /* ========== Обработчик сворачивания фильтра ========== */
+    /* ========= Обработчик сворачивания фильтра ========= */
     const filterToggle = document.getElementById("filterToggle");
     const filterContent = document.getElementById("filterContent");
     const filterToggleIcon = document.getElementById("filterToggleIcon");
