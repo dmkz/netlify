@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Анализ боёв с фильтрами и группировкой</title>
@@ -367,7 +366,7 @@
   </div>
 
   <script>
-    /* ========== Блок отправки боёв ========== */
+    /* ========= Общие переменные и элементы ========= */
     const collapsible = document.querySelector('.collapsible');
     const content = document.querySelector('.content');
     const battleInput = document.getElementById('battleInput');
@@ -377,9 +376,9 @@
     const statusBar = document.getElementById('statusBar');
     const resultsContainer = document.getElementById('resultsContainer');
 
+    // При нажатии на заголовок блока отправки боёв происходит сворачивание/разворачивание
     collapsible.addEventListener('click', function() {
       this.classList.toggle("active");
-      // Если элемент сейчас скрыт, то показываем его и скроллим в него
       if (content.style.display === "block") {
         content.style.display = "none";
       } else {
@@ -393,6 +392,7 @@
       statusBar.textContent = 'Статус: очищено';
     });
 
+    /* ========= Основной обработчик кнопки "Отправить" ========= */
     sendButton.addEventListener('click', async function() {
       statusBar.textContent = 'Статус: обработка ввода...';
       const inputText = battleInput.value;
@@ -401,43 +401,80 @@
         return;
       }
 
+      // Извлекаем ссылки на бои из введённого текста
       let battleLinks = extractBattleLinks(inputText);
       if (battleLinks.length === 0) {
         statusBar.textContent = 'Статус: не найдено ссылок на бои';
         return;
       }
 
-      let battles = battleLinks.map(link => {
+      // Приводим ссылки к нужной форме и извлекаем warid
+      let newBattles = battleLinks.map(link => {
         const normalized = normalizeBattleLink(link);
         const warid = extractWarId(normalized);
         return { warid, link: normalized, result: null };
       }).filter(b => b.warid);
 
-      let storedBattles = JSON.parse(localStorage.getItem('battles') || '[]');
+      // Получаем уже сохранённые в базе бои
+      let dbBattles = [];
+      try {
+        const res = await fetch('/.netlify/functions/getBattles');
+        if (res.ok) {
+          dbBattles = await res.json();
+        } else {
+          console.error("Ошибка получения боёв из базы");
+        }
+      } catch (error) {
+        console.error("Ошибка при запросе к базе:", error);
+      }
+
+      // Объединяем: если бой с таким warid уже существует – оставляем его (с результатом анализа)
       let battlesMap = {};
-      storedBattles.forEach(b => { battlesMap[b.warid] = b; });
-      battles.forEach(b => {
+      dbBattles.forEach(b => { battlesMap[b.warid] = b; });
+      newBattles.forEach(b => {
         if (!battlesMap[b.warid]) battlesMap[b.warid] = b;
       });
       let allBattles = Object.values(battlesMap);
 
       statusBar.textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
 
+      // Анализируем те бои, у которых ещё нет результата
       allBattles = await analyzeBattles(allBattles);
 
+      // Если заданы маркеры ивента – фильтруем
       const markers = markersInput.value.split(',')
-                          .map(m => m.trim())
-                          .filter(m => m);
+                            .map(m => m.trim())
+                            .filter(m => m);
       if (markers.length > 0) {
         allBattles = allBattles.filter(b => battleHasMarkers(b.result, markers));
       }
 
-      localStorage.setItem('battles', JSON.stringify(allBattles));
+      // Определяем, какие бои новые (т.е. отсутствовали в базе)
+      let newInDB = allBattles.filter(b => !dbBattles.some(db => db.warid === b.warid));
+
+      // Если есть новые бои – отправляем их пачкой в базу данных
+      if (newInDB.length > 0) {
+        try {
+          const updateRes = await fetch('/.netlify/functions/updateBattles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ battles: newInDB })
+          });
+          if (!updateRes.ok) {
+            console.error("Ошибка обновления базы");
+          }
+        } catch (error) {
+          console.error("Ошибка при обновлении базы:", error);
+        }
+      }
+
+      // Отображаем объединённый результат (группировка без изменений)
       displayBattles(allBattles);
       updateFilteredOutput();
       statusBar.textContent = `Статус: обработка завершена. Всего боёв: ${allBattles.length}`;
     });
 
+    /* ========= Функции для работы с ссылками и идентификатором боя ========= */
     function extractBattleLinks(text) {
       const regex = /(?:https?:\/\/[^\s'"]+)?\/?(war(?:log)?\.php\?[^"'\s]+)/gi;
       let links = [];
@@ -475,6 +512,7 @@
       }
     }
 
+    /* ========= Функция анализа боёв (оставляем вашу существующую реализацию) ========= */
     async function analyzeBattles(battles) {
       let pendingBattles = battles.filter(b => !b.result);
       let attempt = 1;
@@ -522,7 +560,7 @@
       });
     }
 
-    /* ========== Фильтрация результатов анализа ========== */
+    /* ========= Фильтрация результатов анализа ========= */
     const defaultFilterOptions = {
       shortenMarkers: true,
       showWinningSideName: true,
@@ -548,6 +586,7 @@
       showWinningBonuses: true,
       showLosingBonuses: true
     };
+    // Фильтр сохраняется в localStorage (это не критично для боёв)
     function loadFilterOptions() {
       let stored = localStorage.getItem("battleFilterOptions");
       if (stored) {
@@ -574,7 +613,6 @@
     });
 
     /* ===== Функции для дополнительной группировки ===== */
-    // Извлекает уровень победившей стороны из строки, например [Уровень: 15]
     function extractWinningLevel(result) {
       if (!result) return "Без уровня";
       let lines = result.split('\n').map(l => l.trim());
@@ -586,7 +624,6 @@
       }
       return "Без уровня";
     }
-    // Извлекает фракцию из первой строки победителя (из 5-го блока)
     function extractFaction(result) {
       if (!result) return "Без фракции";
       let lines = result.split('\n').map(l => l.trim());
@@ -603,7 +640,6 @@
       }
       return "Без фракции";
     }
-    // Извлекает процент выживших (число) из 4-го блока строки победителя
     function extractSurvivalPercent(result) {
       if (!result) return 0;
       let lines = result.split('\n').map(l => l.trim());
@@ -779,7 +815,7 @@
       return transformed.join("\n");
     }
 
-    /* ========= Отображение результатов с дополнительной группировкой ========= */
+    /* ========= Отображение и группировка боёв ========= */
     function displayBattles(battles) {
       const markers = markersInput.value.split(',')
                           .map(m => m.trim())
@@ -804,57 +840,47 @@
         // Группировка по уровню победившей стороны внутри общей группы
         let levelGroups = {};
         overallGroups[overallKey].forEach(battle => {
-          let lvl = extractWinningLevel(battle.result);  // например, "[Уровень: 19]"
+          let lvl = extractWinningLevel(battle.result);
           if (!levelGroups[lvl]) levelGroups[lvl] = [];
           levelGroups[lvl].push(battle);
         });
-        // Получаем массив ключей (например, "[Уровень: 19]") и сортируем по убыванию уровня
         let levelKeys = Object.keys(levelGroups);
         levelKeys.sort((a, b) => {
-          // Извлекаем числовые значения из строк вида "[Уровень: 19]": удаляем все нецифровые символы.
           let numA = parseInt(a.replace(/\D/g, ''));
           let numB = parseInt(b.replace(/\D/g, ''));
-          return numB - numA; // сортировка по убыванию
+          return numB - numA;
         });
 
         levelKeys.forEach(levelKey => {
-          // Для каждой группы определяем лучший процент выживших
           let battlesAtLevel = levelGroups[levelKey];
           let bestSurvival = Math.max(...battlesAtLevel.map(battle => extractSurvivalPercent(battle.result)));
-          
-          // Создаем заголовок группы уровня с добавлением лучшего процента
           let levelDiv = document.createElement('div');
           let levelHeader = document.createElement('div');
           levelHeader.className = 'collapsible-group';
           levelHeader.textContent = `${levelKey} [выжило ${bestSurvival.toFixed(2)}% у лучшего игрока]`;
           levelDiv.appendChild(levelHeader);
-          
           let levelContent = document.createElement('div');
           levelContent.className = 'group-content';
 
-          // Далее внутри каждого уровня продолжаем группировку по фракции
+          // Группировка по фракции
           let factionGroups = {};
           battlesAtLevel.forEach(battle => {
             let faction = extractFaction(battle.result);
             if (!factionGroups[faction]) factionGroups[faction] = [];
             factionGroups[faction].push(battle);
           });
-          
-          // Сортируем блоки фракций по лучшему % выживших
           let factionKeys = Object.keys(factionGroups);
           factionKeys.sort((a, b) => {
             let bestA = Math.max(...factionGroups[a].map(battle => extractSurvivalPercent(battle.result)));
             let bestB = Math.max(...factionGroups[b].map(battle => extractSurvivalPercent(battle.result)));
             return bestB - bestA;
           });
-          
           factionKeys.forEach(factionKey => {
             let best = Math.max(...factionGroups[factionKey].map(battle => extractSurvivalPercent(battle.result)));
             let factionHeader = document.createElement('div');
             factionHeader.className = 'group-title';
             factionHeader.textContent = factionKey + " [выжило " + best.toFixed(2) + "% у лучшего игрока]";
             levelContent.appendChild(factionHeader);
-            // Сортировка боёв внутри фракции по убыванию % выживших
             factionGroups[factionKey].sort((a, b) => {
               return extractSurvivalPercent(b.result) - extractSurvivalPercent(a.result);
             });
@@ -862,7 +888,6 @@
               let battleDiv = document.createElement('div');
               battleDiv.className = 'battle';
               battleDiv.dataset.originalResult = battle.result;
-              
               let linkDiv = document.createElement('div');
               linkDiv.className = 'battle-link';
               let linkA = document.createElement('a');
@@ -871,7 +896,6 @@
               linkA.textContent = battle.link;
               linkDiv.appendChild(linkA);
               battleDiv.appendChild(linkDiv);
-              
               let resultDiv = document.createElement('div');
               resultDiv.className = 'battle-result';
               if (battle.result) {
@@ -893,10 +917,9 @@
               levelContent.appendChild(battleDiv);
             });
           });
-          
           levelDiv.appendChild(levelContent);
           overallContent.appendChild(levelDiv);
-          
+
           levelHeader.addEventListener('click', function() {
             this.classList.toggle('active');
             let content = this.nextElementSibling;
