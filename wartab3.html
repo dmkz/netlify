@@ -633,7 +633,30 @@
       showWinningBonuses: true,
       showLosingBonuses: true
     };
-      
+    function loadFilterOptions() {
+      let stored = localStorage.getItem("battleFilterOptions");
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch (e) {
+          return Object.assign({}, defaultFilterOptions);
+        }
+      }
+      return Object.assign({}, defaultFilterOptions);
+    }
+    function saveFilterOptions(options) {
+      localStorage.setItem("battleFilterOptions", JSON.stringify(options));
+    }
+    let filterOptions = loadFilterOptions();
+    document.querySelectorAll("#filterContent input[type=checkbox]").forEach(cb => {
+      let option = cb.getAttribute("data-option");
+      cb.checked = !!filterOptions[option];
+      cb.addEventListener("change", function() {
+        filterOptions[option] = this.checked;
+        saveFilterOptions(filterOptions);
+        updateFilteredOutput();
+      });
+    });
       /* Функции для дополнительной группировки и фильтрации */
       function extractWinningLevel(result) {
         if (!result) return "Без уровня";
