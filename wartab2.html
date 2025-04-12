@@ -800,36 +800,53 @@
         let overallContent = document.createElement('div');
         overallContent.className = 'group-content';
 
-        // Группировка по уровню победившей стороны
+        // Группировка по уровню победившей стороны внутри общей группы
         let levelGroups = {};
         overallGroups[overallKey].forEach(battle => {
-          let lvl = extractWinningLevel(battle.result);
+          let lvl = extractWinningLevel(battle.result);  // например, "[Уровень: 19]"
           if (!levelGroups[lvl]) levelGroups[lvl] = [];
           levelGroups[lvl].push(battle);
         });
-        for (let levelKey in levelGroups) {
+        // Получаем массив ключей (например, "[Уровень: 19]") и сортируем по убыванию уровня
+        let levelKeys = Object.keys(levelGroups);
+        levelKeys.sort((a, b) => {
+          // Извлекаем числовые значения из строк вида "[Уровень: 19]": удаляем все нецифровые символы.
+          let numA = parseInt(a.replace(/\D/g, ''));
+          let numB = parseInt(b.replace(/\D/g, ''));
+          return numB - numA; // сортировка по убыванию
+        });
+
+        levelKeys.forEach(levelKey => {
+          // Для каждой группы определяем лучший процент выживших
+          let battlesAtLevel = levelGroups[levelKey];
+          let bestSurvival = Math.max(...battlesAtLevel.map(battle => extractSurvivalPercent(battle.result)));
+          
+          // Создаем заголовок группы уровня с добавлением лучшего процента
           let levelDiv = document.createElement('div');
           let levelHeader = document.createElement('div');
           levelHeader.className = 'collapsible-group';
-          levelHeader.textContent = levelKey;
+          levelHeader.textContent = `${levelKey} [выжило ${bestSurvival.toFixed(2)}% у лучшего игрока]`;
           levelDiv.appendChild(levelHeader);
+          
           let levelContent = document.createElement('div');
           levelContent.className = 'group-content';
 
-          // Группировка по фракции внутри уровня
+          // Далее внутри каждого уровня продолжаем группировку по фракции
           let factionGroups = {};
-          levelGroups[levelKey].forEach(battle => {
+          battlesAtLevel.forEach(battle => {
             let faction = extractFaction(battle.result);
             if (!factionGroups[faction]) factionGroups[faction] = [];
             factionGroups[faction].push(battle);
           });
-          // Сортируем блоки фракций по лучшему % выживших в группе
+          
+          // Сортируем блоки фракций по лучшему % выживших
           let factionKeys = Object.keys(factionGroups);
           factionKeys.sort((a, b) => {
             let bestA = Math.max(...factionGroups[a].map(battle => extractSurvivalPercent(battle.result)));
             let bestB = Math.max(...factionGroups[b].map(battle => extractSurvivalPercent(battle.result)));
             return bestB - bestA;
           });
+          
           factionKeys.forEach(factionKey => {
             let best = Math.max(...factionGroups[factionKey].map(battle => extractSurvivalPercent(battle.result)));
             let factionHeader = document.createElement('div');
@@ -844,6 +861,7 @@
               let battleDiv = document.createElement('div');
               battleDiv.className = 'battle';
               battleDiv.dataset.originalResult = battle.result;
+              
               let linkDiv = document.createElement('div');
               linkDiv.className = 'battle-link';
               let linkA = document.createElement('a');
@@ -852,6 +870,7 @@
               linkA.textContent = battle.link;
               linkDiv.appendChild(linkA);
               battleDiv.appendChild(linkDiv);
+              
               let resultDiv = document.createElement('div');
               resultDiv.className = 'battle-result';
               if (battle.result) {
@@ -873,14 +892,17 @@
               levelContent.appendChild(battleDiv);
             });
           });
+          
           levelDiv.appendChild(levelContent);
           overallContent.appendChild(levelDiv);
-
+          
           levelHeader.addEventListener('click', function() {
             this.classList.toggle('active');
             let content = this.nextElementSibling;
             content.style.display = (content.style.display === 'block') ? 'none' : 'block';
           });
+        });
+
         }
         overallDiv.appendChild(overallContent);
         resultsContainer.appendChild(overallDiv);
