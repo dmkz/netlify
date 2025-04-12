@@ -331,7 +331,7 @@ function determineFaction(sideAggregate, threshold = 0.5) {
   if (bestMatch) {
     console.log("Faction" + bestMatch.faction + ", score: " + bestScore + ", total: " + total);
   }
-  if (bestMatch && total > 0 && (bestScore / total) >= threshold) {
+  if (bestMatch && total > 0/* && (bestScore / total) >= threshold*/) {
     return bestMatch.faction;
   }
   return "Не определена";
