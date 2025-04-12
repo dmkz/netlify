@@ -1,10 +1,10 @@
 // netlify/functions/getBattles.js
-const faunadb = require('faunadb');
-const q = faunadb.query;
+const { createClient } = require('@supabase/supabase-js');
 
-const client = new faunadb.Client({
-  secret: process.env.FAUNA_SECRET_KEY,  // ключ базы, настройте переменную окружения
-});
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 exports.handler = async (event, context) => {
   if (event.httpMethod !== 'GET') {
@@ -12,23 +12,17 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Получаем все документы из коллекции "battles"
-    const data = await client.query(
-      q.Map(
-        q.Paginate(q.Documents(q.Collection('battles'))),
-        q.Lambda('ref', q.Get(q.Var('ref')))
-      )
-    );
+    const { data, error } = await supabase
+      .from('battles')
+      .select('*');
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify(data.data),
-    };
+    if (error) {
+      throw error;
+    }
+
+    return { statusCode: 200, body: JSON.stringify(data) };
   } catch (error) {
     console.error('Ошибка получения данных:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };

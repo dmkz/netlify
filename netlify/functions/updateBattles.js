@@ -1,10 +1,10 @@
 // netlify/functions/updateBattles.js
-const faunadb = require('faunadb');
-const q = faunadb.query;
+const { createClient } = require('@supabase/supabase-js');
 
-const client = new faunadb.Client({
-  secret: process.env.FAUNA_SECRET_KEY, // ключ базы
-});
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 exports.handler = async (event, context) => {
   if (event.httpMethod !== 'POST') {
@@ -13,24 +13,50 @@ exports.handler = async (event, context) => {
 
   let battles;
   try {
-    battles = JSON.parse(event.body); // предполагается, что приходит массив объектов боёв
+    battles = JSON.parse(event.body); // ожидание, что приходит массив объектов боёв, например: [{ warid, link, result }, ...]
   } catch (error) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) };
   }
 
-  try {
-    // Создадим документы в коллекции "battles" для всех переданных боёв.
-    // При этом можно реализовать логику по обновлению существующих (если такой warid уже есть),
-    // но в данном примере мы просто добавляем новые.
-    const results = await Promise.all(
-      battles.map(battle => {
-        return client.query(
-          q.Create(q.Collection('battles'), { data: battle })
-        );
-      })
-    );
+  if (!Array.isArray(battles)) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Expected an array of battles' }) };
+  }
 
-    return { statusCode: 200, body: JSON.stringify(results) };
+  try {
+    // Получаем список warid уже имеющихся записей в таблице battles
+    const waridList = battles.map(b => b.warid);
+    const { data: existingData, error: selectError } = await supabase
+      .from('battles')
+      .select('warid')
+      .in('warid', waridList);
+
+    if (selectError) {
+      throw selectError;
+    }
+
+    const existingWarIds = existingData.map(record => record.warid);
+    // Фильтруем только новые боевые записи
+    const newBattles = battles.filter(b => !existingWarIds.includes(b.warid));
+
+    if (newBattles.length === 0) {
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ message: 'No new battles to insert.' }),
+      };
+    }
+
+    const { data: insertData, error: insertError } = await supabase
+      .from('battles')
+      .insert(newBattles);
+
+    if (insertError) {
+      throw insertError;
+    }
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ message: 'Battles inserted successfully', data: insertData }),
+    };
   } catch (error) {
     console.error('Ошибка добавления данных:', error);
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
