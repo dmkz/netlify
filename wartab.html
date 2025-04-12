@@ -267,7 +267,7 @@
         statusBar.textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
         const startTime = performance.now();
         try {
-          let response = await fetch(          'https://hwm-nightly.netlify.app/netlify/functions/analyzeBattles.js', {
+          let response = await fetch(          'https://hwm-nightly.netlify.app/.netlify/functions/analyzeBattles', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ links: pendingBattles.map(b => b.link) })
