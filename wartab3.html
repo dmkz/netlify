@@ -467,7 +467,9 @@
         try {
           const res = await fetch('/.netlify/functions/getBattles');
           if (res.ok) {
-            dbBattles = await res.json();
+            const data = await res.json();
+            // Извлекаем массив боёв из поля battles
+            dbBattles = data.battles || [];
           } else {
             console.error("Ошибка получения боёв из базы");
           }
