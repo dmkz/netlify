@@ -458,7 +458,7 @@
           const updateRes = await fetch('/.netlify/functions/updateBattles', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ battles: newInDB })
+            body: JSON.stringify(newInDB)
           });
           if (!updateRes.ok) {
             console.error("Ошибка обновления базы");
