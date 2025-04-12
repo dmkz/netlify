@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Динамический выбор шрифтов</title>
+  <style>
+    body {
+      margin: 20px;
+      /* По умолчанию выберем системный шрифт */
+      font-family: Georgia, serif;
+      transition: font-family 0.3s ease;
+    }
+    #preview {
+      margin-top: 20px;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    label {
+      font-size: 16px;
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <label for="fontSelect">Выберите шрифт:</label>
+  <select id="fontSelect">
+    <!-- Здесь можно добавить как системные шрифты, так и веб-шрифты -->
+    <option value="Georgia">Georgia (системный)</option>
+    <option value="Fira Code">Fira Code (Google Fonts)</option>
+    <option value="Source Code Pro">Source Code Pro (Google Fonts)</option>
+    <option value="Roboto Mono">Roboto Mono (Google Fonts)</option>
+    <option value="Inconsolata">Inconsolata (Google Fonts)</option>
+  </select>
+
+  <div id="preview">
+    Пример текста: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla vel purus at elit finibus ultrices.
+  </div>
+
+  <script>
+    // Сопоставление имён шрифтов с URL для загрузки (если нужен динамический load)
+    const webFonts = {
+      "Fira Code": "https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap",
+      "Source Code Pro": "https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;700&display=swap",
+      "Roboto Mono": "https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap",
+      "Inconsolata": "https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap"
+    };
+
+    const fontSelect = document.getElementById("fontSelect");
+
+    fontSelect.addEventListener("change", function() {
+      const selectedFont = fontSelect.value;
+      // Если выбранный шрифт является веб-шрифтом и его нет еще, то добавляем ссылку в head
+      if (webFonts[selectedFont]) {
+        // Проверяем, если уже есть ссылка для этого шрифта
+        if (!document.querySelector(`link[href*="${encodeURIComponent(selectedFont.replace(/ /g, "+"))}"]`)) {
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = webFonts[selectedFont];
+          document.head.appendChild(link);
+        }
+      }
+      // Обновляем стиль для превью (или для всего body)
+      document.body.style.fontFamily = `${selectedFont}, sans-serif`;
+    });
+
+    // Можно сымитировать изменение при первой загрузке:
+    fontSelect.dispatchEvent(new Event("change"));
+  </script>
+</body>
+</html>
