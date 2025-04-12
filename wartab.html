@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Анализ боёв</title>
+  <style>
+    /* Стили для современного, адаптивного дизайна */
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 960px;
+      margin: auto;
+      padding: 20px;
+    }
+    .collapsible {
+      background-color: #333;
+      color: #fff;
+      cursor: pointer;
+      padding: 18px;
+      width: 100%;
+      border: none;
+      text-align: left;
+      outline: none;
+      font-size: 20px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    .active, .collapsible:hover {
+      background-color: #555;
+    }
+    .content {
+      padding: 0 18px;
+      display: none;
+      overflow: hidden;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      font-size: 16px;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    input[type="text"] {
+      width: calc(100% - 20px);
+      padding: 10px;
+      font-size: 16px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button.send {
+      background-color: #28a745;
+      color: #fff;
+    }
+    button.clear {
+      background-color: #dc3545;
+      color: #fff;
+    }
+    .status-bar {
+      margin-top: 10px;
+      font-size: 16px;
+    }
+    .result-group {
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      padding: 10px;
+    }
+    .group-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .battle {
+      border-bottom: 1px dashed #ccc;
+      padding: 10px 0;
+    }
+    .battle:last-child {
+      border-bottom: none;
+    }
+    .battle-link {
+      margin-bottom: 5px;
+    }
+    .battle-link a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    .battle-link a:hover {
+      text-decoration: underline;
+    }
+    .battle-result {
+      margin-left: 20px;
+    }
+    .result-line {
+      margin-bottom: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Контейнер отправки боёв (с возможностью сворачивания/разворачивания) -->
+    <button type="button" class="collapsible">Отправка боёв</button>
+    <div class="content">
+      <!-- Большое текстовое поле для вставки данных боёв -->
+      <textarea id="battleInput" placeholder="Вставьте сюда текст с боями..."></textarea>
+      <!-- Поле для ввода маркеров ивента -->
+      <input type="text" id="markersInput" placeholder="Маркеры ивента (через запятую)">
+      <!-- Кнопки отправки и очистки -->
+      <div>
+        <button class="send" id="sendButton">Отправить</button>
+        <button class="clear" id="clearButton">Очистить</button>
+      </div>
+      <!-- Статусная строка -->
+      <div class="status-bar" id="statusBar">Статус: ожидаем ввода</div>
+    </div>
+    
+    <!-- Контейнер для отображения результатов -->
+    <div id="resultsContainer"></div>
+  </div>
+  
+  <script>
+    // Элементы страницы
+    const collapsible = document.querySelector('.collapsible');
+    const content = document.querySelector('.content');
+    const battleInput = document.getElementById('battleInput');
+    const markersInput = document.getElementById('markersInput');
+    const sendButton = document.getElementById('sendButton');
+    const clearButton = document.getElementById('clearButton');
+    const statusBar = document.getElementById('statusBar');
+    const resultsContainer = document.getElementById('resultsContainer');
+    
+    // Переключение видимости контейнера отправки боёв
+    collapsible.addEventListener('click', function() {
+      this.classList.toggle("active");
+      content.style.display = (content.style.display === "block") ? "none" : "block";
+    });
+    
+    // Очистка поля ввода
+    clearButton.addEventListener('click', function() {
+      battleInput.value = '';
+      statusBar.textContent = 'Статус: очищено';
+    });
+    
+    // Обработка нажатия на кнопку «Отправить»
+    sendButton.addEventListener('click', async function() {
+      statusBar.textContent = 'Статус: обработка ввода...';
+      const inputText = battleInput.value;
+      if (!inputText.trim()) {
+        statusBar.textContent = 'Статус: пустой ввод';
+        return;
+      }
+      
+      // Извлечение ссылок на бои (ищутся все ссылки с war.php или warlog.php)
+      let battleLinks = extractBattleLinks(inputText);
+      if (battleLinks.length === 0) {
+        statusBar.textContent = 'Статус: не найдено ссылок на бои';
+        return;
+      }
+      
+      // Нормализация ссылок и извлечение warid
+      let battles = battleLinks.map(link => {
+        const normalized = normalizeBattleLink(link);
+        const warid = extractWarId(normalized);
+        return { warid, link: normalized, result: null };
+      }).filter(b => b.warid);
+      
+      // Загрузка ранее сохранённых боёв из localStorage
+      let storedBattles = JSON.parse(localStorage.getItem('battles') || '[]');
+      
+      // Объединение новых и сохранённых боёв по уникальному warid
+      let battlesMap = {};
+      storedBattles.forEach(b => { battlesMap[b.warid] = b; });
+      battles.forEach(b => {
+        if (!battlesMap[b.warid]) battlesMap[b.warid] = b;
+      });
+      let allBattles = Object.values(battlesMap);
+      
+      statusBar.textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
+      
+      // Отправка на анализ тех боёв, для которых ещё не получен результат
+      allBattles = await analyzeBattles(allBattles);
+      
+      // Фильтрация боёв по маркерам (если поле маркеров заполнено)
+      const markers = markersInput.value.split(',').map(m => m.trim()).filter(m => m);
+      if (markers.length > 0) {
+        allBattles = allBattles.filter(b => battleHasMarkers(b.result, markers));
+      }
+      
+      // Сохранение итоговой таблицы боёв в localStorage
+      localStorage.setItem('battles', JSON.stringify(allBattles));
+      
+      // Отображение результатов на странице
+      displayBattles(allBattles);
+      statusBar.textContent = `Статус: обработка завершена. Всего боёв: ${allBattles.length}`;
+    });
+    
+    // Функция для извлечения ссылок на бои из текста
+    function extractBattleLinks(text) {
+      // Регулярное выражение ищет варианты ссылок (абсолютные и относительные) с war.php или warlog.php
+      const regex = /(?:https?:\/\/[^\s'"]+)?\/?(war(?:log)?\.php\?[^"'\s]+)/gi;
+      let links = [];
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        links.push(match[1]);
+      }
+      return links;
+    }
+    
+    // Функция нормализации ссылки:
+    // – Если ссылка относительная, делаем её абсолютной (базовый URL – https://www.heroeswm.ru)
+    // – Заменяем домены на www.heroeswm.ru и warlog.php на war.php
+    // – Удаляем параметр lt
+    function normalizeBattleLink(link) {
+      if (!link.startsWith('http')) {
+        link = 'https://www.heroeswm.ru/' + link;
+      } else {
+        link = link.replace(/https?:\/\/(www\.heroeswm\.ru|mirror\.heroeswm\.ru|my\.lordswm\.com|www\.lordswm\.com|lordswm\.com)/i, 'https://www.heroeswm.ru');
+      }
+      link = link.replace(/warlog\.php/gi, 'war.php');
+      try {
+        let url = new URL(link);
+        url.searchParams.delete('lt');
+        return url.toString();
+      } catch (e) {
+        console.error('Ошибка нормализации ссылки:', link, e);
+        return link;
+      }
+    }
+    
+    // Функция извлечения параметра warid из ссылки
+    function extractWarId(link) {
+      try {
+        let url = new URL(link);
+        return url.searchParams.get('warid');
+      } catch (e) {
+        console.error('Ошибка извлечения warid из ссылки:', link, e);
+        return null;
+      }
+    }
+    
+    // Функция анализа боёв через Netlify функцию analyzeBattles.js
+    async function analyzeBattles(battles) {
+      // Отбираем те бои, для которых результат анализа ещё не получен
+      let pendingBattles = battles.filter(b => !b.result);
+      let attempt = 1;
+      while (pendingBattles.length > 0) {
+        statusBar.textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
+        const startTime = performance.now();
+        try {
+          let response = await fetch(          'https://hwm-nightly.netlify.app/netlify/functions/analyzeBattles.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ links: pendingBattles.map(b => b.link) })
+          });
+          let data = await response.json();
+          // Обновляем данные анализа для каждого боя
+          data.results.forEach(res => {
+            let b = battles.find(battle => battle.link === res.link);
+            if (b) {
+              if (res.status === 'success' && res.result) {
+                b.result = res.result;
+              } else {
+                b.result = null;
+              }
+            }
+          });
+        } catch (e) {
+          console.error('Ошибка при запросе анализа:', e);
+        }
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+        let successCount = battles.filter(b => b.result).length;
+        let errorCount = battles.filter(b => !b.result).length;
+        statusBar.textContent = `Анализ: ${battles.length} боёв. Успех: ${successCount}. Ошибка: ${errorCount}. Время: ${elapsed} с. Попытка ${attempt}`;
+        
+        pendingBattles = battles.filter(b => !b.result);
+        if (pendingBattles.length > 0) {
+          await new Promise(r => setTimeout(r, 1000));
+          attempt++;
+        }
+      }
+      return battles;
+    }
+    
+    // Функция проверки наличия хотя бы одного маркера в результате анализа
+    function battleHasMarkers(result, markers) {
+      if (!result) return false;
+      return markers.some(marker => {
+        const regex = new RegExp('\\[' + marker + '(\\s*[({]|\\])', 'i');
+        return regex.test(result);
+      });
+    }
+    
+    // Функция отображения боёв, сгруппированных по маркеру
+    function displayBattles(battles) {
+      resultsContainer.innerHTML = '';
+      let groups = {};
+      battles.forEach(battle => {
+        let groupKey = determineGroupKey(battle.result);
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push(battle);
+      });
+      for (let key in groups) {
+        let groupDiv = document.createElement('div');
+        groupDiv.className = 'result-group';
+        let title = document.createElement('div');
+        title.className = 'group-title';
+        title.textContent = key;
+        groupDiv.appendChild(title);
+        groups[key].forEach(battle => {
+          let battleDiv = document.createElement('div');
+          battleDiv.className = 'battle';
+          
+          // Контейнер для кликабельной ссылки на бой
+          let linkDiv = document.createElement('div');
+          linkDiv.className = 'battle-link';
+          let linkA = document.createElement('a');
+          linkA.href = battle.link;
+          linkA.target = '_blank';
+          linkA.textContent = battle.link;
+          linkDiv.appendChild(linkA);
+          battleDiv.appendChild(linkDiv);
+          
+          // Контейнер для результата анализа (разбиваем результат по строкам)
+          let resultDiv = document.createElement('div');
+          resultDiv.className = 'battle-result';
+          if (battle.result) {
+            battle.result.split('\n').forEach(line => {
+              let lineDiv = document.createElement('div');
+              lineDiv.className = 'result-line';
+              lineDiv.textContent = line;
+              resultDiv.appendChild(lineDiv);
+            });
+          }
+          battleDiv.appendChild(resultDiv);
+          groupDiv.appendChild(battleDiv);
+        });
+        resultsContainer.appendChild(groupDiv);
+      }
+    }
+    
+    // Функция определения ключа группировки боёв по результату анализа.
+    // Если первая квадратная скобка содержит дополнительную информацию (круглые или фигурные скобки) – группируем по ней.
+    // Если нет, то группировка производится по комбинации маркера и фракции (например, "Цель контракта: Гноллы").
+    function determineGroupKey(result) {
+      if (!result) return 'Без группы';
+      let parts = result.match(/\[([^\]]+)\]/g);
+      if (!parts || parts.length < 2) return 'Без группы';
+      parts = parts.map(p => p.replace(/^\[|\]$/g, ''));
+      if (/\(.*\)|\{.*\}/.test(parts[0])) {
+        return parts[0];
+      } else if (parts.length >= 5) {
+        return parts[0] + ': ' + parts[4];
+      }
+      return parts[0] || 'Без группы';
+    }
+    
+  </script>
+</body>
+</html>
