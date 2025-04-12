@@ -866,7 +866,19 @@
         return transformed.join("\n");
       }
 
-      /* Функции для группировки и отображения боёв */
+      /* Вспомогательная функция для вычисления градиентного цвета для заголовка уровня */
+      function getLevelGradient(level) {
+        // Уровень от 5 до 25 (всего 21 уровень)
+        // При уровне 5: холодный (голубой ~hsl(240, 70%, 50%))
+        // При уровне 25: жаркий (красный ~hsl(0, 70%, 50%))
+        let clamped = Math.min(Math.max(level, 5), 25);
+        let fraction = (clamped - 5) / 20;
+        let hue = 240 - fraction * 240;  // линейно уменьшаем от 240 до 0
+        // Создадим градиент от более тёмного к более светлому оттенку этого цвета
+        return `linear-gradient(90deg, hsl(${hue}, 70%, 40%), hsl(${hue}, 70%, 60%))`;
+      }
+
+      /* Функция отображения и группировки боёв */
       function displayBattles(battles) {
         const markers = markersInput.value.split(',')
                             .map(m => m.trim())
@@ -909,6 +921,11 @@
             let levelHeader = document.createElement('div');
             levelHeader.className = 'collapsible-group';
             levelHeader.textContent = `${levelKey} [выжило ${bestSurvival.toFixed(2)}% у лучшего игрока]`;
+            // Извлекаем числовое значение уровня из строки "[Уровень: N]"
+            let levelNum = parseInt(levelKey.replace(/\D/g, ''));
+            // Применяем градиентный фон, вычисленный по уровню
+            levelHeader.style.background = getLevelGradient(levelNum);
+            levelHeader.style.color = '#fff';
             levelDiv.appendChild(levelHeader);
             let levelContent = document.createElement('div');
             levelContent.className = 'group-content';
@@ -989,7 +1006,7 @@
         }
         updateFilteredOutput();
       }
-
+      
       function determineGroupKey(result, eventMarkers) {
         if (!result) return 'Без группы';
         const lines = result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
