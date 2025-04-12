@@ -376,7 +376,7 @@
     const statusBar = document.getElementById('statusBar');
     const resultsContainer = document.getElementById('resultsContainer');
 
-    // При нажатии на заголовок блока отправки боёв происходит сворачивание/разворачивание
+    // Сворачивание/разворачивание блока отправки боёв
     collapsible.addEventListener('click', function() {
       this.classList.toggle("active");
       if (content.style.display === "block") {
@@ -517,7 +517,7 @@
       }
     }
 
-    /* ========= Функция анализа боёв (оставляем вашу существующую реализацию) ========= */
+    /* ========= Функция анализа боёв (оставляем существующую реализацию) ========= */
     async function analyzeBattles(battles) {
       let pendingBattles = battles.filter(b => !b.result);
       let attempt = 1;
@@ -591,7 +591,6 @@
       showWinningBonuses: false,
       showLosingBonuses: false
     };
-    // Фильтр сохраняется в localStorage (это не критично для боёв)
     function loadFilterOptions() {
       let stored = localStorage.getItem("battleFilterOptions");
       if (stored) {
@@ -988,29 +987,46 @@
         filterToggleIcon.innerHTML = "&#9654;";
       }
     });
+
+    /* ========= Автоматическая загрузка боёв при загрузке страницы ========= */
     document.addEventListener('DOMContentLoaded', async () => {
+      let loadStartTime = performance.now();
+      statusBar.textContent = "Загружаем бои, подождите. Прошло 0.000 сек";
+      // Обновление сообщения с интервалом
+      let loadInterval = setInterval(() => {
+        let elapsed = ((performance.now() - loadStartTime) / 1000).toFixed(3);
+        statusBar.textContent = `Загружаем бои, подождите. Прошло ${elapsed} сек`;
+      }, 100);
+
       try {
         const res = await fetch('/.netlify/functions/getBattles');
+        clearInterval(loadInterval);
+        let loadTime = performance.now() - loadStartTime;
         if (res.ok) {
           const data = await res.json();
+          // Предполагается, что сервер вернул объект с полями: battles и markers
           const dbBattles = data.battles;
           const markers = data.markers || '';
-          // Устанавливаем полученное значение маркеров в поле ввода
           markersInput.value = markers;
+          
+          statusBar.textContent = `Бои загружены (${dbBattles.length} боёв) за ${(loadTime/1000).toFixed(3)} сек. Начинается группировка...`;
+
+          let groupStartTime = performance.now();
           displayBattles(dbBattles);
           updateFilteredOutput();
-          statusBar.textContent = `Статус: загружено ${dbBattles.length} боёв, маркеры: ${markers}`;
+          let groupTime = performance.now() - groupStartTime;
+
+          statusBar.textContent = `Всё готово. Сгруппировано ${dbBattles.length} боёв за ${(groupTime/1000).toFixed(3)} сек`;
         } else {
           console.error("Ошибка получения боёв из базы");
-          statusBar.textContent = 'Статус: ошибка загрузки базы';
+          statusBar.textContent = "Статус: ошибка загрузки базы";
         }
       } catch (error) {
+        clearInterval(loadInterval);
         console.error("Ошибка при запросе к базе:", error);
-        statusBar.textContent = 'Статус: ошибка запроса к базе';
+        statusBar.textContent = "Статус: ошибка запроса к базе";
       }
     });
-
-
   </script>
 </body>
 </html>
