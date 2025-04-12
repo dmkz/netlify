@@ -607,7 +607,33 @@
           return regex.test(result);
         });
       }
-
+      
+      const defaultFilterOptions = {
+      shortenMarkers: true,
+      showWinningSideName: true,
+      showLosingSideName: true,
+      showWinningHP: true,
+      showLosingHP: true,
+      showWinningPercent: true,
+      showLosingPercent: true,
+      showWinningFaction: true,
+      showLosingFaction: true,
+      showWinningHeroInfo: true,
+      showLosingHeroInfo: true,
+      showWinningHeroNickname: true,
+      showLosingHeroNickname: true,
+      showWinningHeroLevel: true,
+      showLosingHeroLevel: true,
+      showWinningHeroParams: true,
+      showLosingHeroParams: true,
+      shortenWinningHeroParams: true,
+      shortenLosingHeroParams: true,
+      showWinningArmy: true,
+      showLosingArmy: true,
+      showWinningBonuses: true,
+      showLosingBonuses: true
+    };
+      
       /* Функции для дополнительной группировки и фильтрации */
       function extractWinningLevel(result) {
         if (!result) return "Без уровня";
