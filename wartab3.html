@@ -392,8 +392,8 @@
 <body>
   <!-- Статус-бар размещён вне контейнера -->
   <div class="status-bar" id="statusBar">
-  <button class="status-instruction-btn" id="instructionToggleBtn">Инструкция</button>
-  <div class="status-bar" id="statusBar">Статус: ожидаем ввода</div>
+      <button class="status-instruction-btn" id="instructionToggleBtn">Инструкция</button>
+      <span id="statusText">Статус: ожидаем ввода</span>
   </div>
   <div class="container">
     <!-- Блок отправки боёв -->
@@ -565,22 +565,22 @@
 
       clearButton.addEventListener('click', function() {
         battleInput.value = '';
-        statusBar.textContent = 'Статус: очищено';
+        document.getElementById('statusText').textContent = 'Статус: очищено';
       });
 
       /* Основной обработчик кнопки "Отправить" */
       sendButton.addEventListener('click', async function() {
-        statusBar.textContent = 'Статус: обработка ввода...';
+        document.getElementById('statusText').textContent = 'Статус: обработка ввода...';
         const inputText = battleInput.value;
         if (!inputText.trim()) {
-          statusBar.textContent = 'Статус: пустой ввод';
+          document.getElementById('statusText').textContent = 'Статус: пустой ввод';
           return;
         }
 
         // Извлекаем ссылки на бои из введённого текста
         let battleLinks = extractBattleLinks(inputText);
         if (battleLinks.length === 0) {
-          statusBar.textContent = 'Статус: не найдено ссылок на бои';
+          document.getElementById('statusText').textContent = 'Статус: не найдено ссылок на бои';
           return;
         }
 
@@ -614,7 +614,7 @@
         });
         let allBattles = Object.values(battlesMap);
 
-        statusBar.textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
+        document.getElementById('statusText').textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
 
         // Анализируем те бои, у которых ещё нет результата
         allBattles = await analyzeBattles(allBattles);
@@ -654,7 +654,7 @@
         // Отображаем объединённый результат (группировка без изменений)
         displayBattles(allBattles);
         updateFilteredOutput();
-        statusBar.textContent = `Статус: обработка завершена. Всего боёв: ${allBattles.length}`;
+        document.getElementById('statusText').textContent = `Статус: обработка завершена. Всего боёв: ${allBattles.length}`;
       });
 
       /* Функции для работы со ссылками и идентификатором боя */
@@ -706,7 +706,7 @@
               failedBattles = pendingBattles;
               break;
             }
-            statusBar.textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
+            document.getElementById('statusText').textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
             const startTime = performance.now();
             try {
               let response = await fetch('https://hwm-nightly.netlify.app/.netlify/functions/analyzeBattles', {
@@ -727,7 +727,7 @@
             const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
             let successCount = battles.filter(b => b.result).length;
             let errorCount = battles.filter(b => !b.result).length;
-            statusBar.textContent = `Анализ: ${battles.length} боёв. Успех: ${successCount}. Ошибка: ${errorCount}. Время: ${elapsed} с. Попытка ${attempt}`;
+            document.getElementById('statusText').textContent = `Анализ: ${battles.length} боёв. Успех: ${successCount}. Ошибка: ${errorCount}. Время: ${elapsed} с. Попытка ${attempt}`;
             pendingBattles = battles.filter(b => !b.result);
             if (pendingBattles.length > 0) {
               await new Promise(r => setTimeout(r, 1000));
@@ -1316,10 +1316,10 @@
       /* Автоматическая загрузка боёв при загрузке страницы */
       try {
         let loadStartTime = performance.now();
-        statusBar.textContent = "Загружаем бои, подождите. Прошло 0.000 сек";
+        document.getElementById('statusText').textContent = "Загружаем бои, подождите. Прошло 0.000 сек";
         let loadInterval = setInterval(() => {
           let elapsed = ((performance.now() - loadStartTime) / 1000).toFixed(3);
-          statusBar.textContent = `Загружаем бои, подождите. Прошло ${elapsed} сек`;
+          document.getElementById('statusText').textContent = `Загружаем бои, подождите. Прошло ${elapsed} сек`;
         }, 100);
         const res = await fetch('/.netlify/functions/getBattles');
         clearInterval(loadInterval);
@@ -1330,19 +1330,19 @@
           const dbBattles = data.battles;
           const markers = data.markers || '';
           markersInput.value = markers;
-          statusBar.textContent = `Бои загружены (${dbBattles.length} боёв) за ${(loadTime/1000).toFixed(3)} сек. Начинается группировка...`;
+          document.getElementById('statusText').textContent = `Бои загружены (${dbBattles.length} боёв) за ${(loadTime/1000).toFixed(3)} сек. Начинается группировка...`;
           let groupStartTime = performance.now();
           displayBattles(dbBattles);
           updateFilteredOutput();
           let groupTime = performance.now() - groupStartTime;
-          statusBar.textContent = `Всё готово. Сгруппировано ${dbBattles.length} боёв за ${(groupTime/1000).toFixed(3)} сек`;
+          document.getElementById('statusText').textContent = `Всё готово. Сгруппировано ${dbBattles.length} боёв за ${(groupTime/1000).toFixed(3)} сек`;
         } else {
           console.error("Ошибка получения боёв из базы");
-          statusBar.textContent = "Статус: ошибка загрузки базы";
+          document.getElementById('statusText').textContent = "Статус: ошибка загрузки базы";
         }
       } catch (error) {
         console.error("Ошибка при запросе к базе:", error);
-        statusBar.textContent = "Статус: ошибка запроса к базе";
+        document.getElementById('statusText').textContent = "Статус: ошибка запроса к базе";
       }
     });
     function showInstructionModal() {
