@@ -264,11 +264,138 @@
         box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
       }
     }
+    /* Новый стиль для кнопки инструкции, которая будет внутри статус-бара */
+    .status-instruction-btn {
+      background-color: #007bff;
+      border: none;
+      color: #fff;
+      padding: 5px 10px;
+      font-size: 14px;
+      margin-right: 10px;
+      float: left;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .status-instruction-btn:hover {
+      background-color: #0056b3;
+    }
+
+    /* Стили для модального окна инструкции */
+    #instructionOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+    }
+
+    #instructionModal {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80%;
+      overflow-y: auto;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Стили для кнопок инструкции внутри модального окна */
+    .instruction-btn {
+      padding: 8px 16px;
+      margin: 10px 5px 0 5px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .instruction-btn.ok {
+      background-color: #28a745;
+      color: #fff;
+    }
+
+    .instruction-btn.ok:hover {
+      background-color: #218838;
+    }
+
+    .instruction-btn.noShow {
+      background-color: #6c757d;
+      color: #fff;
+    }
+
+    .instruction-btn.noShow:hover {
+      background-color: #5a6268;
+    }
+    /* Стили для окна ошибки анализа */
+    #errorModalOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2100;
+    }
+
+    #errorModal {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80%;
+      overflow-y: auto;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Стили для кнопок в окне ошибки */
+    .error-btn {
+      padding: 8px 16px;
+      margin: 10px 5px 0 5px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .error-btn.copy {
+      background-color: #17a2b8;
+      color: #fff;
+    }
+
+    .error-btn.copy:hover {
+      background-color: #117a8b;
+    }
+
+    .error-btn.close {
+      background-color: #dc3545;
+      color: #fff;
+    }
+
+    .error-btn.close:hover {
+      background-color: #c82333;
+    }
   </style>
 </head>
 <body>
   <!-- Статус-бар размещён вне контейнера -->
-  <div class="status-bar" id="statusBar">Статус: ожидаем ввода</div>
+  <div class="status-bar" id="statusBar">
+      <button class="status-instruction-btn" id="instructionToggleBtn">Инструкция</button>
+      <span id="statusText">Статус: ожидаем ввода</span>
+  </div>
   <div class="container">
     <!-- Блок отправки боёв -->
     <button type="button" class="collapsible">Отправка боёв</button>
@@ -439,22 +566,22 @@
 
       clearButton.addEventListener('click', function() {
         battleInput.value = '';
-        statusBar.textContent = 'Статус: очищено';
+        document.getElementById('statusText').textContent = 'Статус: очищено';
       });
 
       /* Основной обработчик кнопки "Отправить" */
       sendButton.addEventListener('click', async function() {
-        statusBar.textContent = 'Статус: обработка ввода...';
+        document.getElementById('statusText').textContent = 'Статус: обработка ввода...';
         const inputText = battleInput.value;
         if (!inputText.trim()) {
-          statusBar.textContent = 'Статус: пустой ввод';
+          document.getElementById('statusText').textContent = 'Статус: пустой ввод';
           return;
         }
 
         // Извлекаем ссылки на бои из введённого текста
         let battleLinks = extractBattleLinks(inputText);
         if (battleLinks.length === 0) {
-          statusBar.textContent = 'Статус: не найдено ссылок на бои';
+          document.getElementById('statusText').textContent = 'Статус: не найдено ссылок на бои';
           return;
         }
 
@@ -488,7 +615,7 @@
         });
         let allBattles = Object.values(battlesMap);
 
-        statusBar.textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
+        document.getElementById('statusText').textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
 
         // Анализируем те бои, у которых ещё нет результата
         allBattles = await analyzeBattles(allBattles);
@@ -528,7 +655,7 @@
         // Отображаем объединённый результат (группировка без изменений)
         displayBattles(allBattles);
         updateFilteredOutput();
-        statusBar.textContent = `Статус: обработка завершена. Всего боёв: ${allBattles.length}`;
+        document.getElementById('statusText').textContent = `Статус: обработка завершена. Всего боёв: ${allBattles.length}`;
       });
 
       /* Функции для работы со ссылками и идентификатором боя */
@@ -571,39 +698,93 @@
 
       /* Функция анализа боёв (оставляем существующую реализацию) */
       async function analyzeBattles(battles) {
-        let pendingBattles = battles.filter(b => !b.result);
-        let attempt = 1;
-        while (pendingBattles.length > 0) {
-          statusBar.textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
-          const startTime = performance.now();
-          try {
-            let response = await fetch('https://hwm-nightly.netlify.app/.netlify/functions/analyzeBattles', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ links: pendingBattles.map(b => b.link) })
-            });
-            let data = await response.json();
-            data.results.forEach(res => {
-              let b = battles.find(battle => battle.link === res.link);
-              if (b) {
-                b.result = (res.status === 'success' && res.result) ? res.result : null;
-              }
-            });
-          } catch (e) {
-            console.error('Ошибка при запросе анализа:', e);
+          let pendingBattles = battles.filter(b => !b.result);
+          let attempt = 1;
+          // Сохраним список неудачно проанализированных боёв
+          let failedBattles = [];
+          while (pendingBattles.length > 0) {
+            if (attempt > 5) {
+              failedBattles = pendingBattles;
+              break;
+            }
+            document.getElementById('statusText').textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
+            const startTime = performance.now();
+            try {
+              let response = await fetch('https://hwm-nightly.netlify.app/.netlify/functions/analyzeBattles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ links: pendingBattles.map(b => b.link) })
+              });
+              let data = await response.json();
+              data.results.forEach(res => {
+                let b = battles.find(battle => battle.link === res.link);
+                if (b) {
+                  b.result = (res.status === 'success' && res.result) ? res.result : null;
+                }
+              });
+            } catch (e) {
+              console.error('Ошибка при запросе анализа:', e);
+            }
+            const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+            let successCount = battles.filter(b => b.result).length;
+            let errorCount = battles.filter(b => !b.result).length;
+            document.getElementById('statusText').textContent = `Анализ: ${battles.length} боёв. Успех: ${successCount}. Ошибка: ${errorCount}. Время: ${elapsed} с. Попытка ${attempt}`;
+            pendingBattles = battles.filter(b => !b.result);
+            if (pendingBattles.length > 0) {
+              await new Promise(r => setTimeout(r, 1000));
+              attempt++;
+            }
           }
-          const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
-          let successCount = battles.filter(b => b.result).length;
-          let errorCount = battles.filter(b => !b.result).length;
-          statusBar.textContent = `Анализ: ${battles.length} боёв. Успех: ${successCount}. Ошибка: ${errorCount}. Время: ${elapsed} с. Попытка ${attempt}`;
-          pendingBattles = battles.filter(b => !b.result);
-          if (pendingBattles.length > 0) {
-            await new Promise(r => setTimeout(r, 1000));
-            attempt++;
+          if (failedBattles.length > 0) {
+            // Удаляем не проанализированные бои из общего списка
+            battles = battles.filter(b => b.result !== null);
+            showAnalysisErrorModal(failedBattles);
           }
+          return battles;
         }
-        return battles;
-      }
+
+    function showAnalysisErrorModal(failedBattles) {
+  let modalOverlay = document.createElement('div');
+  modalOverlay.id = 'errorModalOverlay';
+
+  let modal = document.createElement('div');
+  modal.id = 'errorModal';
+
+  modal.innerHTML = `
+    <h2>Ошибка анализа</h2>
+    <p>
+      Следующие бои не удалось проанализировать (повторных попыток более 5):
+    </p>
+    <!-- Вместо списка используем textarea -->
+    <textarea id="failedBattlesTextarea" readonly style="width:100%; height:150px; font-family: Consolas, 'Courier New', monospace; padding:10px; border:1px solid #ccc; border-radius:4px; resize:vertical;">
+${failedBattles.map(b => b.link).join('\n')}
+    </textarea>
+    <p>Однако все остальные бои были добавлены!</p>
+    <div style="text-align: right;">
+      <button class="error-btn copy" id="copyFailedBtn">Скопировать</button>
+      <button class="error-btn close" id="closeErrorModalBtn">Закрыть</button>
+    </div>
+  `;
+
+  modalOverlay.appendChild(modal);
+  document.body.appendChild(modalOverlay);
+
+  document.getElementById('copyFailedBtn').addEventListener('click', () => {
+    let tempTextarea = document.createElement('textarea');
+    tempTextarea.value = failedBattles.map(b => b.link).join('\n');
+    document.body.appendChild(tempTextarea);
+    tempTextarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(tempTextarea);
+    alert('Ссылки скопированы!');
+  });
+
+  document.getElementById('closeErrorModalBtn').addEventListener('click', () => {
+    document.body.removeChild(modalOverlay);
+  });
+}
+
+
 
       function battleHasMarkers(result, markers) {
         if (!result) return false;
@@ -1139,10 +1320,10 @@
       /* Автоматическая загрузка боёв при загрузке страницы */
       try {
         let loadStartTime = performance.now();
-        statusBar.textContent = "Загружаем бои, подождите. Прошло 0.000 сек";
+        document.getElementById('statusText').textContent = "Загружаем бои, подождите. Прошло 0.000 сек";
         let loadInterval = setInterval(() => {
           let elapsed = ((performance.now() - loadStartTime) / 1000).toFixed(3);
-          statusBar.textContent = `Загружаем бои, подождите. Прошло ${elapsed} сек`;
+          document.getElementById('statusText').textContent = `Загружаем бои, подождите. Прошло ${elapsed} сек`;
         }, 100);
         const res = await fetch('/.netlify/functions/getBattles');
         clearInterval(loadInterval);
@@ -1153,20 +1334,83 @@
           const dbBattles = data.battles;
           const markers = data.markers || '';
           markersInput.value = markers;
-          statusBar.textContent = `Бои загружены (${dbBattles.length} боёв) за ${(loadTime/1000).toFixed(3)} сек. Начинается группировка...`;
+          document.getElementById('statusText').textContent = `Бои загружены (${dbBattles.length} боёв) за ${(loadTime/1000).toFixed(3)} сек. Начинается группировка...`;
           let groupStartTime = performance.now();
           displayBattles(dbBattles);
           updateFilteredOutput();
           let groupTime = performance.now() - groupStartTime;
-          statusBar.textContent = `Всё готово. Сгруппировано ${dbBattles.length} боёв за ${(groupTime/1000).toFixed(3)} сек`;
+          document.getElementById('statusText').textContent = `Всё готово. Сгруппировано ${dbBattles.length} боёв за ${(groupTime/1000).toFixed(3)} сек`;
         } else {
           console.error("Ошибка получения боёв из базы");
-          statusBar.textContent = "Статус: ошибка загрузки базы";
+          document.getElementById('statusText').textContent = "Статус: ошибка загрузки базы";
         }
       } catch (error) {
         console.error("Ошибка при запросе к базе:", error);
-        statusBar.textContent = "Статус: ошибка запроса к базе";
+        document.getElementById('statusText').textContent = "Статус: ошибка запроса к базе";
       }
+    });
+    function showInstructionModal() {
+      let overlay = document.createElement('div');
+      overlay.id = 'instructionOverlay';
+
+      let modal = document.createElement('div');
+      modal.id = 'instructionModal';
+      // Здесь вставляем ваш полный текст инструкции. Он большой, поэтому используем многострочную строку.
+      modal.innerHTML = `
+        <h2>Инструкция по использованию сайта</h2>
+        <p>
+          <strong>Просмотр боёв</strong><br>
+          Когда вы заходите на сервер, он обращается к базе данных и загружает оттуда уже имеющиеся бои. У меня это занимает 3 секунды. Загруженные бои группируются по противникам в порядке возрастания номеров волн. Для каждой волны бои группируются по боевым уровням героев в порядке их убывания. Список уровней имеет разнообразные цвета: высокоуровневые герои ближе к красному, низкоуровневые ближе к синему.<br><br>
+
+          <strong>Фильтр информации о боях</strong><br>
+          Об одном конкретном бое отображается очень много информации: кто сражался, сколько было ХП у его армии, сколько % выжило, кто был в его армии, какая фракция, что он получил за бой, какие статы были у героя, и т.д.. В будущем планирую добавить, какие артефакты носил герой, какие навыки у него были и какое умение фракции и анти-умение фракции, но сейчас этого нет.<br><br>
+
+          Если вы считаете информацию избыточной, то используйте фильтры: отметьте галочками то, что хотите видеть. При изменении фильтра все описания боёв сразу же редактируются «налету», поэтому такая кнопка, как «применить фильтры» отсутствует. Выбранные фильтры сохраняются в браузере.<br><br>
+
+          <strong>Отправка боёв</strong><br>
+          Вы можете отправлять что угодно: текст, содержащий ссылки на бои, или HTML код страницы протокола боёв, содержащий бои. Всё, что содержит «war.php» или «warlog.php» будет считаться боем. Даже если www.heroeswm.ru или lordswm.com отсутствует (вы могли столкнуться с этим, когда открываете почту героев на телефоне), ссылки на бои будут корректно изъяты, а соответствующие www.heroeswm.ru добавлены автоматически.<br><br>
+
+          Сервис автоматически проверит, что бой является боем ивента, который он хочет получить. Информация о том, что он хочет получить, указана в поле под вводом текста. Сейчас сервис принимает только «Цель контракта». Анализ боёв происходит на русском языке и если ссылка на бой ведёт на lordswm.com, то произойдет автоматическая замена на www.heroeswm.ru, поэтому, если вы англоговорящий, то вам ничего не требуется делать дополнительно: просто отправьте свои бои и всё (как отдельные ссылки или как HTML код страницы протокола боёв).<br><br>
+
+          Сочетания клавиш для копирования и вставки HTML кода страницы на компьютере: на странице протокола боёв Ctrl+U, Ctrl+A, Ctrl+C, переход в поле ввода, Ctrl+V.<br><br>
+
+          Дубликаты боёв будут автоматически удалены. Проверяется не ссылка, а параметр «warid»: две ссылки с одним и тем же «warid» считаются одинаковыми.<br><br>
+
+          На мобильном телефоне тоже работает: я проверял на Mozilla Firefox Mobile. Но я установил расширение «View Page Source» из магазина расширений Firefox.<br><br>
+
+          Отправка боёв занимает несколько секунд. Не закрывайте вкладку сразу: дождитесь сообщения, что всё готово.<br><br>
+
+          <strong>Другие ивенты</strong><br>
+          Пока что первоначальная настройка нового ивента работает вручную. Я должен сбрасывать базу данных и выставлять маркеры боёв ивента (например, «Цель контракта») в начале каждого нового ивента. Но на ивентах, где нет номеров волн, уже сейчас враги группируются не по номерам волн, а по фракциям соперников. Например, «Враги: Механики», или «Враги: Разбойники» вместо «Цель контракта (10-1)» и «Цель контракта (40-2)».
+        </p>
+        <div style="text-align: center; margin-top: 20px;">
+          <button class="instruction-btn ok" id="instructionOk">Понял</button>
+          <button class="instruction-btn noShow" id="instructionNoShow">Больше не показывать</button>
+        </div>
+      `;
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      document.getElementById('instructionOk').addEventListener('click', () => {
+        document.body.removeChild(overlay);
+      });
+      document.getElementById('instructionNoShow').addEventListener('click', () => {
+        localStorage.setItem('dontShowInstructions', 'true');
+        document.body.removeChild(overlay);
+      });
+    }
+
+    function checkAndShowInstructions() {
+      if (!localStorage.getItem('dontShowInstructions')) {
+        showInstructionModal();
+      }
+    }
+
+    // Добавляем обработчик для кнопки инструкции в статус-баре
+    document.addEventListener('DOMContentLoaded', () => {
+      checkAndShowInstructions();
+      const instructionToggleBtn = document.getElementById('instructionToggleBtn');
+      instructionToggleBtn.addEventListener('click', showInstructionModal);
     });
   </script>
 </body>
