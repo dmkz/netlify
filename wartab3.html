@@ -663,17 +663,29 @@
       });
     });
       /* Функции для дополнительной группировки и фильтрации */
-      function extractWinningLevel(result) {
-        if (!result) return "Без уровня";
-        let lines = result.split('\n').map(l => l.trim());
-        for (let line of lines) {
-          if (line.toLowerCase().startsWith('[win') || line.startsWith('[+]')) {
+      function extractWinningLevel(resultText, markers) {
+          if (!resultText) return "Без уровня";
+          let lines = resultText.split('\n').map(l => l.trim());
+          let maxLevel = 0;
+          outer: for (let line of lines) {
+            // Если строка содержит хотя бы один из маркеров, пропускаем её
+            for (let marker of markers) {
+              if (line.toLowerCase().includes(marker.toLowerCase())) {
+                continue outer;
+              }
+            }
+            // Если строка не содержит маркеров, пробуем извлечь уровень
             let match = line.match(/\[Уровень:\s*(\d+)\]/i);
-            if (match) return "[Уровень: " + match[1] + "]";
+            if (match) {
+              maxLevel = Math.max(maxLevel, parseInt(match[1], 10));
+            }
           }
+          if (maxLevel !== 0) {
+            return "[Уровень: " + maxLevel + "]";
+          }
+          return "Без уровня";
         }
-        return "Без уровня";
-      }
+
 
       function extractFaction(result) {
         if (!result) return "Без фракции";
@@ -965,7 +977,8 @@
           // Группировка по уровню победившей стороны
           let levelGroups = {};
           overallGroups[overallKey].forEach(battle => {
-            let lvl = extractWinningLevel(battle.result);
+            // TO DO:
+            let lvl = extractWinningLevel(battle.result, markers);
             if (!levelGroups[lvl]) levelGroups[lvl] = [];
             levelGroups[lvl].push(battle);
           });
