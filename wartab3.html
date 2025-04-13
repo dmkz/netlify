@@ -704,11 +704,17 @@
         return "Без фракции";
       }
 
-      function extractSurvivalPercent(result) {
-        if (!result) return 0;
-        let lines = result.split('\n').map(l => l.trim());
-        for (let line of lines) {
-          if (line.toLowerCase().startsWith('[win') || line.startsWith('[+]')) {
+      function extractSurvivalPercent(result, markers) {
+          if (!result) return 0;
+          let lines = result.split('\n').map(l => l.trim());
+          let maxSurv = 0.0;
+          outer: for (let line of lines) {
+            // Если строка содержит хотя бы один из маркеров, пропускаем её
+            for (let marker of markers) {
+              if (line.toLowerCase().includes(marker.toLowerCase())) {
+                continue outer;
+              }
+            }
             let blocks = [];
             const regex = /\[([^\]]+)\]/g;
             let match;
@@ -717,12 +723,14 @@
             }
             if (blocks.length >= 4) {
               let percentMatch = blocks[3].match(/(\d+(\.\d+)?)%/);
-              if (percentMatch) return parseFloat(percentMatch[1]);
+              if (percentMatch) {
+                maxSurv = Math.max(maxSurv, parseFloat(percentMatch[1]));
+              }
             }
           }
+          return maxSurv;
         }
-        return 0;
-      }
+
 
       function updateFilteredOutput() {
         document.querySelectorAll('.battle-result').forEach(resultDiv => {
@@ -991,7 +999,7 @@
 
           levelKeys.forEach(levelKey => {
             let battlesAtLevel = levelGroups[levelKey];
-            let bestSurvival = Math.max(...battlesAtLevel.map(battle => extractSurvivalPercent(battle.result)));
+            let bestSurvival = Math.max(...battlesAtLevel.map(battle => extractSurvivalPercent(battle.result, markers)));
             let levelDiv = document.createElement('div');
             let levelHeader = document.createElement('div');
             levelHeader.className = 'collapsible-group';
@@ -1015,18 +1023,18 @@
             });
             let factionKeys = Object.keys(factionGroups);
             factionKeys.sort((a, b) => {
-              let bestA = Math.max(...factionGroups[a].map(battle => extractSurvivalPercent(battle.result)));
-              let bestB = Math.max(...factionGroups[b].map(battle => extractSurvivalPercent(battle.result)));
+              let bestA = Math.max(...factionGroups[a].map(battle => extractSurvivalPercent(battle.result, markers)));
+              let bestB = Math.max(...factionGroups[b].map(battle => extractSurvivalPercent(battle.result, markers)));
               return bestB - bestA;
             });
             factionKeys.forEach(factionKey => {
-              let best = Math.max(...factionGroups[factionKey].map(battle => extractSurvivalPercent(battle.result)));
+              let best = Math.max(...factionGroups[factionKey].map(battle => extractSurvivalPercent(battle.result, markers)));
               let factionHeader = document.createElement('div');
               factionHeader.className = 'group-title';
               factionHeader.textContent = factionKey + " [выжило " + best.toFixed(2) + "% у лучшего игрока]";
               levelContent.appendChild(factionHeader);
               factionGroups[factionKey].sort((a, b) => {
-                return extractSurvivalPercent(b.result) - extractSurvivalPercent(a.result);
+                return extractSurvivalPercent(b.result, markers) - extractSurvivalPercent(a.result, markers);
               });
               factionGroups[factionKey].forEach(battle => {
                 let battleDiv = document.createElement('div');
