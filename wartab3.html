@@ -273,7 +273,10 @@
     <!-- Блок отправки боёв -->
     <button type="button" class="collapsible">Отправка боёв</button>
     <div class="content">
-      <textarea id="battleInput" placeholder="Вставьте сюда текст с боями..."></textarea>
+      <textarea id="battleInput" placeholder="Вставьте сюда любой текст, содержащий бои ивента...
+Например, вы можете вставить рассылку по ивенту с примерами боёв, или вставить HTML код страницы протокола боёв. Можно вставить сразу несколько HTML страниц. 
+Проще всего: откройте протокол боёв на нужной странице, нажмите CTRL+U, затем CTRL+A, CTRL+C и вставьте сюда (CTRL+V).
+Бои ивента будут выбраны автоматически, а остальные - отфильтрованы. Боями ивента будут считаться те бои, которые содержат следующие маркеры (перечисленные через запятую):"></textarea>
       <input type="text" id="markersInput" placeholder="Маркеры ивента (через запятую)">
       <div>
         <button class="send" id="sendButton">Отправить</button>
@@ -611,29 +614,29 @@
       }
       
       const defaultFilterOptions = {
-      shortenMarkers: true,
-      showWinningSideName: true,
-      showLosingSideName: true,
-      showWinningHP: true,
-      showLosingHP: true,
-      showWinningPercent: true,
-      showLosingPercent: true,
-      showWinningFaction: true,
-      showLosingFaction: true,
-      showWinningHeroInfo: true,
-      showLosingHeroInfo: true,
-      showWinningHeroNickname: true,
-      showLosingHeroNickname: true,
-      showWinningHeroLevel: true,
-      showLosingHeroLevel: true,
-      showWinningHeroParams: true,
-      showLosingHeroParams: true,
-      shortenWinningHeroParams: true,
-      shortenLosingHeroParams: true,
-      showWinningArmy: true,
-      showLosingArmy: true,
-      showWinningBonuses: true,
-      showLosingBonuses: true
+          shortenMarkers: true,
+          showWinningSideName: true,
+          showLosingSideName: true,
+          showWinningHP: false,
+          showLosingHP: true,
+          showWinningPercent: true,
+          showLosingPercent: false,
+          showWinningFaction: true,
+          showLosingFaction: true,
+          showWinningHeroInfo: false,
+          showLosingHeroInfo: true,
+          showWinningHeroNickname: false,
+          showLosingHeroNickname: true,
+          showWinningHeroLevel: false,
+          showLosingHeroLevel: true,
+          showWinningHeroParams: false,
+          showLosingHeroParams: true,
+          shortenWinningHeroParams: false,
+          shortenLosingHeroParams: true,
+          showWinningArmy: false,
+          showLosingArmy: true,
+          showWinningBonuses: true,
+          showLosingBonuses: false
     };
     function loadFilterOptions() {
       let stored = localStorage.getItem("battleFilterOptions");
@@ -866,7 +869,66 @@
         return transformed.join("\n");
       }
 
-      /* Функции для группировки и отображения боёв */
+      /* Вспомогательная функция для вычисления градиентного цвета для заголовка уровня */
+      function getLevelGradient(level) {
+        // Уровень от 5 до 25 (всего 21 уровень)
+        // При уровне 5: холодный (голубой ~hsl(240, 70%, 50%))
+        // При уровне 25: жаркий (красный ~hsl(0, 70%, 50%))
+        let clamped = Math.min(Math.max(level, 5), 25);
+        let fraction = (clamped - 5) / 20;
+        let hue = 240 - fraction * 240;  // линейно уменьшаем от 240 до 0
+        // Создадим градиент от более тёмного к более светлому оттенку этого цвета
+        return `linear-gradient(90deg, hsl(${hue}, 70%, 40%), hsl(${hue}, 70%, 60%))`;
+      }
+        
+      // Функция для извлечения основного ключа и дополнительной информации из строки заголовка
+        function parseGroupHeader(header) {
+          // Предполагаем формат: "Основной текст (дополнительная часть)" – скобки необязательны
+          // Используем регулярное выражение: основная часть – любой символ до первой открывающей скобки (если есть)
+          // Дополнительная часть – всё, что внутри скобок
+          const regex = /^(.*?)\s*(?:\((.+?)\))?$/;
+          const match = header.match(regex);
+          if (match) {
+            return {
+              main: match[1].trim(),
+              extra: (match[2] || "").trim()
+            };
+          }
+          return { main: header, extra: "" };
+        }
+
+        // Функция сравнения для заголовков групп по ключевым словам
+        function compareGroupHeaders(a, b) {
+          // a и b – строки заголовков
+          let parsedA = parseGroupHeader(a);
+          let parsedB = parseGroupHeader(b);
+
+          // Сначала сравниваем основную часть (без учёта регистра)
+          let mainCompare = parsedA.main.localeCompare(parsedB.main, undefined, { sensitivity: "base" });
+          if (mainCompare !== 0) {
+            return mainCompare;
+          }
+          // Если основные части равны, то сравниваем дополнительную
+          // Если обе дополнительные части начинаются с цифры, делаем сравнение с дополнением нулями слева
+          if (/^\d/.test(parsedA.extra) && /^\d/.test(parsedB.extra)) {
+            let maxLength = Math.max(parsedA.extra.length, parsedB.extra.length);
+            let paddedA = parsedA.extra.padStart(maxLength, '0');
+            let paddedB = parsedB.extra.padStart(maxLength, '0');
+            return paddedA.localeCompare(paddedB);
+          }
+          // Иначе сравниваем обычным лексикографическим порядком
+          return parsedA.extra.localeCompare(parsedB.extra, undefined, { sensitivity: "base" });
+        }
+
+        // Функция для извлечения числового уровня из заголовка группы уровня
+        function extractLevelNumber(levelHeader) {
+          // Ожидается, что заголовок выглядит примерно так: "[Уровень: 18]"
+          const regex = /\[Уровень:\s*(\d+)\]/i;
+          const match = levelHeader.match(regex);
+          return match ? parseInt(match[1], 10) : 0;
+        }
+        
+      /* Функция отображения и группировки боёв */
       function displayBattles(battles) {
         const markers = markersInput.value.split(',')
                             .map(m => m.trim())
@@ -878,7 +940,11 @@
           if (!overallGroups[key]) overallGroups[key] = [];
           overallGroups[key].push(battle);
         });
-        for (let overallKey in overallGroups) {
+        // При сортировке общих групп можно выполнить следующее:
+        let overallKeys = Object.keys(overallGroups);
+        overallKeys.sort(compareGroupHeaders);
+        overallKeys.forEach((overallKey) => {
+        //for (let overallKey in overallGroups) {
           let overallDiv = document.createElement('div');
           overallDiv.className = 'result-group';
           let overallHeader = document.createElement('div');
@@ -897,8 +963,8 @@
           });
           let levelKeys = Object.keys(levelGroups);
           levelKeys.sort((a, b) => {
-            let numA = parseInt(a.replace(/\D/g, ''));
-            let numB = parseInt(b.replace(/\D/g, ''));
+            let numA = extractLevelNumber(a);
+            let numB = extractLevelNumber(b);
             return numB - numA;
           });
 
@@ -909,6 +975,12 @@
             let levelHeader = document.createElement('div');
             levelHeader.className = 'collapsible-group';
             levelHeader.textContent = `${levelKey} [выжило ${bestSurvival.toFixed(2)}% у лучшего игрока]`;
+            // Извлекаем числовое значение уровня из строки "[Уровень: N]"
+            //let levelNum = parseInt(levelKey.replace(/\D/g, ''));
+            let levelNum = extractLevelNumber(levelKey);
+            // Применяем градиентный фон, вычисленный по уровню
+            levelHeader.style.background = getLevelGradient(levelNum);
+            levelHeader.style.color = '#fff';
             levelDiv.appendChild(levelHeader);
             let levelContent = document.createElement('div');
             levelContent.className = 'group-content';
@@ -986,10 +1058,10 @@
             let content = this.nextElementSibling;
             content.style.display = (content.style.display === 'block') ? 'none' : 'block';
           });
-        }
+        });
         updateFilteredOutput();
       }
-
+      
       function determineGroupKey(result, eventMarkers) {
         if (!result) return 'Без группы';
         const lines = result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
