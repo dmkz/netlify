@@ -272,6 +272,7 @@
       padding: 5px 10px;
       font-size: 14px;
       margin-right: 10px;
+      float: left;
       border-radius: 4px;
       cursor: pointer;
       transition: background-color 0.3s ease;
@@ -743,42 +744,45 @@
         }
 
     function showAnalysisErrorModal(failedBattles) {
-      let modalOverlay = document.createElement('div');
-      modalOverlay.id = 'errorModalOverlay';
+  let modalOverlay = document.createElement('div');
+  modalOverlay.id = 'errorModalOverlay';
 
-      let modal = document.createElement('div');
-      modal.id = 'errorModal';
+  let modal = document.createElement('div');
+  modal.id = 'errorModal';
 
-      modal.innerHTML = `
-        <h2>Ошибка анализа</h2>
-        <p>
-          Следующие бои не удалось проанализировать (повторных попыток более 5):<br>
-          <strong>${failedBattles.map(b => b.link).join('<br>')}</strong>
-        </p>
-        <p>Однако все остальные бои были добавлены!</p>
-        <div style="text-align: right;">
-          <button class="error-btn copy" id="copyFailedBtn">Скопировать</button>
-          <button class="error-btn close" id="closeErrorModalBtn">Закрыть</button>
-        </div>
-      `;
+  modal.innerHTML = `
+    <h2>Ошибка анализа</h2>
+    <p>
+      Следующие бои не удалось проанализировать (повторных попыток более 5):
+    </p>
+    <!-- Вместо списка используем textarea -->
+    <textarea id="failedBattlesTextarea" readonly style="width:100%; height:150px; font-family: Consolas, 'Courier New', monospace; padding:10px; border:1px solid #ccc; border-radius:4px; resize:vertical;">
+${failedBattles.map(b => b.link).join('\n')}
+    </textarea>
+    <p>Однако все остальные бои были добавлены!</p>
+    <div style="text-align: right;">
+      <button class="error-btn copy" id="copyFailedBtn">Скопировать</button>
+      <button class="error-btn close" id="closeErrorModalBtn">Закрыть</button>
+    </div>
+  `;
 
-      modalOverlay.appendChild(modal);
-      document.body.appendChild(modalOverlay);
+  modalOverlay.appendChild(modal);
+  document.body.appendChild(modalOverlay);
 
-      document.getElementById('copyFailedBtn').addEventListener('click', () => {
-        let tempTextarea = document.createElement('textarea');
-        tempTextarea.value = failedBattles.map(b => b.link).join('\n');
-        document.body.appendChild(tempTextarea);
-        tempTextarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(tempTextarea);
-        alert('Ссылки скопированы!');
-      });
+  document.getElementById('copyFailedBtn').addEventListener('click', () => {
+    let tempTextarea = document.createElement('textarea');
+    tempTextarea.value = failedBattles.map(b => b.link).join('\n');
+    document.body.appendChild(tempTextarea);
+    tempTextarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(tempTextarea);
+    alert('Ссылки скопированы!');
+  });
 
-      document.getElementById('closeErrorModalBtn').addEventListener('click', () => {
-        document.body.removeChild(modalOverlay);
-      });
-    }
+  document.getElementById('closeErrorModalBtn').addEventListener('click', () => {
+    document.body.removeChild(modalOverlay);
+  });
+}
 
 
 
