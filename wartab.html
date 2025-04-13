@@ -663,17 +663,29 @@
       });
     });
       /* Функции для дополнительной группировки и фильтрации */
-      function extractWinningLevel(result) {
-        if (!result) return "Без уровня";
-        let lines = result.split('\n').map(l => l.trim());
-        for (let line of lines) {
-          if (line.toLowerCase().startsWith('[win') || line.startsWith('[+]')) {
+      function extractWinningLevel(resultText, markers) {
+          if (!resultText) return "Без уровня";
+          let lines = resultText.split('\n').map(l => l.trim());
+          let maxLevel = 0;
+          outer: for (let line of lines) {
+            // Если строка содержит хотя бы один из маркеров, пропускаем её
+            for (let marker of markers) {
+              if (line.toLowerCase().includes(marker.toLowerCase())) {
+                continue outer;
+              }
+            }
+            // Если строка не содержит маркеров, пробуем извлечь уровень
             let match = line.match(/\[Уровень:\s*(\d+)\]/i);
-            if (match) return "[Уровень: " + match[1] + "]";
+            if (match) {
+              maxLevel = Math.max(maxLevel, parseInt(match[1], 10));
+            }
           }
+          if (maxLevel !== 0) {
+            return "[Уровень: " + maxLevel + "]";
+          }
+          return "Без уровня";
         }
-        return "Без уровня";
-      }
+
 
       function extractFaction(result) {
         if (!result) return "Без фракции";
@@ -692,11 +704,17 @@
         return "Без фракции";
       }
 
-      function extractSurvivalPercent(result) {
-        if (!result) return 0;
-        let lines = result.split('\n').map(l => l.trim());
-        for (let line of lines) {
-          if (line.toLowerCase().startsWith('[win') || line.startsWith('[+]')) {
+      function extractSurvivalPercent(result, markers) {
+          if (!result) return 0;
+          let lines = result.split('\n').map(l => l.trim());
+          let maxSurv = 0.0;
+          outer: for (let line of lines) {
+            // Если строка содержит хотя бы один из маркеров, пропускаем её
+            for (let marker of markers) {
+              if (line.toLowerCase().includes(marker.toLowerCase())) {
+                continue outer;
+              }
+            }
             let blocks = [];
             const regex = /\[([^\]]+)\]/g;
             let match;
@@ -705,12 +723,14 @@
             }
             if (blocks.length >= 4) {
               let percentMatch = blocks[3].match(/(\d+(\.\d+)?)%/);
-              if (percentMatch) return parseFloat(percentMatch[1]);
+              if (percentMatch) {
+                maxSurv = Math.max(maxSurv, parseFloat(percentMatch[1]));
+              }
             }
           }
+          return maxSurv;
         }
-        return 0;
-      }
+
 
       function updateFilteredOutput() {
         document.querySelectorAll('.battle-result').forEach(resultDiv => {
@@ -880,7 +900,62 @@
         // Создадим градиент от более тёмного к более светлому оттенку этого цвета
         return `linear-gradient(90deg, hsl(${hue}, 70%, 40%), hsl(${hue}, 70%, 60%))`;
       }
+        
+      // Функция для извлечения основного ключа и дополнительной информации из строки заголовка
+        function parseGroupHeader(header) {
+          // Предполагаем формат: "Основной текст (дополнительная часть)" – скобки необязательны
+          // Используем регулярное выражение: основная часть – любой символ до первой открывающей скобки (если есть)
+          // Дополнительная часть – всё, что внутри скобок
+          const regex = /^(.*?)\s*(?:\((.+?)\))?$/;
+          const match = header.match(regex);
+          if (match) {
+            return {
+              main: match[1].trim(),
+              extra: (match[2] || "").trim()
+            };
+          }
+          return { main: header, extra: "" };
+        }
 
+        function compareGroupHeaders(a, b) {
+          // Разбираем заголовки на основную и дополнительную части.
+          let parsedA = parseGroupHeader(a);
+          let parsedB = parseGroupHeader(b);
+
+          // Сначала сравниваем основную часть (без учёта регистра)
+          let mainCompare = parsedA.main.localeCompare(parsedB.main, undefined, { sensitivity: "base" });
+          if (mainCompare !== 0) {
+            return mainCompare;
+          }
+          
+          // Если основные части равны, то пытаемся сравнить дополнительную, если она начинается с цифры.
+          let regex = /^(\d+)/; // выдергиваем последовательность цифр в начале строки
+          let matchA = parsedA.extra.match(regex);
+          let matchB = parsedB.extra.match(regex);
+          
+          if (matchA && matchB) {
+            let numA = parseInt(matchA[1], 10);
+            let numB = parseInt(matchB[1], 10);
+            if (numA !== numB) {
+              return numA - numB; // возрастающий порядок: меньшие числа идут раньше
+            }
+            // Если числовые части равны, можно сравнить и остаток дополнительной информации
+            return parsedA.extra.localeCompare(parsedB.extra, undefined, { sensitivity: "base" });
+          }
+          
+          // Если хотя бы одна дополнительная часть не начинается с цифры, сравниваем их обычным лексикографически
+          return parsedA.extra.localeCompare(parsedB.extra, undefined, { sensitivity: "base" });
+        }
+
+
+        // Функция для извлечения числового уровня из заголовка группы уровня
+        function extractLevelNumber(levelHeader) {
+          // Ожидается, что заголовок выглядит примерно так: "[Уровень: 18]"
+          const regex = /\[Уровень:\s*(\d+)\]/i;
+          const match = levelHeader.match(regex);
+          return match ? parseInt(match[1], 10) : 0;
+        }
+        
       /* Функция отображения и группировки боёв */
       function displayBattles(battles) {
         const markers = markersInput.value.split(',')
@@ -893,7 +968,11 @@
           if (!overallGroups[key]) overallGroups[key] = [];
           overallGroups[key].push(battle);
         });
-        for (let overallKey in overallGroups) {
+        // При сортировке общих групп можно выполнить следующее:
+        let overallKeys = Object.keys(overallGroups);
+        overallKeys.sort(compareGroupHeaders);
+        overallKeys.forEach((overallKey) => {
+        //for (let overallKey in overallGroups) {
           let overallDiv = document.createElement('div');
           overallDiv.className = 'result-group';
           let overallHeader = document.createElement('div');
@@ -906,26 +985,28 @@
           // Группировка по уровню победившей стороны
           let levelGroups = {};
           overallGroups[overallKey].forEach(battle => {
-            let lvl = extractWinningLevel(battle.result);
+            // TO DO:
+            let lvl = extractWinningLevel(battle.result, markers);
             if (!levelGroups[lvl]) levelGroups[lvl] = [];
             levelGroups[lvl].push(battle);
           });
           let levelKeys = Object.keys(levelGroups);
           levelKeys.sort((a, b) => {
-            let numA = parseInt(a.replace(/\D/g, ''));
-            let numB = parseInt(b.replace(/\D/g, ''));
+            let numA = extractLevelNumber(a);
+            let numB = extractLevelNumber(b);
             return numB - numA;
           });
 
           levelKeys.forEach(levelKey => {
             let battlesAtLevel = levelGroups[levelKey];
-            let bestSurvival = Math.max(...battlesAtLevel.map(battle => extractSurvivalPercent(battle.result)));
+            let bestSurvival = Math.max(...battlesAtLevel.map(battle => extractSurvivalPercent(battle.result, markers)));
             let levelDiv = document.createElement('div');
             let levelHeader = document.createElement('div');
             levelHeader.className = 'collapsible-group';
             levelHeader.textContent = `${levelKey} [выжило ${bestSurvival.toFixed(2)}% у лучшего игрока]`;
             // Извлекаем числовое значение уровня из строки "[Уровень: N]"
-            let levelNum = parseInt(levelKey.replace(/\D/g, ''));
+            //let levelNum = parseInt(levelKey.replace(/\D/g, ''));
+            let levelNum = extractLevelNumber(levelKey);
             // Применяем градиентный фон, вычисленный по уровню
             levelHeader.style.background = getLevelGradient(levelNum);
             levelHeader.style.color = '#fff';
@@ -942,18 +1023,18 @@
             });
             let factionKeys = Object.keys(factionGroups);
             factionKeys.sort((a, b) => {
-              let bestA = Math.max(...factionGroups[a].map(battle => extractSurvivalPercent(battle.result)));
-              let bestB = Math.max(...factionGroups[b].map(battle => extractSurvivalPercent(battle.result)));
+              let bestA = Math.max(...factionGroups[a].map(battle => extractSurvivalPercent(battle.result, markers)));
+              let bestB = Math.max(...factionGroups[b].map(battle => extractSurvivalPercent(battle.result, markers)));
               return bestB - bestA;
             });
             factionKeys.forEach(factionKey => {
-              let best = Math.max(...factionGroups[factionKey].map(battle => extractSurvivalPercent(battle.result)));
+              let best = Math.max(...factionGroups[factionKey].map(battle => extractSurvivalPercent(battle.result, markers)));
               let factionHeader = document.createElement('div');
               factionHeader.className = 'group-title';
               factionHeader.textContent = factionKey + " [выжило " + best.toFixed(2) + "% у лучшего игрока]";
               levelContent.appendChild(factionHeader);
               factionGroups[factionKey].sort((a, b) => {
-                return extractSurvivalPercent(b.result) - extractSurvivalPercent(a.result);
+                return extractSurvivalPercent(b.result, markers) - extractSurvivalPercent(a.result, markers);
               });
               factionGroups[factionKey].forEach(battle => {
                 let battleDiv = document.createElement('div');
@@ -1006,7 +1087,7 @@
             let content = this.nextElementSibling;
             content.style.display = (content.style.display === 'block') ? 'none' : 'block';
           });
-        }
+        });
         updateFilteredOutput();
       }
       
