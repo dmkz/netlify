@@ -571,39 +571,101 @@
 
       /* Функция анализа боёв (оставляем существующую реализацию) */
       async function analyzeBattles(battles) {
-        let pendingBattles = battles.filter(b => !b.result);
-        let attempt = 1;
-        while (pendingBattles.length > 0) {
-          statusBar.textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
-          const startTime = performance.now();
-          try {
-            let response = await fetch('https://hwm-nightly.netlify.app/.netlify/functions/analyzeBattles', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ links: pendingBattles.map(b => b.link) })
-            });
-            let data = await response.json();
-            data.results.forEach(res => {
-              let b = battles.find(battle => battle.link === res.link);
-              if (b) {
-                b.result = (res.status === 'success' && res.result) ? res.result : null;
-              }
-            });
-          } catch (e) {
-            console.error('Ошибка при запросе анализа:', e);
+          let pendingBattles = battles.filter(b => !b.result);
+          let attempt = 1;
+          // Сохраним список неудачно проанализированных боёв
+          let failedBattles = [];
+          while (pendingBattles.length > 0) {
+            if (attempt > 5) {
+              failedBattles = pendingBattles;
+              break;
+            }
+            statusBar.textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
+            const startTime = performance.now();
+            try {
+              let response = await fetch('https://hwm-nightly.netlify.app/.netlify/functions/analyzeBattles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ links: pendingBattles.map(b => b.link) })
+              });
+              let data = await response.json();
+              data.results.forEach(res => {
+                let b = battles.find(battle => battle.link === res.link);
+                if (b) {
+                  b.result = (res.status === 'success' && res.result) ? res.result : null;
+                }
+              });
+            } catch (e) {
+              console.error('Ошибка при запросе анализа:', e);
+            }
+            const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+            let successCount = battles.filter(b => b.result).length;
+            let errorCount = battles.filter(b => !b.result).length;
+            statusBar.textContent = `Анализ: ${battles.length} боёв. Успех: ${successCount}. Ошибка: ${errorCount}. Время: ${elapsed} с. Попытка ${attempt}`;
+            pendingBattles = battles.filter(b => !b.result);
+            if (pendingBattles.length > 0) {
+              await new Promise(r => setTimeout(r, 1000));
+              attempt++;
+            }
           }
-          const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
-          let successCount = battles.filter(b => b.result).length;
-          let errorCount = battles.filter(b => !b.result).length;
-          statusBar.textContent = `Анализ: ${battles.length} боёв. Успех: ${successCount}. Ошибка: ${errorCount}. Время: ${elapsed} с. Попытка ${attempt}`;
-          pendingBattles = battles.filter(b => !b.result);
-          if (pendingBattles.length > 0) {
-            await new Promise(r => setTimeout(r, 1000));
-            attempt++;
+          if (failedBattles.length > 0) {
+            // Удаляем не проанализированные бои из общего списка
+            battles = battles.filter(b => b.result !== null);
+            showAnalysisErrorModal(failedBattles);
           }
+          return battles;
         }
-        return battles;
-      }
+
+    function showAnalysisErrorModal(failedBattles) {
+      // Создаем оверлей для модального окна
+      let modalOverlay = document.createElement('div');
+      modalOverlay.id = 'errorModalOverlay';
+      Object.assign(modalOverlay.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: '2000'
+      });
+      
+      let modal = document.createElement('div');
+      modal.id = 'errorModal';
+      Object.assign(modal.style, {
+        backgroundColor: '#fff',
+        padding: '20px',
+        borderRadius: '8px',
+        maxWidth: '600px',
+        width: '80%',
+        boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+      });
+      
+      modal.innerHTML = `<h2>Ошибка анализа</h2>
+        <p>Следующие бои не удалось проанализировать (повторных попыток более 5):</p>
+        <textarea id="failedBattlesText" style="width:100%; height:150px;">${failedBattles.map(b => b.link).join('\n')}</textarea>
+        <div style="text-align: right; margin-top: 10px;">
+          <button id="copyFailedBtn">Скопировать</button>
+          <button id="closeErrorModalBtn">Закрыть</button>
+        </div>`;
+      
+      modalOverlay.appendChild(modal);
+      document.body.appendChild(modalOverlay);
+      
+      document.getElementById('copyFailedBtn').addEventListener('click', () => {
+        let textarea = document.getElementById('failedBattlesText');
+        textarea.select();
+        document.execCommand('copy');
+        alert('Скопировано!');
+      });
+      document.getElementById('closeErrorModalBtn').addEventListener('click', () => {
+        document.body.removeChild(modalOverlay);
+      });
+    }
+
 
       function battleHasMarkers(result, markers) {
         if (!result) return false;
@@ -1167,6 +1229,82 @@
         console.error("Ошибка при запросе к базе:", error);
         statusBar.textContent = "Статус: ошибка запроса к базе";
       }
+    });
+    function showInstructionModal() {
+      let overlay = document.createElement('div');
+      overlay.id = 'instructionOverlay';
+      Object.assign(overlay.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: '2000'
+      });
+      
+      let modal = document.createElement('div');
+      modal.id = 'instructionModal';
+      Object.assign(modal.style, {
+        backgroundColor: '#fff',
+        padding: '20px',
+        borderRadius: '8px',
+        maxWidth: '600px',
+        width: '80%',
+        boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+      });
+      
+      modal.innerHTML = `<h2>Инструкция по использованию сайта</h2>
+        <p>
+          Просмотр боёв<br>
+          Когда вы заходите на сервер, он обращается к базе данных и загружает оттуда уже имеющиеся бои. У меня это занимает 3 секунды. Загруженные бои группируются по противникам в порядке возрастания номеров волн. Для каждой волны бои группируются по боевым уровням героев в порядке их убывания. Список уровней имеет разнообразные цвета: высокоуровневые герои ближе к красному, низкоуровневые – ближе к синему.<br><br>
+          Фильтр информации о боях<br>
+          Об одном конкретном бое отображается очень много информации, и вы можете выбрать, что именно отображать, отметив соответствующие фильтры.<br><br>
+          Отправка боёв<br>
+          Вы можете отправлять текст, содержащий ссылки на бои или HTML-код страницы. Ссылки, содержащие «war.php» или «warlog.php», будут извлечены автоматически.<br><br>
+          Дубликаты боёв будут удалены, а анализ боёв происходит на русском языке.<br><br>
+          Отправка боёв занимает несколько секунд – дождитесь сообщения, что всё готово.
+        </p>
+        <div style="text-align: center; margin-top: 20px;">
+          <button id="instructionClose">✖</button>
+          <button id="instructionOk">Понял</button>
+          <button id="instructionNoShow">Больше не показывать</button>
+        </div>`;
+      
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+      
+      document.getElementById('instructionClose').addEventListener('click', () => {
+        document.body.removeChild(overlay);
+      });
+      document.getElementById('instructionOk').addEventListener('click', () => {
+        document.body.removeChild(overlay);
+      });
+      document.getElementById('instructionNoShow').addEventListener('click', () => {
+        localStorage.setItem('dontShowInstructions', 'true');
+        document.body.removeChild(overlay);
+      });
+    }
+
+    function checkAndShowInstructions() {
+      if (!localStorage.getItem('dontShowInstructions')) {
+        showInstructionModal();
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      checkAndShowInstructions();
+
+      // Добавляем кнопку "Инструкция" в заголовок отправки боёв:
+      const instructionButton = document.createElement('button');
+      instructionButton.textContent = 'Инструкция';
+      instructionButton.style.marginRight = '10px';
+      instructionButton.addEventListener('click', showInstructionModal);
+      const header = document.querySelector('.collapsible');
+      header.parentNode.insertBefore(instructionButton, header);
     });
   </script>
 </body>
