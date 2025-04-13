@@ -897,9 +897,8 @@
           return { main: header, extra: "" };
         }
 
-        // Функция сравнения для заголовков групп по ключевым словам
         function compareGroupHeaders(a, b) {
-          // a и b – строки заголовков
+          // Разбираем заголовки на основную и дополнительную части.
           let parsedA = parseGroupHeader(a);
           let parsedB = parseGroupHeader(b);
 
@@ -908,17 +907,26 @@
           if (mainCompare !== 0) {
             return mainCompare;
           }
-          // Если основные части равны, то сравниваем дополнительную
-          // Если обе дополнительные части начинаются с цифры, делаем сравнение с дополнением нулями слева
-          if (/^\d/.test(parsedA.extra) && /^\d/.test(parsedB.extra)) {
-            let maxLength = Math.max(parsedA.extra.length, parsedB.extra.length);
-            let paddedA = parsedA.extra.padStart(maxLength, '0');
-            let paddedB = parsedB.extra.padStart(maxLength, '0');
-            return paddedA.localeCompare(paddedB);
+          
+          // Если основные части равны, то пытаемся сравнить дополнительную, если она начинается с цифры.
+          let regex = /^(\d+)/; // выдергиваем последовательность цифр в начале строки
+          let matchA = parsedA.extra.match(regex);
+          let matchB = parsedB.extra.match(regex);
+          
+          if (matchA && matchB) {
+            let numA = parseInt(matchA[1], 10);
+            let numB = parseInt(matchB[1], 10);
+            if (numA !== numB) {
+              return numA - numB; // возрастающий порядок: меньшие числа идут раньше
+            }
+            // Если числовые части равны, можно сравнить и остаток дополнительной информации
+            return parsedA.extra.localeCompare(parsedB.extra, undefined, { sensitivity: "base" });
           }
-          // Иначе сравниваем обычным лексикографическим порядком
+          
+          // Если хотя бы одна дополнительная часть не начинается с цифры, сравниваем их обычным лексикографически
           return parsedA.extra.localeCompare(parsedB.extra, undefined, { sensitivity: "base" });
         }
+
 
         // Функция для извлечения числового уровня из заголовка группы уровня
         function extractLevelNumber(levelHeader) {
