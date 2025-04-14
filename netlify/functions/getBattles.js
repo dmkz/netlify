@@ -11,7 +11,7 @@ exports.handler = async (event, context) => {
   }
   try {
     // Получаем все записи из таблицы "battles", выполняя запросы чанками по 1000 строк
-    const chunkSize = 1000;
+    const chunkSize = 5000;
     let allBattles = [];
     let chunkStart = 0;
     while (true) {
