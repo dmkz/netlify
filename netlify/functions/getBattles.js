@@ -10,12 +10,32 @@ exports.handler = async (event, context) => {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
   try {
-    // Получаем все бои из таблицы "battles"
-    const { data: battles, error: battlesError } = await supabase
-      .from('battles')
-      .select('*')
-      .range(0, 1999);
-    if (battlesError) throw battlesError;
+    // Получаем все записи из таблицы "battles", выполняя запросы чанками по 1000 строк
+    const chunkSize = 1000;
+    let allBattles = [];
+    let chunkStart = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('battles')
+        .select('*')
+        .range(chunkStart, chunkStart + chunkSize - 1);
+      if (error) {
+        throw error;
+      }
+      // Если в этом чанке нет данных, завершаем цикл
+      if (!data || data.length === 0) {
+        break;
+      }
+      allBattles.push(...data);
+      // Если получено меньше, чем запрошено, значит записи закончились
+      if (data.length < chunkSize) {
+        break;
+      }
+      chunkStart += chunkSize;
+    }
+    
+    // Выводим в консоль общее количество полученных записей
+    console.log("Количество боёв, полученных из базы:", allBattles.length);
 
     // Получаем значение маркеров из таблицы "settings"
     const { data: settings, error: settingsError } = await supabase
@@ -23,14 +43,14 @@ exports.handler = async (event, context) => {
       .select('value')
       .eq('key', 'eventMarkers')
       .single();
-    if (settingsError && settingsError.code !== 'PGRST116') { // код ошибки, если запись не найдена
+    if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116 – запись не найдена
       throw settingsError;
     }
 
     return {
       statusCode: 200,
       body: JSON.stringify({
-        battles, 
+        battles: allBattles,
         markers: settings ? settings.value : ''
       }),
     };
