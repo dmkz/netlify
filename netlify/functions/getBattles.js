@@ -13,7 +13,8 @@ exports.handler = async (event, context) => {
     // Получаем все бои из таблицы "battles"
     const { data: battles, error: battlesError } = await supabase
       .from('battles')
-      .select('*').limit(1000000);
+      .select('*')
+      ..range(0, 999999);
     if (battlesError) throw battlesError;
 
     // Получаем значение маркеров из таблицы "settings"
