@@ -14,7 +14,7 @@ exports.handler = async (event, context) => {
     const { data: battles, error: battlesError } = await supabase
       .from('battles')
       .select('*')
-      ..range(0, 1999);
+      .range(0, 1999);
     if (battlesError) throw battlesError;
 
     // Получаем значение маркеров из таблицы "settings"
