@@ -640,9 +640,15 @@
         }).filter(b => b.warid);
 
         // Получаем уже сохранённые в базе бои
-        // TO DO: ноль боёв
         let dbBattles = allExamples.slice();
         //try {
+        //    const res = await fetch('/.netlify/functions/getBattles');
+        //    if (!res.ok) throw new Error('Ошибка загрузки данных');
+        //    
+        //    const data = await res.json();
+        //    // Ожидаем { events: [...], examples: [...] }
+        //    allEvents   = data.events   || [];
+        //    allExamples = data.examples || [];
         //  const res = await fetch('/.netlify/functions/getBattles');
         //  if (res.ok) {
         //    const data = await res.json();
@@ -709,8 +715,26 @@
         }
 
         // Отображаем объединённый результат (группировка без изменений)
-        // TO DO:
-        allExamples = allBattles;
+        try {
+            const res = await fetch('/.netlify/functions/getBattles');
+            if (!res.ok) throw new Error('Ошибка загрузки данных');
+            
+            const data = await res.json();
+            // Ожидаем { events: [...], examples: [...] }
+            allEvents   = data.events   || [];
+            allExamples = data.examples || [];
+          const res = await fetch('/.netlify/functions/getBattles');
+          if (res.ok) {
+            const data = await res.json();
+            // Извлекаем массив боёв из поля battles
+            dbBattles = data.battles || [];
+          } else {
+            console.error("Ошибка получения боёв из базы");
+          }
+        } catch (error) {
+          console.error("Ошибка при запросе к базе:", error);
+        }
+        //allExamples = allBattles;
         handleEventChange();
         
         //displayBattles(allBattles);
@@ -1420,6 +1444,7 @@ ${failedBattles.map(b => b.link).join('\n')}
       const filterToggle = document.getElementById("filterToggle");
       const filterContent = document.getElementById("filterContent");
       const filterToggleIcon = document.getElementById("filterToggleIcon");
+      
       filterToggle.addEventListener("click", () => {
         if (filterContent.classList.contains("collapsed")) {
           filterContent.classList.remove("collapsed");
