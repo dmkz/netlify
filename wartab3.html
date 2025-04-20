@@ -656,10 +656,14 @@
 
         // Объединяем: если бой с таким warid уже существует – оставляем его (с результатом анализа)
         let battlesMap = {};
+        console.log(`Боев в dbBattles до: ${dbBattles.length}`);
+        console.log(`Боев в newBattles до: ${dbBattles.length}`);
         dbBattles.forEach(b => { battlesMap[b.warid] = b; });
         newBattles.forEach(b => {
           if (!battlesMap[b.warid]) battlesMap[b.warid] = b;
         });
+        console.log(`Боев в dbBattles после: ${dbBattles.length}`);
+        console.log(`Боев в newBattles после: ${dbBattles.length}`);
         let allBattles = Object.values(battlesMap);
 
         document.getElementById('statusText').textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
