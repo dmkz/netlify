@@ -1103,7 +1103,7 @@ ${failedBattles.map(b => b.link).join('\n')}
 
               /* lt параметр */
               if (needBeg) {
-                url.searchParams.set("lt", "");     // просто “&lt” — LWM / HWM понимают
+                url.searchParams.set("lt", "-1");     // просто “&lt” — LWM / HWM понимают
               } else {
                 url.searchParams.delete("lt");
               }
