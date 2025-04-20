@@ -9,51 +9,55 @@ exports.handler = async (event, context) => {
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
+
   try {
-    // Получаем все записи из таблицы "battles", выполняя запросы чанками по 1000 строк
+    // ===== 1. Считываем все примеры (examples) чанками =====
     const chunkSize = 5000;
-    let allBattles = [];
-    let chunkStart = 0;
+    let allExamples = [];
+    let offset = 0;
+
     while (true) {
-      const { data, error } = await supabase
-        .from('battles')
+      const { data: examplesChunk, error: examplesError } = await supabase
+        .from('examples')
         .select('*')
-        .range(chunkStart, chunkStart + chunkSize - 1);
-      if (error) {
-        throw error;
+        .range(offset, offset + chunkSize - 1);
+
+      if (examplesError) {
+        throw examplesError;
       }
-      // Если в этом чанке нет данных, завершаем цикл
-      if (!data || data.length === 0) {
+      if (!examplesChunk || examplesChunk.length === 0) {
         break;
       }
-      allBattles.push(...data);
-      // Если получено меньше, чем запрошено, значит записи закончились
-      if (data.length < chunkSize) {
+
+      allExamples.push(...examplesChunk);
+
+      if (examplesChunk.length < chunkSize) {
         break;
       }
-      chunkStart += chunkSize;
-    }
-    
-    // Выводим в консоль общее количество полученных записей
-    console.log("Количество боёв, полученных из базы:", allBattles.length);
-
-    // Получаем значение маркеров из таблицы "settings"
-    const { data: settings, error: settingsError } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'eventMarkers')
-      .single();
-    if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116 – запись не найдена
-      throw settingsError;
+      offset += chunkSize;
     }
 
+    console.log(`Получено примеров: ${allExamples.length}`);
+
+    // ===== 2. Считываем все события (events) одним запросом =====
+    const { data: allEvents, error: eventsError } = await supabase
+      .from('events')
+      .select('*');
+
+    if (eventsError) {
+      throw eventsError;
+    }
+    console.log(`Получено событий: ${allEvents.length}`);
+
+    // ===== 3. Отдаём оба массива в ответе =====
     return {
       statusCode: 200,
       body: JSON.stringify({
-        battles: allBattles,
-        markers: settings ? settings.value : ''
+        events: allEvents,
+        examples: allExamples
       }),
     };
+
   } catch (error) {
     console.error('Ошибка получения данных:', error);
     return {

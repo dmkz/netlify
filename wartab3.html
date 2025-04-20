@@ -34,6 +34,14 @@
       top: 0;
       z-index: 1000;
     }
+    /* Специально для контейнера выбора ивента */
+    #eventSelectorHeader {
+      background-color: #444;       /* чуть другой фон, чтобы отличался */
+    }
+    #eventSelectorContainer {
+      /* чтобы при скролле он оставался под заголовком */
+      margin-bottom: 20px;
+    }
     .collapsible::after {
       content: "\25B6"; /* стрелка вправо */
       position: absolute;
@@ -396,6 +404,30 @@
       <button class="status-instruction-btn" id="instructionToggleBtn">Инструкция</button>
       <span id="statusText">Статус: ожидаем ввода</span>
   </div>
+      <!-- Контейнер выбора ивента -->
+    <button type="button" class="collapsible" id="eventSelectorHeader">
+      Выбран ивент:
+    </button>
+    <div class="content" id="eventSelectorContainer">
+      <div style="margin:10px 0;">
+        <label for="eventSelector">Ивент:</label>
+        <select id="eventSelector"></select>
+      </div>
+      <div>
+        <strong>Анонс:</strong>
+        <a href="#" id="eventAnnouncement" target="_blank">—</a>
+      </div>
+      <div>
+        <strong>Награждение:</strong>
+        <a href="#" id="eventReward" target="_blank">—</a>
+      </div>
+      <div>
+        <strong>Маркеры:</strong>
+        <span id="eventMarkersDisplay">—</span>
+      </div>
+    </div>
+    <!-- /Контейнер выбора ивента -->
+
   <div class="container">
     <!-- Блок отправки боёв -->
     <button type="button" class="collapsible">Отправка боёв</button>
@@ -540,6 +572,12 @@
       const sendButton = document.getElementById('sendButton');
       const clearButton = document.getElementById('clearButton');
       const resultsContainer = document.getElementById('resultsContainer');
+      const eventSelectorHeader    = document.getElementById('eventSelectorHeader');
+    const eventSelectorContainer = document.getElementById('eventSelectorContainer');
+    const eventSelector          = document.getElementById('eventSelector');
+    const eventAnnouncement      = document.getElementById('eventAnnouncement');
+    const eventReward            = document.getElementById('eventReward');
+    const eventMarkersDisplay    = document.getElementById('eventMarkersDisplay');
 
       /* Функция для начала "активного" состояния статус-бара */
       function startStatusUpdate() {
@@ -563,6 +601,16 @@
           content.scrollIntoView({behavior:"smooth", block:"start"});
         }
       });
+      
+      // Сворачивание/разворачивание контейнера выбора ивента
+    eventSelectorHeader.addEventListener('click', function() {
+      this.classList.toggle("active");
+      if (eventSelectorContainer.style.display === "block") {
+        eventSelectorContainer.style.display = "none";
+      } else {
+        eventSelectorContainer.style.display = "block";
+      }
+    });
 
       clearButton.addEventListener('click', function() {
         battleInput.value = '';
@@ -1272,6 +1320,27 @@ ${failedBattles.map(b => b.link).join('\n')}
         updateFilteredOutput();
       }
       
+      function handleEventChange() {
+          currentEventId = Number(eventSelector.value);
+          const ev = allEvents.find(e => e.eventId === currentEventId);
+
+          // Обновляем весь контейнер
+          eventSelectorHeader.textContent = `Выбран ивент: ${ev.title}`;
+          eventAnnouncement.href    = ev.announcement || '#';
+          eventAnnouncement.textContent = ev.announcement ? 'Перейти' : '—';
+          eventReward.href          = ev.reward       || '#';
+          eventReward.textContent   = ev.reward ? 'Перейти' : '—';
+          eventMarkersDisplay.textContent = ev.eventMarkers;
+          markersInput.value = ev.eventMarkers;
+
+          // Фильтруем примеры
+          const examplesFor = allExamples.filter(x => x.eventId === currentEventId);
+          statusText.textContent = `Событие ${currentEventId}: ${examplesFor.length} боёв`;
+          displayBattles(examplesFor);
+          updateFilteredOutput();
+        }
+
+      
       function determineGroupKey(result, eventMarkers) {
         if (!result) return 'Без группы';
         const lines = result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -1317,37 +1386,58 @@ ${failedBattles.map(b => b.link).join('\n')}
         }
       });
 
-      /* Автоматическая загрузка боёв при загрузке страницы */
-      try {
-        let loadStartTime = performance.now();
-        document.getElementById('statusText').textContent = "Загружаем бои, подождите. Прошло 0.000 сек";
-        let loadInterval = setInterval(() => {
-          let elapsed = ((performance.now() - loadStartTime) / 1000).toFixed(3);
-          document.getElementById('statusText').textContent = `Загружаем бои, подождите. Прошло ${elapsed} сек`;
-        }, 100);
-        const res = await fetch('/.netlify/functions/getBattles');
-        clearInterval(loadInterval);
-        let loadTime = performance.now() - loadStartTime;
-        if (res.ok) {
+      /* Автоматическая загрузка ивентов и примеров при старте */
+        try {
+          statusText.textContent = 'Загружаем ивенты и примеры...';
+          const t0 = performance.now();
+
+          const res = await fetch('/.netlify/functions/getBattles');
+          if (!res.ok) throw new Error('Ошибка загрузки данных');
+
           const data = await res.json();
-          // Предполагается, что сервер вернул объект с полями: battles и markers
-          const dbBattles = data.battles;
-          const markers = data.markers || '';
-          markersInput.value = markers;
-          document.getElementById('statusText').textContent = `Бои загружены (${dbBattles.length} боёв) за ${(loadTime/1000).toFixed(3)} сек. Начинается группировка...`;
-          let groupStartTime = performance.now();
-          displayBattles(dbBattles);
-          updateFilteredOutput();
-          let groupTime = performance.now() - groupStartTime;
-          document.getElementById('statusText').textContent = `Всё готово. Сгруппировано ${dbBattles.length} боёв за ${(groupTime/1000).toFixed(3)} сек`;
-        } else {
-          console.error("Ошибка получения боёв из базы");
-          document.getElementById('statusText').textContent = "Статус: ошибка загрузки базы";
+          // Ожидаем { events: [...], examples: [...] }
+          allEvents   = data.events   || [];
+          allExamples = data.examples || [];
+
+          // Очистить селектор на всякий случай
+          eventSelector.innerHTML = '';
+
+          // Наполняем селектор
+          allEvents
+            .sort((a,b) => a.eventId - b.eventId)
+            .forEach(ev => {
+              const opt = document.createElement('option');
+              opt.value = ev.eventId;
+              opt.text  = `${ev.eventId}: ${ev.title}`;
+              eventSelector.appendChild(opt);
+            });
+
+          // Берём максимальный eventId и сразу рендерим
+          currentEventId      = Math.max(...allEvents.map(e=>e.eventId));
+          eventSelector.value = currentEventId;
+
+          // Заполняем шапку и содержимое контейнера выбора ивента
+          const chosen = allEvents.find(e => e.eventId === currentEventId);
+          eventSelectorHeader.textContent  = `Выбран ивент: ${chosen.title}`;
+          eventAnnouncement.href           = chosen.announcement || '#';
+          eventAnnouncement.textContent    = chosen.announcement ? 'Перейти' : '—';
+          eventReward.href                 = chosen.reward || '#';
+          eventReward.textContent          = chosen.reward ? 'Перейти' : '—';
+          eventMarkersDisplay.textContent  = chosen.eventMarkers;
+          markersInput.value               = chosen.eventMarkers;
+
+          // привязываем слушатель на изменение выбора в селекторе
+          eventSelector.addEventListener('change', handleEventChange);
+
+          // Первый рендер примеров
+          handleEventChange();
+
+          const t1 = ((performance.now() - t0)/1000).toFixed(2);
+          statusText.textContent = `Данные загружены за ${t1}s — ивентов: ${allEvents.length}, примеров: ${allExamples.length}`;
+        } catch (e) {
+          console.error('Ошибка начальной загрузки:', e);
+          statusText.textContent = 'Ошибка загрузки данных';
         }
-      } catch (error) {
-        console.error("Ошибка при запросе к базе:", error);
-        document.getElementById('statusText').textContent = "Статус: ошибка запроса к базе";
-      }
     });
     function showInstructionModal() {
       let overlay = document.createElement('div');
