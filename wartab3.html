@@ -640,19 +640,20 @@
         }).filter(b => b.warid);
 
         // Получаем уже сохранённые в базе бои
-        let dbBattles = [];
-        try {
-          const res = await fetch('/.netlify/functions/getBattles');
-          if (res.ok) {
-            const data = await res.json();
-            // Извлекаем массив боёв из поля battles
-            dbBattles = data.battles || [];
-          } else {
-            console.error("Ошибка получения боёв из базы");
-          }
-        } catch (error) {
-          console.error("Ошибка при запросе к базе:", error);
-        }
+        // TO DO: ноль боёв
+        let dbBattles = allExamples.slice();
+        //try {
+        //  const res = await fetch('/.netlify/functions/getBattles');
+        //  if (res.ok) {
+        //    const data = await res.json();
+        //    // Извлекаем массив боёв из поля battles
+        //    dbBattles = data.battles || [];
+        //  } else {
+        //    console.error("Ошибка получения боёв из базы");
+        //  }
+        //} catch (error) {
+        //  console.error("Ошибка при запросе к базе:", error);
+        //}
 
         // Объединяем: если бой с таким warid уже существует – оставляем его (с результатом анализа)
         let battlesMap = {};
