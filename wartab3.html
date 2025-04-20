@@ -163,24 +163,18 @@
   <!-- =============================== SCRIPT =============================== -->
   <script>
   /***************** ФУНКЦИЯ ПЕРЕСЧЁТА ВЫСОТ sticky‑блоков *****************/
-  function recalcStickyOffsets () {
-      const H_HDR = 48;               // высота шапки ≈ (курсор + паддинги)
-      const root  = document.documentElement;
+  function recalcStickyOffsets(){
+    const root = document.documentElement;
 
-      const eventBody  = document.getElementById('eventSelectorContainer');
-      const battleBody = document.getElementById('battleContent');
+    const eventBody  = document.getElementById('eventSelectorContainer');
+    const battleBody = document.getElementById('battleContent');
 
-      // Используем getComputedStyle, чтобы увидеть CSS‑display,
-      // и добавляем высоту заголовка
-      const eventOpen  = getComputedStyle(eventBody ).display !== 'none';
-      const battleOpen = getComputedStyle(battleBody).display !== 'none';
+    const eventH  = eventBody .style.display==='none'?0:eventBody .offsetHeight;
+    const battleH = battleBody.style.display==='none'?0:battleBody.offsetHeight;
 
-      const eventH  = eventOpen  ? eventBody .offsetHeight + H_HDR : 0;
-      const battleH = battleOpen ? battleBody.offsetHeight + H_HDR : 0;
-
-      root.style.setProperty('--event-h',  eventH  + 'px');
-      root.style.setProperty('--battle-h', battleH + 'px');
-    }
+    root.style.setProperty('--event-h',  eventH  +'px');
+    root.style.setProperty('--battle-h', battleH +'px');
+  }
 
   document.addEventListener('DOMContentLoaded', async ()=>{
 
@@ -1149,23 +1143,6 @@ ${failedBattles.map(b => b.link).join('\n')}
       checkAndShowInstructions();
       const instructionToggleBtn = document.getElementById('instructionToggleBtn');
       instructionToggleBtn.addEventListener('click', showInstructionModal);
-    });
-    
-    document.querySelectorAll('.collapsible, .filter-header').forEach(btn=>{
-      const body = btn.nextElementSibling;
-      btn.addEventListener('click', ()=>{
-        btn.classList.toggle('active');
-
-        // для обычных блоков – display, для фильтра – класс
-        if (btn.id === 'filterToggle') {
-          body.classList.toggle('collapsed');
-          filterToggleIcon.innerHTML = body.classList.contains('collapsed') ? '&#9654;' : '&#9660;';
-        } else {
-          body.style.display = body.style.display==='block' ? 'none' : 'block';
-        }
-
-        setTimeout(recalcStickyOffsets, 0);
-      });
     });
   </script>
 </body>
