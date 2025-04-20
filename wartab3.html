@@ -3,200 +3,615 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Анализ боёв с фильтрами и группировкой</title>
-
+  <title>Анализ боёв с фильтрами и группировкой</title>
   <style>
-    /* ------------------ базовая раскраска — без изменений ------------------ */
-    body{
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-      background:#f2f2f2;margin:0;padding:0}
-    .container{max-width:960px;margin:auto;padding:20px}
-
-    /* ------------------ sticky‑заголовки трёх секций ------------------ */
-    :root{                       /* переменные, которые будем пересчитывать */
-      --top-base:   60px;        /* отступ под статус‑бар */
-      --event-h:    0px;         /* высота раскрытого блока "ивент" */
-      --battle-h:   0px;         /* высота раскрытого блока "отправка" */
+    /* Общие стили */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f2f2f2;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 960px;
+      margin: auto;
+      padding: 20px;
+    }
+    /* Заставляем только заголовки быть sticky, а не содержимое блока */
+    .collapsible {
+      background-color: #1E4D2B;
+      color: #fff;
+      cursor: pointer;
+      padding: 18px;
+      width: 100%;
+      border: none;
+      text-align: left;
+      outline: none;
+      font-size: 20px;
+      border-radius: 4px;
+      margin-bottom: 5px;
+    }
+    .collapsible:hover {
+      background-color: #27AE60;
+    }
+    /* Специально для контейнера выбора ивента */
+    #eventSelectorHeader,
+    #battleToggle {
+      background-color: #145A32;
+    }
+    #eventSelectorContainer {
+      /* чтобы при скролле он оставался под заголовком */
+      margin-bottom: 20px;
+    }
+    .collapsible::after {
+      content: "\25B6"; /* стрелка вправо */
+      position: absolute;
+      right: 20px;
+      font-size: 20px;
+    }
+    .collapsible.active::after {
+      content: "\25BC"; /* стрелка вниз */
+    }
+    /* Контент блока отправки боёв – обычное положение, но с небольшим отступом сверху */
+    .content {
+      padding: 0 18px;
+      display: none;
+      overflow: hidden;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      margin-top: 5px;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      font-size: 16px;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    input[type="text"] {
+      width: calc(100% - 20px);
+      padding: 10px;
+      font-size: 16px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button.send {
+      background-color: #28a745;
+      color: #fff;
+    }
+    button.clear {
+      background-color: #dc3545;
+      color: #fff;
+    }
+    /* Фильтр – контейнер после блока отправки, sticky (только заголовок) */
+    .filter-container {
+      position: sticky;
+      top: 70px; /* ниже блока отправки */
+      z-index: 990;
+      background: rgba(240, 230, 210, 0.9);
+      border: 2px solid #8b4513;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+    }
+    .filter-header {
+      background: #deb887;
+      padding: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .filter-header:hover {
+      background: #d2a679;
+    }
+    .filter-content {
+      padding: 8px;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .filter-content.collapsed {
+      max-height: 0 !important;
+      padding-top: 0;
+      padding-bottom: 0;
+      border: none;
+    }
+    .filter-group {
+      margin-bottom: 8px;
+    }
+    .filter-group > .group-title {
+      font-weight: bold;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+    .filter-group .group-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .filter-group label {
+      font-size: 14px;
+    }
+    .filter-group input[type="checkbox"] {
+      margin-right: 4px;
+    }
+    .two-columns {
+      display: flex;
+      gap: 16px;
+    }
+    .two-columns .column {
+      flex: 1;
+    }
+    .option {
+      margin-bottom: 4px;
+    }
+    /* Группировка результатов */
+    .result-group {
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .collapsible-group {
+      background-color: #e0e0e0;
+      cursor: pointer;
+      padding: 10px;
+      font-size: 18px;
+      font-weight: bold;
+      border-bottom: 1px solid #ccc;
+      position: sticky;
+      top: 0;
+      z-index: 900;
+    }
+    .collapsible-group::after {
+      content: "\25B6";
+      position: absolute;
+      right: 10px;
+      font-size: 18px;
+    }
+    .collapsible-group.active::after {
+      content: "\25BC";
+    }
+    .group-content {
+      display: none;
+      padding: 10px;
+    }
+    .group-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+      padding: 5px;
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+    /* Отображение боёв */
+    .battle {
+      border-bottom: 1px dashed #ccc;
+      padding: 10px 0;
+      margin-bottom: 10px;
+    }
+    .battle:last-child {
+      border-bottom: none;
+    }
+    .battle-link a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    .battle-link a:hover {
+      text-decoration: underline;
+    }
+    /* Стили строк анализа – моноширинный шрифт и улучшенная читаемость */
+    .result-line {
+      padding: 5px;
+      border-radius: 4px;
+      margin-bottom: 3px;
+      font-family: Consolas, "Courier New", monospace;
+    }
+    .result-line.win {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .result-line.lose {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .result-line.unknown {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+    /* Стиль для статус-бара */
+    .status-bar {
+      background-color: #e9ecef;  /* светло-серый фон */
+      border: 2px solid #ced4da;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 18px;
+      margin: 20px auto;
+      max-width: 960px;
+      text-align: center;
+      color: #495057;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      opacity: 0;
+      /* Плавное появление */
+      animation: fadeIn 0.6s ease-in-out forwards;
+    }
+    /* Анимация появления */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    /* Класс для пульсирующего эффекта при обновлении статуса */
+    .status-update {
+      animation: pulse 1.5s infinite;
+    }
+    /* Анимация пульсации */
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+      }
+    }
+    /* Новый стиль для кнопки инструкции, которая будет внутри статус-бара */
+    .status-instruction-btn {
+      background-color: #007bff;
+      border: none;
+      color: #fff;
+      padding: 5px 10px;
+      font-size: 14px;
+      margin-right: 10px;
+      float: left;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
     }
 
-    .collapsible,
-    .filter-header{              /* все три «шапки» */
-      position:sticky;
-      z-index:1000;
-      width:100%;
-      padding:18px;
-      border:none;
-      text-align:left;
-      font-size:20px;
-      cursor:pointer;
-      color:#fff;
-      background:#1E4D2B;
-      border-radius:4px;
-      margin:0 0 5px 0;
-    }
-    .collapsible:hover{background:#27AE60}
-
-    /* индивидуальные отступы */
-    #eventSelectorHeader{top:var(--top-base);}
-    #battleToggle{
-      top:calc(var(--top-base) + var(--event-h));
-      background:#145A32;
-    }
-    #filterToggle{/* .filter-header имеет этот id */
-      top:calc(var(--top-base) + var(--event-h) + var(--battle-h));
+    .status-instruction-btn:hover {
+      background-color: #0056b3;
     }
 
-    .filter-header{background:#deb887;color:#000;font-weight:bold}
-    .filter-header:hover{background:#d2a679}
-
-    /* стрелочки раскрытия */
-    .collapsible::after,
-    .filter-header::after{
-      content:"\25B6";
-      position:absolute;right:20px;font-size:20px}
-    .collapsible.active::after, .filter-header.active::after{content:"\25BC"}
-
-    /* ------------------ тела секций ------------------ */
-    .content{
-      display:none;
-      background:#fff;
-      border:1px solid #ccc;
-      border-radius:4px;
-      padding:10px 18px;
-      margin:0 0 20px 0;
+    /* Стили для модального окна инструкции */
+    #instructionOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
     }
-    textarea{width:100%;height:150px;font-size:16px;padding:10px;margin:0 0 10px 0;
-             border:1px solid #ccc;border-radius:4px}
-    input[type=text]{width:calc(100% - 20px);padding:10px;font-size:16px;margin:0 0 10px 0;
-                     border:1px solid #ccc;border-radius:4px}
-    button{padding:10px 20px;font-size:16px;border:none;border-radius:4px;cursor:pointer;margin-right:10px}
-    button.send{background:#28a745;color:#fff}button.clear{background:#dc3545;color:#fff}
 
-    /* ------------------ фильтр (тело) ------------------ */
-    .filter-container{
-      background:rgba(240,230,210,.9);
-      border:2px solid #8b4513;border-radius:8px;margin-bottom:20px;overflow:hidden;
-      transition:max-height .3s ease-out,padding .3s ease-out}
-    .filter-content{padding:8px;max-height:70vh;overflow-y:auto}
-    .filter-content.collapsed{max-height:0!important;padding-top:0;padding-bottom:0;border:none}
+    #instructionModal {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80%;
+      overflow-y: auto;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
 
-    /* ---------- далее идёт стилизация результатов (без изменений) ---------- */
-    .result-group{border:1px solid #ccc;background:#fff;border-radius:4px;margin-bottom:20px;overflow:hidden}
-    .collapsible-group{background:#e0e0e0;cursor:pointer;padding:10px;font-size:18px;font-weight:bold;
-                       border-bottom:1px solid #ccc;position:sticky;top:0;z-index:900}
-    .collapsible-group::after{content:"\25B6";position:absolute;right:10px;font-size:18px}
-    .collapsible-group.active::after{content:"\25BC"}
-    .group-content{display:none;padding:10px}
-    .group-title{font-weight:bold;margin-bottom:5px;padding:5px;background:#f0f0f0;border-radius:4px}
+    /* Стили для кнопок инструкции внутри модального окна */
+    .instruction-btn {
+      padding: 8px 16px;
+      margin: 10px 5px 0 5px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
 
-    .battle{border-bottom:1px dashed #ccc;padding:10px 0;margin-bottom:10px}
-    .battle:last-child{border-bottom:none}
-    .battle-link a{color:#007bff;text-decoration:none}.battle-link a:hover{text-decoration:underline}
+    .instruction-btn.ok {
+      background-color: #28a745;
+      color: #fff;
+    }
 
-    .result-line{padding:5px;border-radius:4px;margin-bottom:3px;font-family:Consolas,"Courier New",monospace}
-    .result-line.win{background:#d4edda;color:#155724}
-    .result-line.lose{background:#f8d7da;color:#721c24}
-    .result-line.unknown{background:#fff3cd;color:#856404}
+    .instruction-btn.ok:hover {
+      background-color: #218838;
+    }
 
-    /* ------------------ статус‑бар (как было) ------------------ */
-    .status-bar{background:#e9ecef;border:2px solid #ced4da;border-radius:8px;padding:10px 20px;
-                font-size:18px;margin:20px auto;max-width:960px;text-align:center;color:#495057;
-                box-shadow:0 2px 4px rgba(0,0,0,.1);opacity:0;animation:fadeIn .6s ease-in-out forwards}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
-    .status-update{animation:pulse 1.5s infinite}@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(40,167,69,.7)}
-      70%{box-shadow:0 0 0 10px rgba(40,167,69,0)}100%{box-shadow:0 0 0 0 rgba(40,167,69,0)}}
-    .status-instruction-btn{background:#007bff;color:#fff;border:none;padding:5px 10px;font-size:14px;float:left;
-                            border-radius:4px;cursor:pointer} .status-instruction-btn:hover{background:#0056b3}
+    .instruction-btn.noShow {
+      background-color: #6c757d;
+      color: #fff;
+    }
 
-    /* ------------- прочие стили (модалки, ошибки) оставлены без изменений ------------- */
-    /* … */
+    .instruction-btn.noShow:hover {
+      background-color: #5a6268;
+    }
+    /* Стили для окна ошибки анализа */
+    #errorModalOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2100;
+    }
+
+    #errorModal {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80%;
+      overflow-y: auto;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Стили для кнопок в окне ошибки */
+    .error-btn {
+      padding: 8px 16px;
+      margin: 10px 5px 0 5px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .error-btn.copy {
+      background-color: #17a2b8;
+      color: #fff;
+    }
+
+    .error-btn.copy:hover {
+      background-color: #117a8b;
+    }
+
+    .error-btn.close {
+      background-color: #dc3545;
+      color: #fff;
+    }
+
+    .error-btn.close:hover {
+      background-color: #c82333;
+    }
+    /* убираем у заголовков позиционирование */
+    .collapsible {
+      position: static;
+      margin-bottom: 0;    /* чтобы не было двойных отступов */
+    }
+
+    /* единый «липучий» контейнер */
+    .sticky-section {
+      position: sticky;
+      top: 60px;                   /* под статус‑баром */
+      background: #fff;            /* чтобы закрывать контент под ним */
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 20px;         
+      z-index: 995;                /* базовый уровень */
+    }
+
+    /* индивидуальный порядок секций: */
+    #eventSection { z-index: 997; }
+    #battleSection{ z-index: 996; }
+
+    /* прокручиваемое тело внутри, если развернуто */
+    .sticky-section .content {
+      max-height: calc(100vh - 60px);  /* умещается под статус‑бар */
+      overflow-y: auto;
+      margin-top: 0;                   /* сбрасываем автогенерацию отступов */
+      padding: 10px 18px;              /* подганяем под ваш дизайн */
+    }
   </style>
 </head>
 <body>
-
-  <!-- Статус‑бар -->
+  <!-- Статус-бар размещён вне контейнера -->
   <div class="status-bar" id="statusBar">
-    <button class="status-instruction-btn" id="instructionToggleBtn">Инструкция</button>
-    <span id="statusText">Статус: ожидаем ввода</span>
+      <button class="status-instruction-btn" id="instructionToggleBtn">Инструкция</button>
+      <span id="statusText">Статус: ожидаем ввода</span>
   </div>
 
   <div class="container">
-
-    <!-- 1. выбор ивента -->
-    <button type="button" class="collapsible" id="eventSelectorHeader">Выбран ивент:</button>
+  
+    <!-- Контейнер выбора ивента -->
+    <div class="sticky-section" id="eventSection">
+    <button type="button" class="collapsible" id="eventSelectorHeader">
+      Выбран ивент:
+    </button>
     <div class="content" id="eventSelectorContainer">
-      <!-- ваше содержимое без изменений -->
       <div style="margin:10px 0;">
         <label for="eventSelector">Ивент:</label>
         <select id="eventSelector"></select>
       </div>
-      <div><strong>Анонс:</strong> <a id="eventAnnouncement" href="#" target="_blank">—</a></div>
-      <div><strong>Награждение:</strong> <a id="eventReward" href="#" target="_blank">—</a></div>
-      <div><strong>Маркеры:</strong> <span id="eventMarkersDisplay">—</span></div>
+      <div>
+        <strong>Анонс:</strong>
+        <a href="#" id="eventAnnouncement" target="_blank">—</a>
+      </div>
+      <div>
+        <strong>Награждение:</strong>
+        <a href="#" id="eventReward" target="_blank">—</a>
+      </div>
+      <div>
+        <strong>Маркеры:</strong>
+        <span id="eventMarkersDisplay">—</span>
+      </div>
     </div>
-
-    <!-- 2. отправка боёв -->
+    </div>
+    <!-- /Контейнер выбора ивента -->
+    <div class="sticky-section" id="battleSection">
+    <!-- Блок отправки боёв -->
     <button type="button" class="collapsible" id="battleToggle">Отправка боёв</button>
-    <div class="content" id="battleContent">
-      <!-- форма отправки без изменений -->
-      <textarea id="battleInput" placeholder="Вставьте сюда текст…"></textarea>
+    <div class="content">
+      <textarea id="battleInput" placeholder="Вставьте сюда любой текст, содержащий бои ивента...
+Например, вы можете вставить рассылку по ивенту с примерами боёв, или вставить HTML код страницы протокола боёв. Можно вставить сразу несколько HTML страниц. 
+Проще всего: откройте протокол боёв на нужной странице, нажмите CTRL+U, затем CTRL+A, CTRL+C и вставьте сюда (CTRL+V).
+Бои ивента будут выбраны автоматически, а остальные - отфильтрованы. Боями ивента будут считаться те бои, которые содержат следующие маркеры (перечисленные через запятую):"></textarea>
       <input type="text" id="markersInput" placeholder="Маркеры ивента (через запятую)">
       <div>
-        <button class="send"  id="sendButton">Отправить</button>
+        <button class="send" id="sendButton">Отправить</button>
         <button class="clear" id="clearButton">Очистить</button>
       </div>
     </div>
-
-    <!-- 3. фильтр -->
+    </div>
+    <!-- Блок фильтров -->
     <div class="filter-container" id="filterContainer">
-      <div class="filter-header" id="filterToggle">Фильтры <span id="filterToggleIcon">&#9654;</span></div>
+      <div class="filter-header" id="filterToggle">
+        Фильтры <span id="filterToggleIcon">&#9654;</span>
+      </div>
       <div class="filter-content collapsed" id="filterContent">
-        <!-- содержимое фильтра без изменений -->
+        <div class="filter-group common-options">
+          <div class="group-title">Общие опции</div>
+          <div class="group-content">
+            <div>
+              <input type="checkbox" id="shortenMarkers" data-option="shortenMarkers">
+              <label for="shortenMarkers">Сокращать маркеры</label>
+            </div>
+          </div>
+        </div>
+        <div class="two-columns">
+          <div class="column">
+            <div class="group-title">Победители</div>
+            <!-- Здесь ваши опции для победителей -->
+            <div class="option">
+              <input type="checkbox" id="showWinningSideName" data-option="showWinningSideName">
+              <label for="showWinningSideName">Название стороны</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHP" data-option="showWinningHP">
+              <label for="showWinningHP">Суммарное ХП</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningPercent" data-option="showWinningPercent">
+              <label for="showWinningPercent">% выживших</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningFaction" data-option="showWinningFaction">
+              <label for="showWinningFaction">Фракция</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroInfo" data-option="showWinningHeroInfo">
+              <label for="showWinningHeroInfo">Информация о героях</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroNickname" data-option="showWinningHeroNickname">
+              <label for="showWinningHeroNickname">Никнейм героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroLevel" data-option="showWinningHeroLevel">
+              <label for="showWinningHeroLevel">Уровень героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroParams" data-option="showWinningHeroParams">
+              <label for="showWinningHeroParams">Параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="shortenWinningHeroParams" data-option="shortenWinningHeroParams">
+              <label for="shortenWinningHeroParams">Сокращать параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningArmy" data-option="showWinningArmy">
+              <label for="showWinningArmy">Армия</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningBonuses" data-option="showWinningBonuses">
+              <label for="showWinningBonuses">Бонусы</label>
+            </div>
+          </div>
+          <div class="column">
+            <div class="group-title">Проигравшие</div>
+            <!-- Здесь ваши опции для проигравших -->
+            <div class="option">
+              <input type="checkbox" id="showLosingSideName" data-option="showLosingSideName">
+              <label for="showLosingSideName">Название стороны</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHP" data-option="showLosingHP">
+              <label for="showLosingHP">Суммарное ХП</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingPercent" data-option="showLosingPercent">
+              <label for="showLosingPercent">% выживших</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingFaction" data-option="showLosingFaction">
+              <label for="showLosingFaction">Фракция</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroInfo" data-option="showLosingHeroInfo">
+              <label for="showLosingHeroInfo">Информация о героях</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroNickname" data-option="showLosingHeroNickname">
+              <label for="showLosingHeroNickname">Никнейм героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroLevel" data-option="showLosingHeroLevel">
+              <label for="showLosingHeroLevel">Уровень героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroParams" data-option="showLosingHeroParams">
+              <label for="showLosingHeroParams">Параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="shortenLosingHeroParams" data-option="shortenLosingHeroParams">
+              <label for="shortenLosingHeroParams">Сокращать параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingArmy" data-option="showLosingArmy">
+              <label for="showLosingArmy">Армия</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingBonuses" data-option="showLosingBonuses">
+              <label for="showLosingBonuses">Бонусы</label>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-
-    <!-- результаты -->
+    <!-- Контейнер для результатов -->
     <div id="resultsContainer"></div>
   </div>
 
-
-  <!-- =============================== SCRIPT =============================== -->
   <script>
-  /***************** ФУНКЦИЯ ПЕРЕСЧЁТА ВЫСОТ sticky‑блоков *****************/
-  function recalcStickyOffsets(){
-    const root = document.documentElement;
-
-    const eventBody  = document.getElementById('eventSelectorContainer');
-    const battleBody = document.getElementById('battleContent');
-
-    const eventH  = eventBody .style.display==='none'?0:eventBody .offsetHeight;
-    const battleH = battleBody.style.display==='none'?0:battleBody.offsetHeight;
-
-    root.style.setProperty('--event-h',  eventH  +'px');
-    root.style.setProperty('--battle-h', battleH +'px');
-  }
-
-  document.addEventListener('DOMContentLoaded', ()=>{
-
-    /* ------- стандартные обработчики раскрытия/сворачивания -------- */
-    document.querySelectorAll('.collapsible, .filter-header').forEach(btn=>{
-      const body = btn.nextElementSibling;
-      btn.addEventListener('click',()=>{
-        btn.classList.toggle('active');
-        body.style.display = body.style.display==='block' ? 'none' : 'block';
-
-        /* пересчитываем высоты после изменения */
-        setTimeout(recalcStickyOffsets,0);
-      });
-    });
-
-    /* первичный пересчёт + пересчёт при ресайзе */
-    recalcStickyOffsets();
-    window.addEventListener('resize',recalcStickyOffsets);
-
+    document.addEventListener('DOMContentLoaded', async () => {
       // Общие переменные и элементы
       const statusBar = document.getElementById('statusBar');
       const battleToggle = document.getElementById('battleToggle');
+      document.querySelectorAll('.collapsible').forEach(button => {
+          // здесь button — это и «Выбран ивент», и «Отправка боёв»
+          const content = button.nextElementSibling;
+          button.addEventListener('click', () => {
+            button.classList.toggle('active');
+            if (content.style.display === 'block') {
+              content.style.display = 'none';
+            } else {
+              content.style.display = 'block';
+            }
+          });
+        });
 
       const battleInput = document.getElementById('battleInput');
       const markersInput = document.getElementById('markersInput');
@@ -234,7 +649,6 @@
         if (battleToggle.classList.contains('active')) {
           battleToggle.classList.remove('active');
           battleToggle.nextElementSibling.style.display = 'none';
-          recalcStickyOffsets();
         }
 
         // 2) Прокрутить к статус-бару (чтобы пользователь увидел ход выполнения)
@@ -1027,6 +1441,15 @@ ${failedBattles.map(b => b.link).join('\n')}
       const filterToggle = document.getElementById("filterToggle");
       const filterContent = document.getElementById("filterContent");
       const filterToggleIcon = document.getElementById("filterToggleIcon");
+      filterToggle.addEventListener("click", () => {
+        if (filterContent.classList.contains("collapsed")) {
+          filterContent.classList.remove("collapsed");
+          filterToggleIcon.innerHTML = "&#9660;";
+        } else {
+          filterContent.classList.add("collapsed");
+          filterToggleIcon.innerHTML = "&#9654;";
+        }
+      });
 
       /* Автоматическая загрузка ивентов и примеров при старте */
         try {
