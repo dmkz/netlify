@@ -20,7 +20,7 @@
     /* Заставляем только заголовки быть sticky, а не содержимое блока */
     .collapsible {
       cursor: pointer;              /* всегда pointer */
-      transition: background 0.3s;  /* плавный переход фона */
+      transition: background 0.25s ease, color 0.25s ease;
       color: #fff;
       cursor: pointer;
       padding: 10px;
@@ -56,33 +56,34 @@
     #filterContainer {
         z-index: 998;
     }
-    /* Специально для контейнера выбора ивента */
-    /* Event Selector Header – глубокий синий с лёгким градиентом */
+    /* #eventSelectorHeader: мягкий морской бирюзовый */
     #eventSelectorHeader {
-      background: linear-gradient(135deg, hsl(210, 80%, 45%), hsl(210, 60%, 55%));
-      color: #fff;
+      background: hsl(180, 30%, 70%);
+      color: hsl(180, 15%, 15%);
     }
     #eventSelectorHeader:hover {
-      background: linear-gradient(135deg, hsl(210, 85%, 50%), hsl(210, 65%, 60%));
+      background: hsl(180, 35%, 75%);
+      color: hsl(180, 15%, 10%);
     }
 
-    /* Battle Toggle – «ягодный» коралл */
+    /* #battleToggle: тёплый пастельно-лиловый */
     #battleToggle {
-      background: linear-gradient(135deg, hsl(340, 82%, 52%), hsl(340, 72%, 62%));
-      color: #fff;
+      background: hsl(300, 25%, 80%);
+      color: hsl(300, 20%, 20%);
     }
     #battleToggle:hover {
-      background: linear-gradient(135deg, hsl(340, 87%, 57%), hsl(340, 77%, 67%));
+      background: hsl(300, 30%, 85%);
+      color: hsl(300, 20%, 15%);
     }
 
-    /* Стрелки (последний символ) адаптируем под общий цвет */
+    /* Стрелки стационарного цвета под заголовком */
     #eventSelectorHeader::after,
-    #eventSelectorHeader.active::after {
-      color: rgba(255,255,255,0.8);
+    #battleToggle::after {
+      color: hsla(0, 0%, 0%, 0.6);
     }
-    #battleToggle::after,
+    #eventSelectorHeader.active::after,
     #battleToggle.active::after {
-      color: rgba(255,255,255,0.8);
+      color: hsla(0, 0%, 0%, 0.8);
     }
     #eventSelectorContainer {
       /* чтобы при скролле он оставался под заголовком */
