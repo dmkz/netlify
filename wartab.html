@@ -170,10 +170,11 @@
       margin-bottom: 4px;
       text-align: center;
     }
-    .filter-group .group-content {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px;
+    .filter-group .group-content{
+      display:grid;
+      /* берём столько колонок, сколько влезет, 120 px – минимальная ширина ячейки */
+      grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+      gap:8px;
     }
     .filter-group label {
       font-size: 14px;
