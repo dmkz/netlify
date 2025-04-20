@@ -164,28 +164,37 @@
   <script>
   /***************** ФУНКЦИЯ ПЕРЕСЧЁТА ВЫСОТ sticky‑блоков *****************/
   function recalcStickyOffsets () {
+      const H_HDR = 48;               // высота шапки ≈ (курсор + паддинги)
+      const root  = document.documentElement;
 
-      const hdrEvt = document.getElementById('eventSelectorHeader').offsetHeight;
-      const hdrBat = document.getElementById('battleToggle').offsetHeight;
+      const eventBody  = document.getElementById('eventSelectorContainer');
+      const battleBody = document.getElementById('battleContent');
 
-      const bodyEvt = document.getElementById('eventSelectorContainer');
-      const bodyBat = document.getElementById('battleContent');
+      // Используем getComputedStyle, чтобы увидеть CSS‑display,
+      // и добавляем высоту заголовка
+      const eventOpen  = getComputedStyle(eventBody ).display !== 'none';
+      const battleOpen = getComputedStyle(battleBody).display !== 'none';
 
-      /* открыт ли контент (проверяем реальный computed‑display) */
-      const evtOpen = getComputedStyle(bodyEvt).display !== 'none';
-      const batOpen = getComputedStyle(bodyBat).display !== 'none';
+      const eventH  = eventOpen  ? eventBody .offsetHeight + H_HDR : 0;
+      const battleH = battleOpen ? battleBody.offsetHeight + H_HDR : 0;
 
-      /* суммируем: к высоте заголовка всегда добавляем,
-         а тело – только если открыто */
-      const eventBlockH  = hdrEvt + (evtOpen ? bodyEvt.offsetHeight  : 0);
-      const battleBlockH = hdrBat + (batOpen ? bodyBat.offsetHeight : 0);
-
-      const root = document.documentElement;
-      root.style.setProperty('--event-h',  eventBlockH  + 'px');
-      root.style.setProperty('--battle-h', battleBlockH + 'px');
+      root.style.setProperty('--event-h',  eventH  + 'px');
+      root.style.setProperty('--battle-h', battleH + 'px');
     }
 
   document.addEventListener('DOMContentLoaded', async ()=>{
+
+    /* ------- стандартные обработчики раскрытия/сворачивания -------- */
+    document.querySelectorAll('.collapsible, .filter-header').forEach(btn=>{
+      const body = btn.nextElementSibling;
+      btn.addEventListener('click',()=>{
+        btn.classList.toggle('active');
+        body.style.display = body.style.display==='block' ? 'none' : 'block';
+
+        /* пересчитываем высоты после изменения */
+        setTimeout(recalcStickyOffsets,0);
+      });
+    });
 
     /* первичный пересчёт + пересчёт при ресайзе */
     recalcStickyOffsets();
