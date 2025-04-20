@@ -396,6 +396,20 @@
     .error-btn.close:hover {
       background-color: #c82333;
     }
+    /* === Sticky body для "Выбора ивента" и "Отправки боёв" === */
+    #eventSelectorContainer,
+    #battleToggle + .content {
+      position: sticky;
+      /* Сколько пикселей вниз «отсалютироваться» от самого верха окна.
+         Подберите так, чтобы блок появлялся сразу под статус‐баром и шапкой .collapsible */
+      top: 60px; 
+      z-index: 995;          /* чуть выше фона страниц, но ниже самого фильтра */
+      max-height: calc(100vh - 60px);
+      overflow-y: auto;      /* если тело развёрнуто и большое — внутри скролл */
+      background: #fff;      /* перекрывает контент под ним */
+      border: 1px solid #ccc;/* чтобы визуально отделялось */
+      border-radius: 4px;    
+    }
   </style>
 </head>
 <body>
