@@ -425,6 +425,9 @@
     .error-btn.close:hover {
       background-color: #c82333;
     }
+    
+    .common-row { display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+    .inline-opt { display:flex; align-items:center; gap:4px; font-size:14px; }
   </style>
 </head>
 <body>
@@ -479,12 +482,30 @@
       <div class="filter-content collapsed" id="filterContent">
         <div class="filter-group common-options">
           <div class="group-title">Общие опции</div>
-          <div class="group-content">
-            <div>
-              <input type="checkbox" id="shortenMarkers" data-option="shortenMarkers">
-              <label for="shortenMarkers">Сокращать маркеры</label>
+          <div class="group-content common-row">
+              <!-- 1) Сокращать маркеры -->
+              <label class="inline-opt">
+                <input type="checkbox" id="shortenMarkers" data-option="shortenMarkers">
+                Сокращать маркеры
+              </label>
+
+              <!-- 2) Начало боя -->
+              <label class="inline-opt">
+                <input type="checkbox" id="startFromBeg" data-option="startFromBeg">
+                Начало боя
+              </label>
+
+              <!-- 3) Домен -->
+              <label class="inline-opt">
+                Домен&nbsp;
+                <select id="domainSelect" data-option="domain">
+                  <option>www.heroeswm.ru</option>
+                  <option>mirror.heroeswm.ru</option>
+                  <option>my.lordswm.com</option>
+                  <option>www.lordswm.com</option>
+                </select>
+              </label>
             </div>
-          </div>
         </div>
         <div class="two-columns">
           <div class="column">
@@ -933,6 +954,8 @@ ${failedBattles.map(b => b.link).join('\n')}
       
       const defaultFilterOptions = {
           shortenMarkers: true,
+          startFromBeg: false,
+          domain: "www.heroeswm.ru",
           showWinningSideName: true,
           showLosingSideName: true,
           showWinningHP: false,
@@ -979,6 +1002,23 @@ ${failedBattles.map(b => b.link).join('\n')}
         saveFilterOptions(filterOptions);
         updateFilteredOutput();
       });
+    });
+    // селект домена
+    const domainSel = document.getElementById("domainSelect");
+    domainSel.value = filterOptions.domain;
+    domainSel.addEventListener("change", () => {
+      filterOptions.domain = domainSel.value;
+      saveFilterOptions(filterOptions);
+      updateFilteredOutput();
+    });
+
+    // чекбокс «Начало боя»
+    const begChk = document.getElementById("startFromBeg");
+    begChk.checked = !!filterOptions.startFromBeg;
+    begChk.addEventListener("change", () => {
+      filterOptions.startFromBeg = begChk.checked;
+      saveFilterOptions(filterOptions);
+      updateFilteredOutput();
     });
       /* Функции для дополнительной группировки и фильтрации */
       function extractWinningLevel(resultText, markers) {
@@ -1051,7 +1091,28 @@ ${failedBattles.map(b => b.link).join('\n')}
 
 
       function updateFilteredOutput() {
-        // TO DO: filter link to begging of the battle
+          /* --- правка ссылок -------------------------------------------------- */
+          const needBeg   = !!filterOptions.startFromBeg;
+          const newDomain = filterOptions.domain;
+
+          document.querySelectorAll(".battle-link a").forEach(a => {
+            try {
+              const url = new URL(a.href);
+
+              /* домен */
+              url.hostname = newDomain;
+
+              /* lt параметр */
+              if (needBeg) {
+                url.searchParams.set("lt", "");     // просто “&lt” — LWM / HWM понимают
+              } else {
+                url.searchParams.delete("lt");
+              }
+
+              a.href = url.toString();
+              a.textContent = a.href;
+            } catch (_) {}
+          });
         document.querySelectorAll('.battle-result').forEach(resultDiv => {
           let original = resultDiv.parentNode.dataset.originalResult;
           if (!original) return;
