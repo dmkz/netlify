@@ -1051,6 +1051,7 @@ ${failedBattles.map(b => b.link).join('\n')}
 
 
       function updateFilteredOutput() {
+        // TO DO: filter link to begging of the battle
         document.querySelectorAll('.battle-result').forEach(resultDiv => {
           let original = resultDiv.parentNode.dataset.originalResult;
           if (!original) return;
@@ -1361,11 +1362,17 @@ ${failedBattles.map(b => b.link).join('\n')}
                 let linkDiv = document.createElement('div');
                 linkDiv.className = 'battle-link';
                 let linkA = document.createElement('a');
-                console.log("battle.link:" + battle.link);
-                console.log("battle.warid:" + battle.warid);
-                console.log("battle.show:" + battle.show);
-                console.log("battle.enemy:" + battle.enemy);
-                linkA.href = battle.link;
+                let battleLink = `https://www.heroeswm.ru/war.php?warid=${battle.warid}`;
+
+                if (battle.enemy) {
+                  // оба параметра — showt и show_enemy
+                  battleLink += `&showt=${battle.show}&show_enemy=${battle.enemy}`;
+                } else if (battle.show) {
+                  battleLink += `&show=${battle.show}`;
+                }
+
+                console.log("battleLink:", battleLink);
+                linkA.href = battleLink;
                 linkA.target = '_blank';
                 linkA.textContent = battle.link;
                 linkDiv.appendChild(linkA);
