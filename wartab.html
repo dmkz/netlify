@@ -1374,7 +1374,7 @@ ${failedBattles.map(b => b.link).join('\n')}
                 console.log("battleLink:", battleLink);
                 linkA.href = battleLink;
                 linkA.target = '_blank';
-                linkA.textContent = battle.link;
+                linkA.textContent = battleLink;
                 linkDiv.appendChild(linkA);
                 battleDiv.appendChild(linkDiv);
                 let resultDiv = document.createElement('div');
