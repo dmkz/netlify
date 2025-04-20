@@ -21,8 +21,7 @@
     .collapsible {
       cursor: pointer;              /* всегда pointer */
       transition: background 0.2s ease, color 0.2s ease;
-      color: #fff;
-      cursor: pointer;
+      color: black;
       padding: 10px;
       width: 100%;
       border: none;
@@ -33,6 +32,12 @@
       margin-bottom: 5px;
       position: sticky;
       top: 0px;
+      border: 2px solid #8b4513;
+      border-radius: 8px;
+      background: #deb887;
+    }
+    .collapsible:hover {
+        background: #d2a679;
     }
     #eventSelectorHeader {
         top: 0px;
@@ -56,33 +61,7 @@
     #filterContainer {
         z-index: 998;
     }
-    /* #eventSelectorHeader — глубокий «морской» синий */
-    #eventSelectorHeader {
-      background: hsl(210, 25%, 35%);    /* примерно #2C3E50 */
-      color: hsl(210, 20%, 95%);         /* почти белый */
-    }
-    #eventSelectorHeader:hover {
-      background: hsl(210, 25%, 40%);    /* слегка светлее */
-    }
-
-    /* #battleToggle — «приглушённый» персиковый */
-    #battleToggle {
-      background: hsl(20, 60%, 70%);     /* примерно #E6A77F */
-      color: hsl(20, 40%, 15%);          /* тёмно-коричневый */
-    }
-    #battleToggle:hover {
-      background: hsl(20, 60%, 75%);     /* чуть светлее */
-    }
-
-    /* Стрелки (у ::after) — нейтральный полу‑прозрачный чёрный */
-    #eventSelectorHeader::after,
-    #battleToggle::after {
-      color: hsla(0, 0%, 0%, 0.6);
-    }
-    #eventSelectorHeader.active::after,
-    #battleToggle.active::after {
-      color: hsla(0, 0%, 0%, 0.8);
-    }
+    
     #eventSelectorContainer {
       /* чтобы при скролле он оставался под заголовком */
       margin-bottom: 20px;
