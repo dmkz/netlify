@@ -20,7 +20,7 @@
     /* Заставляем только заголовки быть sticky, а не содержимое блока */
     .collapsible {
       cursor: pointer;              /* всегда pointer */
-      transition: background 0.25s ease, color 0.25s ease;
+      transition: background 0.2s ease, color 0.2s ease;
       color: #fff;
       cursor: pointer;
       padding: 10px;
@@ -56,27 +56,27 @@
     #filterContainer {
         z-index: 998;
     }
-    /* #eventSelectorHeader: мягкий морской бирюзовый */
+    /* #eventSelectorHeader: уютный морской бирюзово‑серый */
     #eventSelectorHeader {
-      background: hsl(180, 30%, 70%);
-      color: hsl(180, 15%, 15%);
+      background: hsl(174, 45%, 60%);   /* #5ABFB8 */
+      color: hsl(174, 25%, 15%);        /* #28514A */
     }
     #eventSelectorHeader:hover {
-      background: hsl(180, 35%, 75%);
-      color: hsl(180, 15%, 10%);
+      background: hsl(174, 50%, 65%);   /* чуть светлее */
+      color: hsl(174, 25%, 12%);
     }
 
-    /* #battleToggle: тёплый пастельно-лиловый */
+    /* #battleToggle: тёплый терракотово‑кирпичный */
     #battleToggle {
-      background: hsl(300, 25%, 80%);
-      color: hsl(300, 20%, 20%);
+      background: hsl(14, 65%, 60%);    /* #DD6E4A */
+      color: hsl(14, 40%, 15%);         /* #6E2F1F */
     }
     #battleToggle:hover {
-      background: hsl(300, 30%, 85%);
-      color: hsl(300, 20%, 15%);
+      background: hsl(14, 70%, 65%);
+      color: hsl(14, 40%, 12%);
     }
 
-    /* Стрелки стационарного цвета под заголовком */
+    /* Стрелки сохраняют темный нейтральный оттенок */
     #eventSelectorHeader::after,
     #battleToggle::after {
       color: hsla(0, 0%, 0%, 0.6);
