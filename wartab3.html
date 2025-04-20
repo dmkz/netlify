@@ -672,7 +672,10 @@
                               .map(m => m.trim())
                               .filter(m => m);
         if (markers.length > 0) {
-          allBattles = allBattles.filter(b => battleHasMarkers(b.result, markers));
+          console.log(`Боев до фильтрации: ${allBattles.length}`);
+          const filtered = allBattles.filter(b => battleHasMarkers(b.result, markers));
+          console.log(`Боев после фильтрации: ${filtered.length}`);
+          allBattles = filtered;
         }
 
         // Определяем, какие бои новые (т.е. отсутствовали в базе)
