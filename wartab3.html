@@ -19,7 +19,7 @@
     }
     /* Заставляем только заголовки быть sticky, а не содержимое блока */
     .collapsible {
-      background-color: #1E4D2B;
+      background-color: #333;
       color: #fff;
       cursor: pointer;
       padding: 18px;
@@ -34,13 +34,9 @@
       top: 0;
       z-index: 1000;
     }
-    .collapsible:hover {
-      background-color: #27AE60;
-    }
     /* Специально для контейнера выбора ивента */
-    #eventSelectorHeader,
-    #battleToggle {
-      background-color: #145A32;
+    #eventSelectorHeader {
+      background-color: #444;       /* чуть другой фон, чтобы отличался */
     }
     #eventSelectorContainer {
       /* чтобы при скролле он оставался под заголовком */
@@ -413,13 +409,6 @@
       background: #fff;      /* перекрывает контент под ним */
       border: 1px solid #ccc;/* чтобы визуально отделялось */
       border-radius: 4px;    
-    }
-    /* Правим порядок наложения sticky‑блоков */
-    #eventSelectorContainer {
-      z-index: 997;  /* самую большую цифру — ивент всегда поверх */
-    }
-    #battleToggle + .content {
-      z-index: 996;  /* чуть ниже — боёв не перекрывает ивент */
     }
   </style>
 </head>
