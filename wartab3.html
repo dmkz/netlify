@@ -120,8 +120,86 @@
     /*  #filterToggle теперь обычный flex‑заголовок, топ из него убираем */
     #filterToggle{ top:auto; }
 
-    /* ------------- прочие стили (модалки, ошибки) оставлены без изменений ------------- */
-    /* … */
+    /* ───── Стили модального окна ИНСТРУКЦИИ ───── */
+    #instructionOverlay{
+      position:fixed;
+      top:0;
+      left:0;
+      width:100%;
+      height:100%;
+      background-color:rgba(0,0,0,.5);
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      z-index:2000;
+    }
+
+    #instructionModal{
+      background:#fff;
+      padding:20px;
+      border-radius:8px;
+      max-width:600px;
+      width:90%;
+      max-height:80%;
+      overflow-y:auto;
+      box-shadow:0 4px 8px rgba(0,0,0,.2);
+    }
+
+    /* Кнопки внутри окна инструкции */
+    .instruction-btn{
+      padding:8px 16px;
+      margin:10px 5px 0 5px;
+      font-size:16px;
+      border:none;
+      border-radius:4px;
+      cursor:pointer;
+      transition:background-color .3s ease;
+    }
+    .instruction-btn.ok     {background:#28a745;color:#fff;}
+    .instruction-btn.ok:hover     {background:#218838;}
+    .instruction-btn.noShow {background:#6c757d;color:#fff;}
+    .instruction-btn.noShow:hover {background:#5a6268;}
+
+
+    /* ───── Стили модального окна ОШИБКИ анализа ───── */
+    #errorModalOverlay{
+      position:fixed;
+      top:0;
+      left:0;
+      width:100%;
+      height:100%;
+      background-color:rgba(0,0,0,.5);
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      z-index:2100;
+    }
+
+    #errorModal{
+      background:#fff;
+      padding:20px;
+      border-radius:8px;
+      max-width:600px;
+      width:90%;
+      max-height:80%;
+      overflow-y:auto;
+      box-shadow:0 4px 8px rgba(0,0,0,.2);
+    }
+
+    /* Кнопки внутри окна ошибки */
+    .error-btn{
+      padding:8px 16px;
+      margin:10px 5px 0 5px;
+      font-size:16px;
+      border:none;
+      border-radius:4px;
+      cursor:pointer;
+      transition:background-color .3s ease;
+    }
+    .error-btn.copy {background:#17a2b8;color:#fff;}
+    .error-btn.copy:hover {background:#117a8b;}
+    .error-btn.close{background:#dc3545;color:#fff;}
+    .error-btn.close:hover{background:#c82333;}
   </style>
 </head>
 <body>
