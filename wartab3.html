@@ -665,8 +665,9 @@
         document.getElementById('statusText').textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
 
         // Анализируем те бои, у которых ещё нет результата
+        console.log(`Боев до анализа: ${allBattles.length}`);
         allBattles = await analyzeBattles(allBattles);
-
+        console.log(`Боев после анализа: ${allBattles.length}`);
         // Если заданы маркеры ивента – фильтруем
         const markers = markersInput.value.split(',')
                               .map(m => m.trim())
