@@ -736,48 +736,78 @@
 
       /* Функция анализа боёв (оставляем существующую реализацию) */
       async function analyzeBattles(battles) {
-          let pendingBattles = battles.filter(b => !b.result);
-          let attempt = 1;
-          // Сохраним список неудачно проанализированных боёв
-          let failedBattles = [];
-          while (pendingBattles.length > 0) {
-            if (attempt > 5) {
-              failedBattles = pendingBattles;
-              break;
-            }
-            document.getElementById('statusText').textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
-            const startTime = performance.now();
-            try {
-              let response = await fetch('/.netlify/functions/analyzeBattles', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ links: pendingBattles.map(b => b.link) })
-              });
-              let data = await response.json();
-              data.results.forEach(res => {
-                let b = battles.find(battle => battle.link === res.link);
-                if (b) {
-                  b.result = (res.status === 'success' && res.result) ? res.result : null;
+          // Список тех, у кого ещё нет результата
+          const toAnalyze = battles.filter(b => !b.result);
+          const BATCH_SIZE = 200;   // размер порции
+          const MAX_ATTEMPTS = 5;  // сколько раз пытаем каждый чанк
+
+          let permanentlyFailed = [];
+
+          // Обрабатываем чанки по BATCH_SIZE
+          for (let i = 0; i < toAnalyze.length; i += BATCH_SIZE) {
+            const chunk = toAnalyze.slice(i, i + BATCH_SIZE);
+
+            let attempt = 1;
+            let success = false;
+
+            while (attempt <= MAX_ATTEMPTS && !success) {
+              try {
+                // Запрос анализатора
+                const response = await fetch(
+                  '/.netlify/functions/analyzeBattles',
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ links: chunk.map(b => b.link) })
+                  }
+                );
+
+                if (!response.ok) {
+                  console.warn(`Чанк ${i/BATCH_SIZE + 1}, попытка ${attempt} — статус ${response.status}`);
+                  attempt++;
+                  await new Promise(r => setTimeout(r, 1000)); // пауза перед retry
+                  continue;
                 }
-              });
-            } catch (e) {
-              console.error('Ошибка при запросе анализа:', e);
+
+                // Если ок, парсим JSON
+                const data = await response.json();
+                if (!Array.isArray(data.results)) {
+                  console.warn(`Чанк ${i/BATCH_SIZE + 1}, unexpected format, попытка ${attempt}`);
+                  attempt++;
+                  await new Promise(r => setTimeout(r, 1000));
+                  continue;
+                }
+
+                // Наконец, записываем результаты
+                data.results.forEach(res => {
+                  const b = battles.find(x => x.link === res.link);
+                  if (b && res.status === 'success' && res.result) {
+                    b.result = res.result;
+                  }
+                });
+
+                success = true; // чанк успешно проанализирован
+              } catch (err) {
+                console.error(`Ошибка чанка ${i/BATCH_SIZE + 1}, попытка ${attempt}:`, err);
+                attempt++;
+                await new Promise(r => setTimeout(r, 1000));
+              }
             }
-            const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
-            let successCount = battles.filter(b => b.result).length;
-            let errorCount = battles.filter(b => !b.result).length;
-            document.getElementById('statusText').textContent = `Анализ: ${battles.length} боёв. Успех: ${successCount}. Ошибка: ${errorCount}. Время: ${elapsed} с. Попытка ${attempt}`;
-            pendingBattles = battles.filter(b => !b.result);
-            if (pendingBattles.length > 0) {
-              await new Promise(r => setTimeout(r, 1000));
-              attempt++;
+
+            if (!success) {
+              // После MAX_ATTEMPTS помечаем эти бои как окончательно неудачные
+              permanentlyFailed.push(...chunk);
             }
           }
-          if (failedBattles.length > 0) {
+
+          // Если есть окончательно не проанализированные — показываем их
+          if (permanentlyFailed.length) {
+            showAnalysisErrorModal(permanentlyFailed);
             // Удаляем не проанализированные бои из общего списка
             battles = battles.filter(b => b.result !== null);
-            showAnalysisErrorModal(failedBattles);
           }
+
+          // Возвращаем все бои (у некоторых результат может остаться null)
           return battles;
         }
 
