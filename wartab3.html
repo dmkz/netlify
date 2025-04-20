@@ -108,6 +108,18 @@
     .status-instruction-btn{background:#007bff;color:#fff;border:none;padding:5px 10px;font-size:14px;float:left;
                             border-radius:4px;cursor:pointer} .status-instruction-btn:hover{background:#0056b3}
 
+    .filter-container{
+      position:sticky;                               /* ← было забыто  */
+      top:calc(var(--top-base) + var(--event-h) + var(--battle-h));
+      background:rgba(240,230,210,.9);
+      border:2px solid #8b4513;border-radius:8px;
+      margin-bottom:20px;overflow:hidden;
+      transition:max-height .3s ease-out,padding .3s ease-out;
+    }
+
+    /*  #filterToggle теперь обычный flex‑заголовок, топ из него убираем */
+    #filterToggle{ top:auto; }
+
     /* ------------- прочие стили (модалки, ошибки) оставлены без изменений ------------- */
     /* … */
   </style>
@@ -149,9 +161,117 @@
 
     <!-- 3. фильтр -->
     <div class="filter-container" id="filterContainer">
-      <div class="filter-header" id="filterToggle">Фильтры <span id="filterToggleIcon">&#9654;</span></div>
+      <div class="filter-header" id="filterToggle">
+        Фильтры <span id="filterToggleIcon">&#9654;</span>
+      </div>
       <div class="filter-content collapsed" id="filterContent">
-        <!-- содержимое фильтра без изменений -->
+        <div class="filter-group common-options">
+          <div class="group-title">Общие опции</div>
+          <div class="group-content">
+            <div>
+              <input type="checkbox" id="shortenMarkers" data-option="shortenMarkers">
+              <label for="shortenMarkers">Сокращать маркеры</label>
+            </div>
+          </div>
+        </div>
+        <div class="two-columns">
+          <div class="column">
+            <div class="group-title">Победители</div>
+            <!-- Здесь ваши опции для победителей -->
+            <div class="option">
+              <input type="checkbox" id="showWinningSideName" data-option="showWinningSideName">
+              <label for="showWinningSideName">Название стороны</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHP" data-option="showWinningHP">
+              <label for="showWinningHP">Суммарное ХП</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningPercent" data-option="showWinningPercent">
+              <label for="showWinningPercent">% выживших</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningFaction" data-option="showWinningFaction">
+              <label for="showWinningFaction">Фракция</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroInfo" data-option="showWinningHeroInfo">
+              <label for="showWinningHeroInfo">Информация о героях</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroNickname" data-option="showWinningHeroNickname">
+              <label for="showWinningHeroNickname">Никнейм героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroLevel" data-option="showWinningHeroLevel">
+              <label for="showWinningHeroLevel">Уровень героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroParams" data-option="showWinningHeroParams">
+              <label for="showWinningHeroParams">Параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="shortenWinningHeroParams" data-option="shortenWinningHeroParams">
+              <label for="shortenWinningHeroParams">Сокращать параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningArmy" data-option="showWinningArmy">
+              <label for="showWinningArmy">Армия</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningBonuses" data-option="showWinningBonuses">
+              <label for="showWinningBonuses">Бонусы</label>
+            </div>
+          </div>
+          <div class="column">
+            <div class="group-title">Проигравшие</div>
+            <!-- Здесь ваши опции для проигравших -->
+            <div class="option">
+              <input type="checkbox" id="showLosingSideName" data-option="showLosingSideName">
+              <label for="showLosingSideName">Название стороны</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHP" data-option="showLosingHP">
+              <label for="showLosingHP">Суммарное ХП</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingPercent" data-option="showLosingPercent">
+              <label for="showLosingPercent">% выживших</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingFaction" data-option="showLosingFaction">
+              <label for="showLosingFaction">Фракция</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroInfo" data-option="showLosingHeroInfo">
+              <label for="showLosingHeroInfo">Информация о героях</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroNickname" data-option="showLosingHeroNickname">
+              <label for="showLosingHeroNickname">Никнейм героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroLevel" data-option="showLosingHeroLevel">
+              <label for="showLosingHeroLevel">Уровень героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroParams" data-option="showLosingHeroParams">
+              <label for="showLosingHeroParams">Параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="shortenLosingHeroParams" data-option="shortenLosingHeroParams">
+              <label for="shortenLosingHeroParams">Сокращать параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingArmy" data-option="showLosingArmy">
+              <label for="showLosingArmy">Армия</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingBonuses" data-option="showLosingBonuses">
+              <label for="showLosingBonuses">Бонусы</label>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -164,25 +284,21 @@
   <script>
   /***************** ФУНКЦИЯ ПЕРЕСЧЁТА ВЫСОТ sticky‑блоков *****************/
   function recalcStickyOffsets () {
-
-      const hdrEvt = document.getElementById('eventSelectorHeader').offsetHeight;
-      const hdrBat = document.getElementById('battleToggle').offsetHeight;
+      /* реальные высоты заголовков */
+      const hEvtHdr = document.getElementById('eventSelectorHeader').offsetHeight;
+      const hBatHdr = document.getElementById('battleToggle').offsetHeight;
 
       const bodyEvt = document.getElementById('eventSelectorContainer');
       const bodyBat = document.getElementById('battleContent');
 
-      /* открыт ли контент (проверяем реальный computed‑display) */
       const evtOpen = getComputedStyle(bodyEvt).display !== 'none';
       const batOpen = getComputedStyle(bodyBat).display !== 'none';
 
-      /* суммируем: к высоте заголовка всегда добавляем,
-         а тело – только если открыто */
-      const eventBlockH  = hdrEvt + (evtOpen ? bodyEvt.offsetHeight  : 0);
-      const battleBlockH = hdrBat + (batOpen ? bodyBat.offsetHeight : 0);
+      const eventBlockH  = hEvtHdr + (evtOpen ? bodyEvt.offsetHeight  : 0);
+      const battleBlockH = hBatHdr + (batOpen ? bodyBat.offsetHeight : 0);
 
-      const root = document.documentElement;
-      root.style.setProperty('--event-h',  eventBlockH  + 'px');
-      root.style.setProperty('--battle-h', battleBlockH + 'px');
+      document.documentElement.style.setProperty('--event-h',  eventBlockH  + 'px');
+      document.documentElement.style.setProperty('--battle-h', battleBlockH + 'px');
     }
 
   document.addEventListener('DOMContentLoaded', async ()=>{
@@ -1157,6 +1273,22 @@ ${failedBattles.map(b => b.link).join('\n')}
 
         setTimeout(recalcStickyOffsets, 0);
       });
+    });
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+
+      if (btn.id === 'filterToggle') {
+        body.classList.toggle('collapsed');
+        filterToggleIcon.innerHTML = body.classList.contains('collapsed') ? '►' : '▼';
+      } else {
+        const opened = body.style.display !== 'block';
+        body.style.display = opened ? 'block' : 'none';
+
+        /* если мы ТОЛЬКО‑ЧТО раскрыли — прокручиваем к началу тела */
+        if (opened) body.scrollIntoView({ behavior:'smooth', block:'start' });
+      }
+
+      setTimeout(recalcStickyOffsets, 0);
     });
   </script>
 </body>
