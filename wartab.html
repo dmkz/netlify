@@ -53,6 +53,8 @@
     }
     /* Контент блока отправки боёв – обычное положение, но с небольшим отступом сверху */
     .content {
+      position: sticky;
+      top: 30px; /* ниже заголовка */
       padding: 0 18px;
       display: none;
       overflow: hidden;
@@ -95,7 +97,6 @@
       background-color: #dc3545;
       color: #fff;
     }
-    /* Фильтр – контейнер после блока отправки, sticky (только заголовок) */
     .filter-container {
       position: sticky;
       top: 70px; /* ниже блока отправки */
