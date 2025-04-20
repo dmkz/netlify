@@ -34,8 +34,17 @@
       top: 0;
       z-index: 1000;
     }
-    /* Специально для контейнера выбора ивента */
     #eventSelectorHeader {
+        top: 0px;
+    }
+    #eventSelectorContainer, #battleToggle {
+        top: 44px;
+    }
+    #battleToggleContainer, {
+        top: 88px;
+    }
+    /* Специально для контейнера выбора ивента */
+    #eventSelectorHeader, #filterContainer {
       background-color: #444;       /* чуть другой фон, чтобы отличался */
     }
     #eventSelectorContainer {
@@ -76,8 +85,8 @@
     }
     @media only screen and (max-width: 768px) and (orientation: portrait) {
       textarea {
-        height: 250px;
-        min-height: 250px;
+        height: 350px;
+        min-height: 350px;
       }
     }
     input[type="text"] {
@@ -106,7 +115,6 @@
     }
     .filter-container {
       position: sticky;
-      top: 44px; /* ниже блока отправки */
       z-index: 990;
       background: rgba(240, 230, 210, 0.9);
       border: 2px solid #8b4513;
@@ -439,7 +447,7 @@
     <!-- /Контейнер выбора ивента -->
     <!-- Блок отправки боёв -->
     <button type="button" class="collapsible" id="battleToggle">Отправка боёв</button>
-    <div class="content">
+    <div class="content" id="battleToggleContainer">
       <textarea id="battleInput" placeholder="Вставьте сюда любой текст, содержащий бои ивента...
 Например, вы можете вставить рассылку по ивенту с примерами боёв, или вставить HTML код страницы протокола боёв. Можно вставить сразу несколько HTML страниц. 
 Проще всего: откройте протокол боёв на нужной странице, нажмите CTRL+U, затем CTRL+A, CTRL+C и вставьте сюда (CTRL+V).
