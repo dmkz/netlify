@@ -709,8 +709,12 @@
         }
 
         // Отображаем объединённый результат (группировка без изменений)
-        displayBattles(allBattles);
-        updateFilteredOutput();
+        // TO DO:
+        allExamples = allBattles;
+        handleEventChange();
+        
+        //displayBattles(allBattles);
+        //updateFilteredOutput();
         document.getElementById('statusText').textContent = `Статус: обработка завершена. Всего боёв: ${allBattles.length}`;
       });
 
