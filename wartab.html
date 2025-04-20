@@ -34,6 +34,14 @@
       top: 0;
       z-index: 1000;
     }
+    /* Специально для контейнера выбора ивента */
+    #eventSelectorHeader {
+      background-color: #444;       /* чуть другой фон, чтобы отличался */
+    }
+    #eventSelectorContainer {
+      /* чтобы при скролле он оставался под заголовком */
+      margin-bottom: 20px;
+    }
     .collapsible::after {
       content: "\25B6"; /* стрелка вправо */
       position: absolute;
@@ -396,9 +404,33 @@
       <button class="status-instruction-btn" id="instructionToggleBtn">Инструкция</button>
       <span id="statusText">Статус: ожидаем ввода</span>
   </div>
+
   <div class="container">
+    <!-- Контейнер выбора ивента -->
+    <button type="button" class="collapsible" id="eventSelectorHeader">
+      Выбран ивент:
+    </button>
+    <div class="content" id="eventSelectorContainer">
+      <div style="margin:10px 0;">
+        <label for="eventSelector">Ивент:</label>
+        <select id="eventSelector"></select>
+      </div>
+      <div>
+        <strong>Анонс:</strong>
+        <a href="#" id="eventAnnouncement" target="_blank">—</a>
+      </div>
+      <div>
+        <strong>Награждение:</strong>
+        <a href="#" id="eventReward" target="_blank">—</a>
+      </div>
+      <div>
+        <strong>Маркеры:</strong>
+        <span id="eventMarkersDisplay">—</span>
+      </div>
+    </div>
+    <!-- /Контейнер выбора ивента -->
     <!-- Блок отправки боёв -->
-    <button type="button" class="collapsible">Отправка боёв</button>
+    <button type="button" class="collapsible" id="battleToggle">Отправка боёв</button>
     <div class="content">
       <textarea id="battleInput" placeholder="Вставьте сюда любой текст, содержащий бои ивента...
 Например, вы можете вставить рассылку по ивенту с примерами боёв, или вставить HTML код страницы протокола боёв. Можно вставить сразу несколько HTML страниц. 
@@ -533,13 +565,31 @@
     document.addEventListener('DOMContentLoaded', async () => {
       // Общие переменные и элементы
       const statusBar = document.getElementById('statusBar');
-      const collapsible = document.querySelector('.collapsible');
-      const content = document.querySelector('.content');
+      const battleToggle = document.getElementById('battleToggle');
+      document.querySelectorAll('.collapsible').forEach(button => {
+          // здесь button — это и «Выбран ивент», и «Отправка боёв»
+          const content = button.nextElementSibling;
+          button.addEventListener('click', () => {
+            button.classList.toggle('active');
+            if (content.style.display === 'block') {
+              content.style.display = 'none';
+            } else {
+              content.style.display = 'block';
+            }
+          });
+        });
+
       const battleInput = document.getElementById('battleInput');
       const markersInput = document.getElementById('markersInput');
       const sendButton = document.getElementById('sendButton');
       const clearButton = document.getElementById('clearButton');
       const resultsContainer = document.getElementById('resultsContainer');
+      const eventSelectorHeader    = document.getElementById('eventSelectorHeader');
+    const eventSelectorContainer = document.getElementById('eventSelectorContainer');
+    const eventSelector          = document.getElementById('eventSelector');
+    const eventAnnouncement      = document.getElementById('eventAnnouncement');
+    const eventReward            = document.getElementById('eventReward');
+    const eventMarkersDisplay    = document.getElementById('eventMarkersDisplay');
 
       /* Функция для начала "активного" состояния статус-бара */
       function startStatusUpdate() {
@@ -553,17 +603,6 @@
         statusBar.classList.remove('status-update');
       }
 
-      /* Сворачивание/разворачивание блока отправки боёв */
-      collapsible.addEventListener('click', function() {
-        this.classList.toggle("active");
-        if (content.style.display === "block") {
-          content.style.display = "none";
-        } else {
-          content.style.display = "block";
-          content.scrollIntoView({behavior:"smooth", block:"start"});
-        }
-      });
-
       clearButton.addEventListener('click', function() {
         battleInput.value = '';
         document.getElementById('statusText').textContent = 'Статус: очищено';
@@ -572,6 +611,14 @@
       /* Основной обработчик кнопки "Отправить" */
       sendButton.addEventListener('click', async function() {
         document.getElementById('statusText').textContent = 'Статус: обработка ввода...';
+        // 1) Свернуть блок "Отправка боёв", если он открыт
+        if (battleToggle.classList.contains('active')) {
+          battleToggle.classList.remove('active');
+          battleToggle.nextElementSibling.style.display = 'none';
+        }
+
+        // 2) Прокрутить к статус-бару (чтобы пользователь увидел ход выполнения)
+        statusBar.scrollIntoView({ behavior: 'smooth' });
         const inputText = battleInput.value;
         if (!inputText.trim()) {
           document.getElementById('statusText').textContent = 'Статус: пустой ввод';
@@ -593,39 +640,54 @@
         }).filter(b => b.warid);
 
         // Получаем уже сохранённые в базе бои
-        let dbBattles = [];
-        try {
-          const res = await fetch('/.netlify/functions/getBattles');
-          if (res.ok) {
-            const data = await res.json();
-            // Извлекаем массив боёв из поля battles
-            dbBattles = data.battles || [];
-          } else {
-            console.error("Ошибка получения боёв из базы");
-          }
-        } catch (error) {
-          console.error("Ошибка при запросе к базе:", error);
-        }
+        let dbBattles = allExamples.slice();
+        //try {
+        //    const res = await fetch('/.netlify/functions/getBattles');
+        //    if (!res.ok) throw new Error('Ошибка загрузки данных');
+        //    
+        //    const data = await res.json();
+        //    // Ожидаем { events: [...], examples: [...] }
+        //    allEvents   = data.events   || [];
+        //    allExamples = data.examples || [];
+        //  const res = await fetch('/.netlify/functions/getBattles');
+        //  if (res.ok) {
+        //    const data = await res.json();
+        //    // Извлекаем массив боёв из поля battles
+        //    dbBattles = data.battles || [];
+        //  } else {
+        //    console.error("Ошибка получения боёв из базы");
+        //  }
+        //} catch (error) {
+        //  console.error("Ошибка при запросе к базе:", error);
+        //}
 
         // Объединяем: если бой с таким warid уже существует – оставляем его (с результатом анализа)
         let battlesMap = {};
+        console.log(`Боев в dbBattles до: ${dbBattles.length}`);
+        console.log(`Боев в newBattles до: ${dbBattles.length}`);
         dbBattles.forEach(b => { battlesMap[b.warid] = b; });
         newBattles.forEach(b => {
           if (!battlesMap[b.warid]) battlesMap[b.warid] = b;
         });
+        console.log(`Боев в dbBattles после: ${dbBattles.length}`);
+        console.log(`Боев в newBattles после: ${dbBattles.length}`);
         let allBattles = Object.values(battlesMap);
 
         document.getElementById('statusText').textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
 
         // Анализируем те бои, у которых ещё нет результата
+        console.log(`Боев до анализа: ${allBattles.length}`);
         allBattles = await analyzeBattles(allBattles);
-
+        console.log(`Боев после анализа: ${allBattles.length}`);
         // Если заданы маркеры ивента – фильтруем
         const markers = markersInput.value.split(',')
                               .map(m => m.trim())
                               .filter(m => m);
         if (markers.length > 0) {
-          allBattles = allBattles.filter(b => battleHasMarkers(b.result, markers));
+          console.log(`Боев до фильтрации: ${allBattles.length}`);
+          const filtered = allBattles.filter(b => battleHasMarkers(b.result, markers));
+          console.log(`Боев после фильтрации: ${filtered.length}`);
+          allBattles = filtered;
         }
 
         // Определяем, какие бои новые (т.е. отсутствовали в базе)
@@ -653,8 +715,22 @@
         }
 
         // Отображаем объединённый результат (группировка без изменений)
-        displayBattles(allBattles);
-        updateFilteredOutput();
+        try {
+            const res = await fetch('/.netlify/functions/getBattles');
+            if (!res.ok) throw new Error('Ошибка загрузки данных');
+            
+            const data = await res.json();
+            // Ожидаем { events: [...], examples: [...] }
+            allEvents   = data.events   || [];
+            allExamples = data.examples || [];
+        } catch (error) {
+          console.error("Ошибка при запросе к базе:", error);
+        }
+        //allExamples = allBattles;
+        handleEventChange();
+        
+        //displayBattles(allBattles);
+        //updateFilteredOutput();
         document.getElementById('statusText').textContent = `Статус: обработка завершена. Всего боёв: ${allBattles.length}`;
       });
 
@@ -698,50 +774,82 @@
 
       /* Функция анализа боёв (оставляем существующую реализацию) */
       async function analyzeBattles(battles) {
-          let pendingBattles = battles.filter(b => !b.result);
-          let attempt = 1;
-          // Сохраним список неудачно проанализированных боёв
-          let failedBattles = [];
-          while (pendingBattles.length > 0) {
-            if (attempt > 5) {
-              failedBattles = pendingBattles;
-              break;
-            }
-            document.getElementById('statusText').textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
-            const startTime = performance.now();
-            try {
-              let response = await fetch('https://hwm-nightly.netlify.app/.netlify/functions/analyzeBattles', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ links: pendingBattles.map(b => b.link) })
-              });
-              let data = await response.json();
-              data.results.forEach(res => {
-                let b = battles.find(battle => battle.link === res.link);
-                if (b) {
-                  b.result = (res.status === 'success' && res.result) ? res.result : null;
+          const toAnalyze = battles.filter(b => !b.result);
+          const total     = toAnalyze.length;
+          const BATCH_SIZE   = 200;
+          const MAX_ATTEMPTS = 5;
+
+          let permanentlyFailed = [];
+          let processed = 0;
+          const t0 = performance.now();
+
+          for (let i = 0; i < total; i += BATCH_SIZE) {
+            const chunk = toAnalyze.slice(i, i + BATCH_SIZE);
+            let attempt = 1,
+                success = false;
+
+            while (attempt <= MAX_ATTEMPTS && !success) {
+              // обновляем статус перед каждой попыткой
+              const elapsed = ((performance.now() - t0) / 1000).toFixed(3);
+              statusText.textContent = 
+                `Статус: ${processed}/${total} боёв. ` +
+                `Отправлено ${chunk.length} ссылок, попытка ${attempt}/${MAX_ATTEMPTS}. ` +
+                `Время: ${elapsed} сек`;
+
+              try {
+                const res = await fetch(
+                  'https://heroeswm.netlify.app/.netlify/functions/analyzeBattles',
+                  {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ links: chunk.map(b=>b.link) })
+                  }
+                );
+                if (!res.ok) {
+                  attempt++;
+                  await new Promise(r=>setTimeout(r,1000));
+                  continue;
                 }
-              });
-            } catch (e) {
-              console.error('Ошибка при запросе анализа:', e);
+                const data = await res.json();
+                if (!Array.isArray(data.results)) {
+                  attempt++;
+                  await new Promise(r=>setTimeout(r,1000));
+                  continue;
+                }
+
+                // Пометить результаты как готовые
+                data.results.forEach(r => {
+                  const b = battles.find(x => x.link === r.link);
+                  if (b && r.status === 'success' && r.result) {
+                    b.result = r.result;
+                    processed++;
+                  }
+                });
+                success = true;
+              } catch (err) {
+                attempt++;
+                await new Promise(r=>setTimeout(r,1000));
+              }
             }
-            const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
-            let successCount = battles.filter(b => b.result).length;
-            let errorCount = battles.filter(b => !b.result).length;
-            document.getElementById('statusText').textContent = `Анализ: ${battles.length} боёв. Успех: ${successCount}. Ошибка: ${errorCount}. Время: ${elapsed} с. Попытка ${attempt}`;
-            pendingBattles = battles.filter(b => !b.result);
-            if (pendingBattles.length > 0) {
-              await new Promise(r => setTimeout(r, 1000));
-              attempt++;
+
+            if (!success) {
+              permanentlyFailed.push(...chunk);
             }
           }
-          if (failedBattles.length > 0) {
-            // Удаляем не проанализированные бои из общего списка
+
+          // Финальное обновление статуса
+          const totalElapsed = ((performance.now() - t0) / 1000).toFixed(3);
+          statusText.textContent = 
+            `Анализ завершён: ${processed}/${total} боёв за ${totalElapsed} сек`;
+
+          if (permanentlyFailed.length) {
+            showAnalysisErrorModal(permanentlyFailed);
             battles = battles.filter(b => b.result !== null);
-            showAnalysisErrorModal(failedBattles);
           }
+
           return battles;
         }
+
 
     function showAnalysisErrorModal(failedBattles) {
   let modalOverlay = document.createElement('div');
@@ -1272,6 +1380,27 @@ ${failedBattles.map(b => b.link).join('\n')}
         updateFilteredOutput();
       }
       
+      function handleEventChange() {
+          currentEventId = Number(eventSelector.value);
+          const ev = allEvents.find(e => e.eventId === currentEventId);
+
+          // Обновляем весь контейнер
+          eventSelectorHeader.textContent = `Выбран ивент: ${ev.title}`;
+          eventAnnouncement.href    = ev.announcement || '#';
+          eventAnnouncement.textContent = ev.announcement ? 'Перейти' : '—';
+          eventReward.href          = ev.reward       || '#';
+          eventReward.textContent   = ev.reward ? 'Перейти' : '—';
+          eventMarkersDisplay.textContent = ev.eventMarkers;
+          markersInput.value = ev.eventMarkers;
+
+          // Фильтруем примеры
+          const examplesFor = allExamples.filter(x => x.eventId === currentEventId);
+          statusText.textContent = `Событие ${currentEventId}: ${examplesFor.length} боёв`;
+          displayBattles(examplesFor);
+          updateFilteredOutput();
+        }
+
+      
       function determineGroupKey(result, eventMarkers) {
         if (!result) return 'Без группы';
         const lines = result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -1307,6 +1436,7 @@ ${failedBattles.map(b => b.link).join('\n')}
       const filterToggle = document.getElementById("filterToggle");
       const filterContent = document.getElementById("filterContent");
       const filterToggleIcon = document.getElementById("filterToggleIcon");
+      
       filterToggle.addEventListener("click", () => {
         if (filterContent.classList.contains("collapsed")) {
           filterContent.classList.remove("collapsed");
@@ -1317,37 +1447,58 @@ ${failedBattles.map(b => b.link).join('\n')}
         }
       });
 
-      /* Автоматическая загрузка боёв при загрузке страницы */
-      try {
-        let loadStartTime = performance.now();
-        document.getElementById('statusText').textContent = "Загружаем бои, подождите. Прошло 0.000 сек";
-        let loadInterval = setInterval(() => {
-          let elapsed = ((performance.now() - loadStartTime) / 1000).toFixed(3);
-          document.getElementById('statusText').textContent = `Загружаем бои, подождите. Прошло ${elapsed} сек`;
-        }, 100);
-        const res = await fetch('/.netlify/functions/getBattles');
-        clearInterval(loadInterval);
-        let loadTime = performance.now() - loadStartTime;
-        if (res.ok) {
+      /* Автоматическая загрузка ивентов и примеров при старте */
+        try {
+          statusText.textContent = 'Загружаем ивенты и примеры...';
+          const t0 = performance.now();
+
+          const res = await fetch('/.netlify/functions/getBattles');
+          if (!res.ok) throw new Error('Ошибка загрузки данных');
+
           const data = await res.json();
-          // Предполагается, что сервер вернул объект с полями: battles и markers
-          const dbBattles = data.battles;
-          const markers = data.markers || '';
-          markersInput.value = markers;
-          document.getElementById('statusText').textContent = `Бои загружены (${dbBattles.length} боёв) за ${(loadTime/1000).toFixed(3)} сек. Начинается группировка...`;
-          let groupStartTime = performance.now();
-          displayBattles(dbBattles);
-          updateFilteredOutput();
-          let groupTime = performance.now() - groupStartTime;
-          document.getElementById('statusText').textContent = `Всё готово. Сгруппировано ${dbBattles.length} боёв за ${(groupTime/1000).toFixed(3)} сек`;
-        } else {
-          console.error("Ошибка получения боёв из базы");
-          document.getElementById('statusText').textContent = "Статус: ошибка загрузки базы";
+          // Ожидаем { events: [...], examples: [...] }
+          allEvents   = data.events   || [];
+          allExamples = data.examples || [];
+
+          // Очистить селектор на всякий случай
+          eventSelector.innerHTML = '';
+
+          // Наполняем селектор
+          allEvents
+            .sort((a,b) => a.eventId - b.eventId)
+            .forEach(ev => {
+              const opt = document.createElement('option');
+              opt.value = ev.eventId;
+              opt.text  = `${ev.eventId}: ${ev.title}`;
+              eventSelector.appendChild(opt);
+            });
+
+          // Берём максимальный eventId и сразу рендерим
+          currentEventId      = Math.max(...allEvents.map(e=>e.eventId));
+          eventSelector.value = currentEventId;
+
+          // Заполняем шапку и содержимое контейнера выбора ивента
+          const chosen = allEvents.find(e => e.eventId === currentEventId);
+          eventSelectorHeader.textContent  = `Выбран ивент: ${chosen.title}`;
+          eventAnnouncement.href           = chosen.announcement || '#';
+          eventAnnouncement.textContent    = chosen.announcement ? 'Перейти' : '—';
+          eventReward.href                 = chosen.reward || '#';
+          eventReward.textContent          = chosen.reward ? 'Перейти' : '—';
+          eventMarkersDisplay.textContent  = chosen.eventMarkers;
+          markersInput.value               = chosen.eventMarkers;
+
+          // привязываем слушатель на изменение выбора в селекторе
+          eventSelector.addEventListener('change', handleEventChange);
+
+          // Первый рендер примеров
+          handleEventChange();
+
+          const t1 = ((performance.now() - t0)/1000).toFixed(2);
+          statusText.textContent = `Данные загружены за ${t1}s — ивентов: ${allEvents.length}, примеров: ${allExamples.length}`;
+        } catch (e) {
+          console.error('Ошибка начальной загрузки:', e);
+          statusText.textContent = 'Ошибка загрузки данных';
         }
-      } catch (error) {
-        console.error("Ошибка при запросе к базе:", error);
-        document.getElementById('statusText').textContent = "Статус: ошибка запроса к базе";
-      }
     });
     function showInstructionModal() {
       let overlay = document.createElement('div');
