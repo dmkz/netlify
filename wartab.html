@@ -19,7 +19,8 @@
     }
     /* Заставляем только заголовки быть sticky, а не содержимое блока */
     .collapsible {
-      background-color: #333;
+      cursor: pointer;              /* всегда pointer */
+      transition: background 0.3s;  /* плавный переход фона */
       color: #fff;
       cursor: pointer;
       padding: 10px;
@@ -56,8 +57,32 @@
         z-index: 998;
     }
     /* Специально для контейнера выбора ивента */
+    /* Event Selector Header – глубокий синий с лёгким градиентом */
     #eventSelectorHeader {
-      background-color: #444;       /* чуть другой фон, чтобы отличался */
+      background: linear-gradient(135deg, hsl(210, 80%, 45%), hsl(210, 60%, 55%));
+      color: #fff;
+    }
+    #eventSelectorHeader:hover {
+      background: linear-gradient(135deg, hsl(210, 85%, 50%), hsl(210, 65%, 60%));
+    }
+
+    /* Battle Toggle – «ягодный» коралл */
+    #battleToggle {
+      background: linear-gradient(135deg, hsl(340, 82%, 52%), hsl(340, 72%, 62%));
+      color: #fff;
+    }
+    #battleToggle:hover {
+      background: linear-gradient(135deg, hsl(340, 87%, 57%), hsl(340, 77%, 67%));
+    }
+
+    /* Стрелки (последний символ) адаптируем под общий цвет */
+    #eventSelectorHeader::after,
+    #eventSelectorHeader.active::after {
+      color: rgba(255,255,255,0.8);
+    }
+    #battleToggle::after,
+    #battleToggle.active::after {
+      color: rgba(255,255,255,0.8);
     }
     #eventSelectorContainer {
       /* чтобы при скролле он оставался под заголовком */
