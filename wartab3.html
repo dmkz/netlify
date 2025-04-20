@@ -404,7 +404,9 @@
       <button class="status-instruction-btn" id="instructionToggleBtn">Инструкция</button>
       <span id="statusText">Статус: ожидаем ввода</span>
   </div>
-      <!-- Контейнер выбора ивента -->
+
+  <div class="container">
+    <!-- Контейнер выбора ивента -->
     <button type="button" class="collapsible" id="eventSelectorHeader">
       Выбран ивент:
     </button>
@@ -427,8 +429,6 @@
       </div>
     </div>
     <!-- /Контейнер выбора ивента -->
-
-  <div class="container">
     <!-- Блок отправки боёв -->
     <button type="button" class="collapsible">Отправка боёв</button>
     <div class="content">
@@ -565,7 +565,19 @@
     document.addEventListener('DOMContentLoaded', async () => {
       // Общие переменные и элементы
       const statusBar = document.getElementById('statusBar');
-      const collapsible = document.querySelector('.collapsible');
+      document.querySelectorAll('.collapsible').forEach(button => {
+          // здесь button — это и «Выбран ивент», и «Отправка боёв»
+          const content = button.nextElementSibling;
+          button.addEventListener('click', () => {
+            button.classList.toggle('active');
+            if (content.style.display === 'block') {
+              content.style.display = 'none';
+            } else {
+              content.style.display = 'block';
+            }
+          });
+        });
+
       const content = document.querySelector('.content');
       const battleInput = document.getElementById('battleInput');
       const markersInput = document.getElementById('markersInput');
