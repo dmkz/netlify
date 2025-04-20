@@ -32,16 +32,28 @@
       margin-bottom: 5px;
       position: sticky;
       top: 0px;
-      z-index: 1000;
     }
     #eventSelectorHeader {
         top: 0px;
+        z-index: 1000;
+    }
+    #eventSelectorContainer {
+        z-index: 1000;
     }
     #eventSelectorContainer, #battleToggle {
         top: 44px;
     }
+    #battleToggle {
+        z-index: 999;
+    }
+    #battleToggleContainer {
+        z-index: 999;
+    }
     #battleToggleContainer, #filterContainer {
         top: 88px;
+    }
+    #filterContainer {
+        z-index: 998;
     }
     /* Специально для контейнера выбора ивента */
     #eventSelectorHeader {
@@ -71,7 +83,6 @@
       border-radius: 4px;
       margin-bottom: 20px;
       margin-top: 5px;
-      z-index: 1000;
     }
     textarea {
       width: calc(100% - 20px);
