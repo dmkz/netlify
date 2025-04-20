@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Анализ боёв с фильтрами и группировкой</title>
+  <style>
+    /* Общие стили */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f2f2f2;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 960px;
+      margin: auto;
+      padding: 20px;
+    }
+    /* Заставляем только заголовки быть sticky, а не содержимое блока */
+    .collapsible {
+      background-color: #333;
+      color: #fff;
+      cursor: pointer;
+      padding: 18px;
+      width: 100%;
+      border: none;
+      text-align: left;
+      outline: none;
+      font-size: 20px;
+      border-radius: 4px;
+      margin-bottom: 5px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .collapsible::after {
+      content: "\25B6"; /* стрелка вправо */
+      position: absolute;
+      right: 20px;
+      font-size: 20px;
+    }
+    .collapsible.active::after {
+      content: "\25BC"; /* стрелка вниз */
+    }
+    /* Контент блока отправки боёв – обычное положение, но с небольшим отступом сверху */
+    .content {
+      padding: 0 18px;
+      display: none;
+      overflow: hidden;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      margin-top: 5px;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      font-size: 16px;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    input[type="text"] {
+      width: calc(100% - 20px);
+      padding: 10px;
+      font-size: 16px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button.send {
+      background-color: #28a745;
+      color: #fff;
+    }
+    button.clear {
+      background-color: #dc3545;
+      color: #fff;
+    }
+    /* Фильтр – контейнер после блока отправки, sticky (только заголовок) */
+    .filter-container {
+      position: sticky;
+      top: 70px; /* ниже блока отправки */
+      z-index: 990;
+      background: rgba(240, 230, 210, 0.9);
+      border: 2px solid #8b4513;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+    }
+    .filter-header {
+      background: #deb887;
+      padding: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .filter-header:hover {
+      background: #d2a679;
+    }
+    .filter-content {
+      padding: 8px;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .filter-content.collapsed {
+      max-height: 0 !important;
+      padding-top: 0;
+      padding-bottom: 0;
+      border: none;
+    }
+    .filter-group {
+      margin-bottom: 8px;
+    }
+    .filter-group > .group-title {
+      font-weight: bold;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+    .filter-group .group-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .filter-group label {
+      font-size: 14px;
+    }
+    .filter-group input[type="checkbox"] {
+      margin-right: 4px;
+    }
+    .two-columns {
+      display: flex;
+      gap: 16px;
+    }
+    .two-columns .column {
+      flex: 1;
+    }
+    .option {
+      margin-bottom: 4px;
+    }
+    /* Группировка результатов */
+    .result-group {
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .collapsible-group {
+      background-color: #e0e0e0;
+      cursor: pointer;
+      padding: 10px;
+      font-size: 18px;
+      font-weight: bold;
+      border-bottom: 1px solid #ccc;
+      position: sticky;
+      top: 0;
+      z-index: 900;
+    }
+    .collapsible-group::after {
+      content: "\25B6";
+      position: absolute;
+      right: 10px;
+      font-size: 18px;
+    }
+    .collapsible-group.active::after {
+      content: "\25BC";
+    }
+    .group-content {
+      display: none;
+      padding: 10px;
+    }
+    .group-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+      padding: 5px;
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+    /* Отображение боёв */
+    .battle {
+      border-bottom: 1px dashed #ccc;
+      padding: 10px 0;
+      margin-bottom: 10px;
+    }
+    .battle:last-child {
+      border-bottom: none;
+    }
+    .battle-link a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    .battle-link a:hover {
+      text-decoration: underline;
+    }
+    /* Стили строк анализа – моноширинный шрифт и улучшенная читаемость */
+    .result-line {
+      padding: 5px;
+      border-radius: 4px;
+      margin-bottom: 3px;
+      font-family: Consolas, "Courier New", monospace;
+    }
+    .result-line.win {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .result-line.lose {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .result-line.unknown {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+    /* Стиль для статус-бара */
+    .status-bar {
+      background-color: #e9ecef;  /* светло-серый фон */
+      border: 2px solid #ced4da;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 18px;
+      margin: 20px auto;
+      max-width: 960px;
+      text-align: center;
+      color: #495057;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      opacity: 0;
+      /* Плавное появление */
+      animation: fadeIn 0.6s ease-in-out forwards;
+    }
+    /* Анимация появления */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    /* Класс для пульсирующего эффекта при обновлении статуса */
+    .status-update {
+      animation: pulse 1.5s infinite;
+    }
+    /* Анимация пульсации */
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+      }
+    }
+    /* Новый стиль для кнопки инструкции, которая будет внутри статус-бара */
+    .status-instruction-btn {
+      background-color: #007bff;
+      border: none;
+      color: #fff;
+      padding: 5px 10px;
+      font-size: 14px;
+      margin-right: 10px;
+      float: left;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .status-instruction-btn:hover {
+      background-color: #0056b3;
+    }
+
+    /* Стили для модального окна инструкции */
+    #instructionOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+    }
+
+    #instructionModal {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80%;
+      overflow-y: auto;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Стили для кнопок инструкции внутри модального окна */
+    .instruction-btn {
+      padding: 8px 16px;
+      margin: 10px 5px 0 5px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .instruction-btn.ok {
+      background-color: #28a745;
+      color: #fff;
+    }
+
+    .instruction-btn.ok:hover {
+      background-color: #218838;
+    }
+
+    .instruction-btn.noShow {
+      background-color: #6c757d;
+      color: #fff;
+    }
+
+    .instruction-btn.noShow:hover {
+      background-color: #5a6268;
+    }
+    /* Стили для окна ошибки анализа */
+    #errorModalOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2100;
+    }
+
+    #errorModal {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80%;
+      overflow-y: auto;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Стили для кнопок в окне ошибки */
+    .error-btn {
+      padding: 8px 16px;
+      margin: 10px 5px 0 5px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .error-btn.copy {
+      background-color: #17a2b8;
+      color: #fff;
+    }
+
+    .error-btn.copy:hover {
+      background-color: #117a8b;
+    }
+
+    .error-btn.close {
+      background-color: #dc3545;
+      color: #fff;
+    }
+
+    .error-btn.close:hover {
+      background-color: #c82333;
+    }
+  </style>
+</head>
+<body>
+  <!-- Статус-бар размещён вне контейнера -->
+  <div class="status-bar" id="statusBar">
+      <button class="status-instruction-btn" id="instructionToggleBtn">Инструкция</button>
+      <span id="statusText">Статус: ожидаем ввода</span>
+  </div>
+  <div class="container">
+    <!-- Блок отправки боёв -->
+    <button type="button" class="collapsible">Отправка боёв</button>
+    <div class="content">
+      <textarea id="battleInput" placeholder="Вставьте сюда любой текст, содержащий бои ивента...
+Например, вы можете вставить рассылку по ивенту с примерами боёв, или вставить HTML код страницы протокола боёв. Можно вставить сразу несколько HTML страниц. 
+Проще всего: откройте протокол боёв на нужной странице, нажмите CTRL+U, затем CTRL+A, CTRL+C и вставьте сюда (CTRL+V).
+Бои ивента будут выбраны автоматически, а остальные - отфильтрованы. Боями ивента будут считаться те бои, которые содержат следующие маркеры (перечисленные через запятую):"></textarea>
+      <input type="text" id="markersInput" placeholder="Маркеры ивента (через запятую)">
+      <div>
+        <button class="send" id="sendButton">Отправить</button>
+        <button class="clear" id="clearButton">Очистить</button>
+      </div>
+    </div>
+    <!-- Блок фильтров -->
+    <div class="filter-container" id="filterContainer">
+      <div class="filter-header" id="filterToggle">
+        Фильтры <span id="filterToggleIcon">&#9654;</span>
+      </div>
+      <div class="filter-content collapsed" id="filterContent">
+        <div class="filter-group common-options">
+          <div class="group-title">Общие опции</div>
+          <div class="group-content">
+            <div>
+              <input type="checkbox" id="shortenMarkers" data-option="shortenMarkers">
+              <label for="shortenMarkers">Сокращать маркеры</label>
+            </div>
+          </div>
+        </div>
+        <div class="two-columns">
+          <div class="column">
+            <div class="group-title">Победители</div>
+            <!-- Здесь ваши опции для победителей -->
+            <div class="option">
+              <input type="checkbox" id="showWinningSideName" data-option="showWinningSideName">
+              <label for="showWinningSideName">Название стороны</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHP" data-option="showWinningHP">
+              <label for="showWinningHP">Суммарное ХП</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningPercent" data-option="showWinningPercent">
+              <label for="showWinningPercent">% выживших</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningFaction" data-option="showWinningFaction">
+              <label for="showWinningFaction">Фракция</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroInfo" data-option="showWinningHeroInfo">
+              <label for="showWinningHeroInfo">Информация о героях</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroNickname" data-option="showWinningHeroNickname">
+              <label for="showWinningHeroNickname">Никнейм героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroLevel" data-option="showWinningHeroLevel">
+              <label for="showWinningHeroLevel">Уровень героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningHeroParams" data-option="showWinningHeroParams">
+              <label for="showWinningHeroParams">Параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="shortenWinningHeroParams" data-option="shortenWinningHeroParams">
+              <label for="shortenWinningHeroParams">Сокращать параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningArmy" data-option="showWinningArmy">
+              <label for="showWinningArmy">Армия</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showWinningBonuses" data-option="showWinningBonuses">
+              <label for="showWinningBonuses">Бонусы</label>
+            </div>
+          </div>
+          <div class="column">
+            <div class="group-title">Проигравшие</div>
+            <!-- Здесь ваши опции для проигравших -->
+            <div class="option">
+              <input type="checkbox" id="showLosingSideName" data-option="showLosingSideName">
+              <label for="showLosingSideName">Название стороны</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHP" data-option="showLosingHP">
+              <label for="showLosingHP">Суммарное ХП</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingPercent" data-option="showLosingPercent">
+              <label for="showLosingPercent">% выживших</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingFaction" data-option="showLosingFaction">
+              <label for="showLosingFaction">Фракция</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroInfo" data-option="showLosingHeroInfo">
+              <label for="showLosingHeroInfo">Информация о героях</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroNickname" data-option="showLosingHeroNickname">
+              <label for="showLosingHeroNickname">Никнейм героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroLevel" data-option="showLosingHeroLevel">
+              <label for="showLosingHeroLevel">Уровень героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingHeroParams" data-option="showLosingHeroParams">
+              <label for="showLosingHeroParams">Параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="shortenLosingHeroParams" data-option="shortenLosingHeroParams">
+              <label for="shortenLosingHeroParams">Сокращать параметры героев</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingArmy" data-option="showLosingArmy">
+              <label for="showLosingArmy">Армия</label>
+            </div>
+            <div class="option">
+              <input type="checkbox" id="showLosingBonuses" data-option="showLosingBonuses">
+              <label for="showLosingBonuses">Бонусы</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Контейнер для результатов -->
+    <div id="resultsContainer"></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Общие переменные и элементы
+      const statusBar = document.getElementById('statusBar');
+      const collapsible = document.querySelector('.collapsible');
+      const content = document.querySelector('.content');
+      const battleInput = document.getElementById('battleInput');
+      const markersInput = document.getElementById('markersInput');
+      const sendButton = document.getElementById('sendButton');
+      const clearButton = document.getElementById('clearButton');
+      const resultsContainer = document.getElementById('resultsContainer');
+
+      /* Функция для начала "активного" состояния статус-бара */
+      function startStatusUpdate() {
+        console.log("startStatusUpdate вызвана в " + new Date().toLocaleTimeString());
+        statusBar.classList.add('status-update');
+      }
+
+      /* Функция для остановки анимации обновления */
+      function stopStatusUpdate() {
+        console.log("stopStatusUpdate вызвана в " + new Date().toLocaleTimeString());
+        statusBar.classList.remove('status-update');
+      }
+
+      /* Сворачивание/разворачивание блока отправки боёв */
+      collapsible.addEventListener('click', function() {
+        this.classList.toggle("active");
+        if (content.style.display === "block") {
+          content.style.display = "none";
+        } else {
+          content.style.display = "block";
+          content.scrollIntoView({behavior:"smooth", block:"start"});
+        }
+      });
+
+      clearButton.addEventListener('click', function() {
+        battleInput.value = '';
+        document.getElementById('statusText').textContent = 'Статус: очищено';
+      });
+
+      /* Основной обработчик кнопки "Отправить" */
+      sendButton.addEventListener('click', async function() {
+        document.getElementById('statusText').textContent = 'Статус: обработка ввода...';
+        const inputText = battleInput.value;
+        if (!inputText.trim()) {
+          document.getElementById('statusText').textContent = 'Статус: пустой ввод';
+          return;
+        }
+
+        // Извлекаем ссылки на бои из введённого текста
+        let battleLinks = extractBattleLinks(inputText);
+        if (battleLinks.length === 0) {
+          document.getElementById('statusText').textContent = 'Статус: не найдено ссылок на бои';
+          return;
+        }
+
+        // Приводим ссылки к нужной форме и извлекаем warid
+        let newBattles = battleLinks.map(link => {
+          const normalized = normalizeBattleLink(link);
+          const warid = extractWarId(normalized);
+          return { warid, link: normalized, result: null };
+        }).filter(b => b.warid);
+
+        // Получаем уже сохранённые в базе бои
+        let dbBattles = [];
+        /* Загрузка ивентов + примеров при старте */
+        try {
+          const t0 = performance.now();
+          document.getElementById('statusText').textContent = "Загружаем ивенты и примеры…";
+
+          // прогресс-таймер (обновляем статус каждую 0.1 с)
+          const timer = setInterval(() => {
+            let dt = ((performance.now() - t0)/1000).toFixed(3);
+            document.getElementById('statusText').textContent =
+              `Загружаем ивенты и примеры… ${dt} с`;
+          }, 100);
+
+          const res = await fetch('/.netlify/functions/getBattles');
+          clearInterval(timer);
+          if (!res.ok) throw new Error('Ошибка загрузки данных');
+
+          // распаковываем сразу оба массива
+          const { events, examples } = await res.json();
+
+          // замеряем общее время
+          const loadTime = ((performance.now() - t0)/1000).toFixed(3);
+          document.getElementById('statusText').textContent =
+            `Загружено за ${loadTime} с — ${events.length} ивентов, ${examples.length} примеров`;
+
+          // 1) заполняем select#eventSelector
+          const sel = document.getElementById('eventSelector');
+          events
+            .sort((a,b) => a.eventId - b.eventId)
+            .forEach(ev => {
+              const o = document.createElement('option');
+              o.value = ev.eventId;
+              o.text  = `${ev.eventId}: ${ev.title}`;
+              sel.appendChild(o);
+            });
+
+          // 2) навешиваем обработчик и сразу рендерим последний ивент
+          sel.addEventListener('change', handleEventChange);
+          sel.value = Math.max(...events.map(e=>e.eventId));
+          handleEventChange();
+
+        } catch (e) {
+          console.error(e);
+          document.getElementById('statusText').textContent =
+            "Статус: ошибка загрузки ивентов и примеров";
+        }
+
+
+        // Объединяем: если бой с таким warid уже существует – оставляем его (с результатом анализа)
+        let battlesMap = {};
+        dbBattles.forEach(b => { battlesMap[b.warid] = b; });
+        newBattles.forEach(b => {
+          if (!battlesMap[b.warid]) battlesMap[b.warid] = b;
+        });
+        let allBattles = Object.values(battlesMap);
+
+        document.getElementById('statusText').textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
+
+        // Анализируем те бои, у которых ещё нет результата
+        allBattles = await analyzeBattles(allBattles);
+
+        // Если заданы маркеры ивента – фильтруем
+        const markers = markersInput.value.split(',')
+                              .map(m => m.trim())
+                              .filter(m => m);
+        if (markers.length > 0) {
+          allBattles = allBattles.filter(b => battleHasMarkers(b.result, markers));
+        }
+
+        // Определяем, какие бои новые (т.е. отсутствовали в базе)
+        let newInDB = allBattles.filter(b => !dbBattles.some(db => db.warid === b.warid));
+
+        // Если есть новые бои – отправляем их пачкой в базу данных
+        if (newInDB.length > 0) {
+          try {
+            // Формируем объект с полями: battles и markers
+            const payload = {
+              battles: newInDB,
+              markers: markersInput.value // текущее значение из поля ввода
+            };
+            const updateRes = await fetch('/.netlify/functions/updateBattles', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (!updateRes.ok) {
+              console.error("Ошибка обновления базы");
+            }
+          } catch (error) {
+            console.error("Ошибка при обновлении базы:", error);
+          }
+        }
+
+        // Отображаем объединённый результат (группировка без изменений)
+        displayBattles(allBattles);
+        updateFilteredOutput();
+        document.getElementById('statusText').textContent = `Статус: обработка завершена. Всего боёв: ${allBattles.length}`;
+      });
+
+      /* Функции для работы со ссылками и идентификатором боя */
+      function extractBattleLinks(text) {
+        const regex = /(?:https?:\/\/[^\s'"]+)?\/?(war(?:log)?\.php\?[^"'\s]+)/gi;
+        let links = [];
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+          links.push(match[1]);
+        }
+        return links;
+      }
+
+      function normalizeBattleLink(link) {
+        if (!link.startsWith('http')) {
+          link = 'https://www.heroeswm.ru/' + link;
+        } else {
+          link = link.replace(/https?:\/\/(www\.heroeswm\.ru|mirror\.heroeswm\.ru|my\.lordswm\.com|www\.lordswm\.com|lordswm\.com)/i, 'https://www.heroeswm.ru');
+        }
+        link = link.replace(/warlog\.php/gi, 'war.php');
+        try {
+          let url = new URL(link);
+          url.searchParams.delete('lt');
+          return url.toString();
+        } catch (e) {
+          console.error('Ошибка нормализации ссылки:', link, e);
+          return link;
+        }
+      }
+
+      function extractWarId(link) {
+        try {
+          let url = new URL(link);
+          return url.searchParams.get('warid');
+        } catch (e) {
+          console.error('Ошибка извлечения warid из ссылки:', link, e);
+          return null;
+        }
+      }
+
+      /* Функция анализа боёв (оставляем существующую реализацию) */
+      async function analyzeBattles(battles) {
+          let pendingBattles = battles.filter(b => !b.result);
+          let attempt = 1;
+          // Сохраним список неудачно проанализированных боёв
+          let failedBattles = [];
+          while (pendingBattles.length > 0) {
+            if (attempt > 5) {
+              failedBattles = pendingBattles;
+              break;
+            }
+            document.getElementById('statusText').textContent = `Анализируем: ${pendingBattles.length} боёв. Попытка ${attempt}...`;
+            const startTime = performance.now();
+            try {
+              let response = await fetch('https://hwm-nightly.netlify.app/.netlify/functions/analyzeBattles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ links: pendingBattles.map(b => b.link) })
+              });
+              let data = await response.json();
+              data.results.forEach(res => {
+                let b = battles.find(battle => battle.link === res.link);
+                if (b) {
+                  b.result = (res.status === 'success' && res.result) ? res.result : null;
+                }
+              });
+            } catch (e) {
+              console.error('Ошибка при запросе анализа:', e);
+            }
+            const elapsed = ((performance.now() - startTime) / 1000).toFixed(3);
+            let successCount = battles.filter(b => b.result).length;
+            let errorCount = battles.filter(b => !b.result).length;
+            document.getElementById('statusText').textContent = `Анализ: ${battles.length} боёв. Успех: ${successCount}. Ошибка: ${errorCount}. Время: ${elapsed} с. Попытка ${attempt}`;
+            pendingBattles = battles.filter(b => !b.result);
+            if (pendingBattles.length > 0) {
+              await new Promise(r => setTimeout(r, 1000));
+              attempt++;
+            }
+          }
+          if (failedBattles.length > 0) {
+            // Удаляем не проанализированные бои из общего списка
+            battles = battles.filter(b => b.result !== null);
+            showAnalysisErrorModal(failedBattles);
+          }
+          return battles;
+        }
+
+    function showAnalysisErrorModal(failedBattles) {
+  let modalOverlay = document.createElement('div');
+  modalOverlay.id = 'errorModalOverlay';
+
+  let modal = document.createElement('div');
+  modal.id = 'errorModal';
+
+  modal.innerHTML = `
+    <h2>Ошибка анализа</h2>
+    <p>
+      Следующие бои не удалось проанализировать (повторных попыток более 5):
+    </p>
+    <!-- Вместо списка используем textarea -->
+    <textarea id="failedBattlesTextarea" readonly style="width:100%; height:150px; font-family: Consolas, 'Courier New', monospace; padding:10px; border:1px solid #ccc; border-radius:4px; resize:vertical;">
+${failedBattles.map(b => b.link).join('\n')}
+    </textarea>
+    <p>Однако все остальные бои были добавлены!</p>
+    <div style="text-align: right;">
+      <button class="error-btn copy" id="copyFailedBtn">Скопировать</button>
+      <button class="error-btn close" id="closeErrorModalBtn">Закрыть</button>
+    </div>
+  `;
+
+  modalOverlay.appendChild(modal);
+  document.body.appendChild(modalOverlay);
+
+  document.getElementById('copyFailedBtn').addEventListener('click', () => {
+    let tempTextarea = document.createElement('textarea');
+    tempTextarea.value = failedBattles.map(b => b.link).join('\n');
+    document.body.appendChild(tempTextarea);
+    tempTextarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(tempTextarea);
+    alert('Ссылки скопированы!');
+  });
+
+  document.getElementById('closeErrorModalBtn').addEventListener('click', () => {
+    document.body.removeChild(modalOverlay);
+  });
+}
+
+
+
+      function battleHasMarkers(result, markers) {
+        if (!result) return false;
+        return markers.some(marker => {
+          const regex = new RegExp('\\[' + marker + '(\\s*[({]|\\])', 'i');
+          return regex.test(result);
+        });
+      }
+      
+      const defaultFilterOptions = {
+          shortenMarkers: true,
+          showWinningSideName: true,
+          showLosingSideName: true,
+          showWinningHP: false,
+          showLosingHP: true,
+          showWinningPercent: true,
+          showLosingPercent: false,
+          showWinningFaction: true,
+          showLosingFaction: true,
+          showWinningHeroInfo: false,
+          showLosingHeroInfo: true,
+          showWinningHeroNickname: false,
+          showLosingHeroNickname: true,
+          showWinningHeroLevel: false,
+          showLosingHeroLevel: true,
+          showWinningHeroParams: false,
+          showLosingHeroParams: true,
+          shortenWinningHeroParams: false,
+          shortenLosingHeroParams: true,
+          showWinningArmy: false,
+          showLosingArmy: true,
+          showWinningBonuses: true,
+          showLosingBonuses: false
+    };
+    function loadFilterOptions() {
+      let stored = localStorage.getItem("battleFilterOptions");
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch (e) {
+          return Object.assign({}, defaultFilterOptions);
+        }
+      }
+      return Object.assign({}, defaultFilterOptions);
+    }
+    function saveFilterOptions(options) {
+      localStorage.setItem("battleFilterOptions", JSON.stringify(options));
+    }
+    let filterOptions = loadFilterOptions();
+    document.querySelectorAll("#filterContent input[type=checkbox]").forEach(cb => {
+      let option = cb.getAttribute("data-option");
+      cb.checked = !!filterOptions[option];
+      cb.addEventListener("change", function() {
+        filterOptions[option] = this.checked;
+        saveFilterOptions(filterOptions);
+        updateFilteredOutput();
+      });
+    });
+      /* Функции для дополнительной группировки и фильтрации */
+      function extractWinningLevel(resultText, markers) {
+          if (!resultText) return "Без уровня";
+          let lines = resultText.split('\n').map(l => l.trim());
+          let maxLevel = 0;
+          outer: for (let line of lines) {
+            // Если строка содержит хотя бы один из маркеров, пропускаем её
+            for (let marker of markers) {
+              if (line.toLowerCase().includes(marker.toLowerCase())) {
+                continue outer;
+              }
+            }
+            // Если строка не содержит маркеров, пробуем извлечь уровень
+            let match = line.match(/\[Уровень:\s*(\d+)\]/i);
+            if (match) {
+              maxLevel = Math.max(maxLevel, parseInt(match[1], 10));
+            }
+          }
+          if (maxLevel !== 0) {
+            return "[Уровень: " + maxLevel + "]";
+          }
+          return "Без уровня";
+        }
+
+
+      function extractFaction(result) {
+        if (!result) return "Без фракции";
+        let lines = result.split('\n').map(l => l.trim());
+        for (let line of lines) {
+          if (line.toLowerCase().startsWith('[win') || line.startsWith('[+]')) {
+            let blocks = [];
+            const regex = /\[([^\]]+)\]/g;
+            let match;
+            while ((match = regex.exec(line)) !== null) {
+              blocks.push(match[1].trim());
+            }
+            if (blocks.length >= 5) return blocks[4];
+          }
+        }
+        return "Без фракции";
+      }
+
+      function extractSurvivalPercent(result, markers) {
+          if (!result) return 0;
+          let lines = result.split('\n').map(l => l.trim());
+          let maxSurv = 0.0;
+          outer: for (let line of lines) {
+            // Если строка содержит хотя бы один из маркеров, пропускаем её
+            for (let marker of markers) {
+              if (line.toLowerCase().includes(marker.toLowerCase())) {
+                continue outer;
+              }
+            }
+            let blocks = [];
+            const regex = /\[([^\]]+)\]/g;
+            let match;
+            while ((match = regex.exec(line)) !== null) {
+              blocks.push(match[1].trim());
+            }
+            if (blocks.length >= 4) {
+              let percentMatch = blocks[3].match(/(\d+(\.\d+)?)%/);
+              if (percentMatch) {
+                maxSurv = Math.max(maxSurv, parseFloat(percentMatch[1]));
+              }
+            }
+          }
+          return maxSurv;
+        }
+
+
+      function updateFilteredOutput() {
+        document.querySelectorAll('.battle-result').forEach(resultDiv => {
+          let original = resultDiv.parentNode.dataset.originalResult;
+          if (!original) return;
+          resultDiv.innerHTML = "";
+          let lines = original.split('\n');
+          lines.forEach(line => {
+            let newLine = transformLine(line, filterOptions);
+            let lineDiv = document.createElement('div');
+            lineDiv.className = 'result-line';
+            lineDiv.textContent = newLine;
+            if (newLine.startsWith('[win!]') || newLine.startsWith('[+]')) {
+              lineDiv.classList.add('win');
+            } else if (newLine.startsWith('[lose]') || newLine.startsWith('[-]')) {
+              lineDiv.classList.add('lose');
+            } else if (newLine.startsWith('[?]')) {
+              lineDiv.classList.add('unknown');
+            }
+            resultDiv.appendChild(lineDiv);
+          });
+        });
+      }
+
+      function shortenHeroParams(paramsBlock) {
+        const mapping = {
+          "Нападение:": "Н:",
+          "Защита:": "З:",
+          "Сила магии:": "СМ:",
+          "Знания:": "ЗН:",
+          "Удача:": "Уд:",
+          "Боевой Дух:": "БД:",
+          "Уровень:": "У:"
+        };
+        for (let key in mapping) {
+          let shortKey = mapping[key];
+          let regex = new RegExp(key, "gi");
+          paramsBlock = paramsBlock.replace(regex, shortKey);
+        }
+        return paramsBlock.replace(/\s+/g, "");
+      }
+
+      function transformHeroBlock(heroBlock, isWinner, opts) {
+        if ((isWinner && !opts.showWinningHeroInfo) || (!isWinner && !opts.showLosingHeroInfo))
+          return "";
+        let firstBracket = heroBlock.indexOf("[");
+        let nickname = "";
+        let blocks = [];
+        if (firstBracket !== -1) {
+          nickname = heroBlock.substring(0, firstBracket).trim();
+          let regex = /\[([^\]]+)\]/g;
+          let m;
+          while ((m = regex.exec(heroBlock)) !== null) {
+            blocks.push(m[1]);
+          }
+        } else {
+          nickname = heroBlock.trim();
+        }
+        let levelBlock = "";
+        let paramsBlock = "";
+        if (blocks.length > 0) {
+          if (/Уровень:|^Ур:/i.test(blocks[0])) {
+            levelBlock = blocks[0];
+            if (blocks.length > 1) {
+              paramsBlock = blocks.slice(1).join("][");
+            }
+          } else {
+            paramsBlock = blocks.join("][");
+          }
+        }
+        if ((isWinner && !opts.showWinningHeroNickname) || (!isWinner && !opts.showLosingHeroNickname))
+          nickname = "";
+        if (!((isWinner && opts.showWinningHeroLevel) || (!isWinner && opts.showLosingHeroLevel))) {
+          levelBlock = "";
+        } else if (levelBlock) {
+          if ((isWinner && opts.shortenWinningHeroParams) || (!isWinner && opts.shortenLosingHeroParams)) {
+            levelBlock = levelBlock.replace(/Уровень:/gi, "Ур:").replace(/\s+/g, "");
+          }
+          levelBlock = "[" + levelBlock + "]";
+        }
+        if (!((isWinner && opts.showWinningHeroParams) || (!isWinner && opts.showLosingHeroParams))) {
+          paramsBlock = "";
+        } else if (paramsBlock) {
+          let tmp = "[" + paramsBlock + "]";
+          if ((isWinner && opts.shortenWinningHeroParams) || (!isWinner && opts.shortenLosingHeroParams)) {
+            tmp = shortenHeroParams(tmp);
+          }
+          paramsBlock = tmp;
+        }
+        let result = (nickname + levelBlock + paramsBlock).trim();
+        return result;
+      }
+
+      function replacePrefix(str, prefix, replacement) {
+        if (str.toLowerCase().startsWith(prefix.toLowerCase())) {
+          return replacement + str.slice(prefix.length);
+        }
+        return str;
+      }
+
+      function transformLine(line, opts) {
+        let trimmed = line.trim();
+        if (!trimmed.startsWith("[")) return line;
+        let inner = trimmed.substring(1, trimmed.length - 1);
+        let blocks = inner.split("] [");
+        let marker = blocks[0];
+        let isWinner = (marker.toLowerCase().includes("win") || marker.indexOf("+") !== -1);
+        if (isWinner) {
+          if (opts.shortenMarkers) {
+            if (marker.toLowerCase().startsWith("win!")) {
+              blocks[0] = replacePrefix(marker, "win!", "+");
+            }
+          }
+        } else {
+          if (opts.shortenMarkers && marker.toLowerCase().startsWith("lose")) {
+            blocks[0] = replacePrefix(marker, "lose", "-");
+          }
+        }
+        if ((isWinner && !opts.showWinningSideName) || (!isWinner && !opts.showLosingSideName)) {
+          blocks[1] = "";
+        }
+        if ((isWinner && !opts.showWinningHP) || (!isWinner && !opts.showLosingHP)) {
+          blocks[2] = "";
+        }
+        if ((isWinner && !opts.showWinningPercent) || (!isWinner && !opts.showLosingPercent)) {
+          blocks[3] = "";
+        }
+        if ((isWinner && !opts.showWinningFaction) || (!isWinner && !opts.showLosingFaction)) {
+          blocks[4] = "";
+        }
+        let heroBlockExists = false;
+        let heroIdx = 5;
+        if (blocks.length > heroIdx && blocks[heroIdx].includes("Уровень:")) {
+          heroBlockExists = true;
+          blocks[heroIdx] = transformHeroBlock(blocks[heroIdx], isWinner, opts);
+        }
+        let armyIdx = heroBlockExists ? 6 : 5;
+        if (blocks.length > armyIdx) {
+          if ((isWinner && !opts.showWinningArmy) || (!isWinner && !opts.showLosingArmy)) {
+            blocks[armyIdx] = "";
+          }
+        }
+        let bonusIdx = heroBlockExists ? 7 : 6;
+        if (blocks.length > bonusIdx) {
+          if ((isWinner && !opts.showWinningBonuses) || (!isWinner && !opts.showLosingBonuses)) {
+            blocks[bonusIdx] = "";
+          }
+        }
+        let newLine = blocks.filter(b => b !== "").map(b => "[" + b + "]").join(" ");
+        return newLine;
+      }
+
+      function transformTokensText(inputText, opts) {
+        let lines = inputText.split("\n");
+        let transformed = lines.map(line => transformLine(line, opts));
+        return transformed.join("\n");
+      }
+
+      /* Вспомогательная функция для вычисления градиентного цвета для заголовка уровня */
+      function getLevelGradient(level) {
+        // Уровень от 5 до 25 (всего 21 уровень)
+        // При уровне 5: холодный (голубой ~hsl(240, 70%, 50%))
+        // При уровне 25: жаркий (красный ~hsl(0, 70%, 50%))
+        let clamped = Math.min(Math.max(level, 5), 25);
+        let fraction = (clamped - 5) / 20;
+        let hue = 240 - fraction * 240;  // линейно уменьшаем от 240 до 0
+        // Создадим градиент от более тёмного к более светлому оттенку этого цвета
+        return `linear-gradient(90deg, hsl(${hue}, 70%, 40%), hsl(${hue}, 70%, 60%))`;
+      }
+        
+      // Функция для извлечения основного ключа и дополнительной информации из строки заголовка
+        function parseGroupHeader(header) {
+          // Предполагаем формат: "Основной текст (дополнительная часть)" – скобки необязательны
+          // Используем регулярное выражение: основная часть – любой символ до первой открывающей скобки (если есть)
+          // Дополнительная часть – всё, что внутри скобок
+          const regex = /^(.*?)\s*(?:\((.+?)\))?$/;
+          const match = header.match(regex);
+          if (match) {
+            return {
+              main: match[1].trim(),
+              extra: (match[2] || "").trim()
+            };
+          }
+          return { main: header, extra: "" };
+        }
+
+        function compareGroupHeaders(a, b) {
+          // Разбираем заголовки на основную и дополнительную части.
+          let parsedA = parseGroupHeader(a);
+          let parsedB = parseGroupHeader(b);
+
+          // Сначала сравниваем основную часть (без учёта регистра)
+          let mainCompare = parsedA.main.localeCompare(parsedB.main, undefined, { sensitivity: "base" });
+          if (mainCompare !== 0) {
+            return mainCompare;
+          }
+          
+          // Если основные части равны, то пытаемся сравнить дополнительную, если она начинается с цифры.
+          let regex = /^(\d+)/; // выдергиваем последовательность цифр в начале строки
+          let matchA = parsedA.extra.match(regex);
+          let matchB = parsedB.extra.match(regex);
+          
+          if (matchA && matchB) {
+            let numA = parseInt(matchA[1], 10);
+            let numB = parseInt(matchB[1], 10);
+            if (numA !== numB) {
+              return numA - numB; // возрастающий порядок: меньшие числа идут раньше
+            }
+            // Если числовые части равны, можно сравнить и остаток дополнительной информации
+            return parsedA.extra.localeCompare(parsedB.extra, undefined, { sensitivity: "base" });
+          }
+          
+          // Если хотя бы одна дополнительная часть не начинается с цифры, сравниваем их обычным лексикографически
+          return parsedA.extra.localeCompare(parsedB.extra, undefined, { sensitivity: "base" });
+        }
+
+
+        // Функция для извлечения числового уровня из заголовка группы уровня
+        function extractLevelNumber(levelHeader) {
+          // Ожидается, что заголовок выглядит примерно так: "[Уровень: 18]"
+          const regex = /\[Уровень:\s*(\d+)\]/i;
+          const match = levelHeader.match(regex);
+          return match ? parseInt(match[1], 10) : 0;
+        }
+        
+      /* Функция отображения и группировки боёв */
+      function displayBattles(battles) {
+        const markers = markersInput.value.split(',')
+                            .map(m => m.trim())
+                            .filter(m => m);
+        resultsContainer.innerHTML = '';
+        let overallGroups = {};
+        battles.forEach(battle => {
+          let key = determineGroupKey(battle.result, markers);
+          if (!overallGroups[key]) overallGroups[key] = [];
+          overallGroups[key].push(battle);
+        });
+        // При сортировке общих групп можно выполнить следующее:
+        let overallKeys = Object.keys(overallGroups);
+        overallKeys.sort(compareGroupHeaders);
+        overallKeys.forEach((overallKey) => {
+        //for (let overallKey in overallGroups) {
+          let overallDiv = document.createElement('div');
+          overallDiv.className = 'result-group';
+          let overallHeader = document.createElement('div');
+          overallHeader.className = 'collapsible-group';
+          overallHeader.textContent = overallKey;
+          overallDiv.appendChild(overallHeader);
+          let overallContent = document.createElement('div');
+          overallContent.className = 'group-content';
+
+          // Группировка по уровню победившей стороны
+          let levelGroups = {};
+          overallGroups[overallKey].forEach(battle => {
+            // TO DO:
+            let lvl = extractWinningLevel(battle.result, markers);
+            if (!levelGroups[lvl]) levelGroups[lvl] = [];
+            levelGroups[lvl].push(battle);
+          });
+          let levelKeys = Object.keys(levelGroups);
+          levelKeys.sort((a, b) => {
+            let numA = extractLevelNumber(a);
+            let numB = extractLevelNumber(b);
+            return numB - numA;
+          });
+
+          levelKeys.forEach(levelKey => {
+            let battlesAtLevel = levelGroups[levelKey];
+            let bestSurvival = Math.max(...battlesAtLevel.map(battle => extractSurvivalPercent(battle.result, markers)));
+            let levelDiv = document.createElement('div');
+            let levelHeader = document.createElement('div');
+            levelHeader.className = 'collapsible-group';
+            levelHeader.textContent = `${levelKey} [выжило ${bestSurvival.toFixed(2)}% у лучшего игрока]`;
+            // Извлекаем числовое значение уровня из строки "[Уровень: N]"
+            //let levelNum = parseInt(levelKey.replace(/\D/g, ''));
+            let levelNum = extractLevelNumber(levelKey);
+            // Применяем градиентный фон, вычисленный по уровню
+            levelHeader.style.background = getLevelGradient(levelNum);
+            levelHeader.style.color = '#fff';
+            levelDiv.appendChild(levelHeader);
+            let levelContent = document.createElement('div');
+            levelContent.className = 'group-content';
+
+            // Группировка по фракции
+            let factionGroups = {};
+            battlesAtLevel.forEach(battle => {
+              let faction = extractFaction(battle.result);
+              if (!factionGroups[faction]) factionGroups[faction] = [];
+              factionGroups[faction].push(battle);
+            });
+            let factionKeys = Object.keys(factionGroups);
+            factionKeys.sort((a, b) => {
+              let bestA = Math.max(...factionGroups[a].map(battle => extractSurvivalPercent(battle.result, markers)));
+              let bestB = Math.max(...factionGroups[b].map(battle => extractSurvivalPercent(battle.result, markers)));
+              return bestB - bestA;
+            });
+            factionKeys.forEach(factionKey => {
+              let best = Math.max(...factionGroups[factionKey].map(battle => extractSurvivalPercent(battle.result, markers)));
+              let factionHeader = document.createElement('div');
+              factionHeader.className = 'group-title';
+              factionHeader.textContent = factionKey + " [выжило " + best.toFixed(2) + "% у лучшего игрока]";
+              levelContent.appendChild(factionHeader);
+              factionGroups[factionKey].sort((a, b) => {
+                return extractSurvivalPercent(b.result, markers) - extractSurvivalPercent(a.result, markers);
+              });
+              factionGroups[factionKey].forEach(battle => {
+                let battleDiv = document.createElement('div');
+                battleDiv.className = 'battle';
+                battleDiv.dataset.originalResult = battle.result;
+                let linkDiv = document.createElement('div');
+                linkDiv.className = 'battle-link';
+                let linkA = document.createElement('a');
+                linkA.href = battle.link;
+                linkA.target = '_blank';
+                linkA.textContent = battle.link;
+                linkDiv.appendChild(linkA);
+                battleDiv.appendChild(linkDiv);
+                let resultDiv = document.createElement('div');
+                resultDiv.className = 'battle-result';
+                if (battle.result) {
+                  battle.result.split('\n').forEach(line => {
+                    let lineDiv = document.createElement('div');
+                    lineDiv.className = 'result-line';
+                    lineDiv.textContent = line;
+                    if (line.startsWith('[win!]') || line.startsWith('[+]')) {
+                      lineDiv.classList.add('win');
+                    } else if (line.startsWith('[lose]') || line.startsWith('[-]')) {
+                      lineDiv.classList.add('lose');
+                    } else if (line.startsWith('[?]')) {
+                      lineDiv.classList.add('unknown');
+                    }
+                    resultDiv.appendChild(lineDiv);
+                  });
+                }
+                battleDiv.appendChild(resultDiv);
+                levelContent.appendChild(battleDiv);
+              });
+            });
+            levelDiv.appendChild(levelContent);
+            overallContent.appendChild(levelDiv);
+
+            levelHeader.addEventListener('click', function() {
+              this.classList.toggle('active');
+              let content = this.nextElementSibling;
+              content.style.display = (content.style.display === 'block') ? 'none' : 'block';
+            });
+          });
+
+          overallDiv.appendChild(overallContent);
+          resultsContainer.appendChild(overallDiv);
+
+          overallHeader.addEventListener('click', function() {
+            this.classList.toggle('active');
+            let content = this.nextElementSibling;
+            content.style.display = (content.style.display === 'block') ? 'none' : 'block';
+          });
+        });
+        updateFilteredOutput();
+      }
+      
+      function determineGroupKey(result, eventMarkers) {
+        if (!result) return 'Без группы';
+        const lines = result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        for (const line of lines) {
+          let blocks = [];
+          const regex = /\[([^\]]+)\]/g;
+          let match;
+          while ((match = regex.exec(line)) !== null) {
+            blocks.push(match[1].trim());
+          }
+          if (!blocks.length) continue;
+          for (let i = 0; i < blocks.length; i++) {
+            for (const marker of eventMarkers) {
+              if (blocks[i].toLowerCase().startsWith(marker.toLowerCase())) {
+                const remainder = blocks[i].substring(marker.length).trim();
+                if (remainder && (remainder.startsWith('(') || remainder.startsWith('{'))) {
+                  return blocks[i];
+                } else {
+                  if (i + 3 < blocks.length) {
+                    return marker + ": " + blocks[i + 3];
+                  } else {
+                    return marker;
+                  }
+                }
+              }
+            }
+          }
+        }
+        return 'Без группы';
+      }
+
+      /* Обработчик сворачивания фильтра */
+      const filterToggle = document.getElementById("filterToggle");
+      const filterContent = document.getElementById("filterContent");
+      const filterToggleIcon = document.getElementById("filterToggleIcon");
+      filterToggle.addEventListener("click", () => {
+        if (filterContent.classList.contains("collapsed")) {
+          filterContent.classList.remove("collapsed");
+          filterToggleIcon.innerHTML = "&#9660;";
+        } else {
+          filterContent.classList.add("collapsed");
+          filterToggleIcon.innerHTML = "&#9654;";
+        }
+      });
+
+      /* Автоматическая загрузка боёв при загрузке страницы */
+      try {
+        let loadStartTime = performance.now();
+        document.getElementById('statusText').textContent = "Загружаем бои, подождите. Прошло 0.000 сек";
+        let loadInterval = setInterval(() => {
+          let elapsed = ((performance.now() - loadStartTime) / 1000).toFixed(3);
+          document.getElementById('statusText').textContent = `Загружаем бои, подождите. Прошло ${elapsed} сек`;
+        }, 100);
+        const res = await fetch('/.netlify/functions/getBattles');
+        clearInterval(loadInterval);
+        let loadTime = performance.now() - loadStartTime;
+        if (res.ok) {
+          const data = await res.json();
+          // Предполагается, что сервер вернул объект с полями: battles и markers
+          const dbBattles = data.battles;
+          const markers = data.markers || '';
+          markersInput.value = markers;
+          document.getElementById('statusText').textContent = `Бои загружены (${dbBattles.length} боёв) за ${(loadTime/1000).toFixed(3)} сек. Начинается группировка...`;
+          let groupStartTime = performance.now();
+          displayBattles(dbBattles);
+          updateFilteredOutput();
+          let groupTime = performance.now() - groupStartTime;
+          document.getElementById('statusText').textContent = `Всё готово. Сгруппировано ${dbBattles.length} боёв за ${(groupTime/1000).toFixed(3)} сек`;
+        } else {
+          console.error("Ошибка получения боёв из базы");
+          document.getElementById('statusText').textContent = "Статус: ошибка загрузки базы";
+        }
+      } catch (error) {
+        console.error("Ошибка при запросе к базе:", error);
+        document.getElementById('statusText').textContent = "Статус: ошибка запроса к базе";
+      }
+    });
+    function showInstructionModal() {
+      let overlay = document.createElement('div');
+      overlay.id = 'instructionOverlay';
+
+      let modal = document.createElement('div');
+      modal.id = 'instructionModal';
+      // Здесь вставляем ваш полный текст инструкции. Он большой, поэтому используем многострочную строку.
+      modal.innerHTML = `
+        <h2>Инструкция по использованию сайта</h2>
+        <p>
+          <strong>Просмотр боёв</strong><br>
+          Когда вы заходите на сервер, он обращается к базе данных и загружает оттуда уже имеющиеся бои. У меня это занимает 3 секунды. Загруженные бои группируются по противникам в порядке возрастания номеров волн. Для каждой волны бои группируются по боевым уровням героев в порядке их убывания. Список уровней имеет разнообразные цвета: высокоуровневые герои ближе к красному, низкоуровневые ближе к синему.<br><br>
+
+          <strong>Фильтр информации о боях</strong><br>
+          Об одном конкретном бое отображается очень много информации: кто сражался, сколько было ХП у его армии, сколько % выжило, кто был в его армии, какая фракция, что он получил за бой, какие статы были у героя, и т.д.. В будущем планирую добавить, какие артефакты носил герой, какие навыки у него были и какое умение фракции и анти-умение фракции, но сейчас этого нет.<br><br>
+
+          Если вы считаете информацию избыточной, то используйте фильтры: отметьте галочками то, что хотите видеть. При изменении фильтра все описания боёв сразу же редактируются «налету», поэтому такая кнопка, как «применить фильтры» отсутствует. Выбранные фильтры сохраняются в браузере.<br><br>
+
+          <strong>Отправка боёв</strong><br>
+          Вы можете отправлять что угодно: текст, содержащий ссылки на бои, или HTML код страницы протокола боёв, содержащий бои. Всё, что содержит «war.php» или «warlog.php» будет считаться боем. Даже если www.heroeswm.ru или lordswm.com отсутствует (вы могли столкнуться с этим, когда открываете почту героев на телефоне), ссылки на бои будут корректно изъяты, а соответствующие www.heroeswm.ru добавлены автоматически.<br><br>
+
+          Сервис автоматически проверит, что бой является боем ивента, который он хочет получить. Информация о том, что он хочет получить, указана в поле под вводом текста. Сейчас сервис принимает только «Цель контракта». Анализ боёв происходит на русском языке и если ссылка на бой ведёт на lordswm.com, то произойдет автоматическая замена на www.heroeswm.ru, поэтому, если вы англоговорящий, то вам ничего не требуется делать дополнительно: просто отправьте свои бои и всё (как отдельные ссылки или как HTML код страницы протокола боёв).<br><br>
+
+          Сочетания клавиш для копирования и вставки HTML кода страницы на компьютере: на странице протокола боёв Ctrl+U, Ctrl+A, Ctrl+C, переход в поле ввода, Ctrl+V.<br><br>
+
+          Дубликаты боёв будут автоматически удалены. Проверяется не ссылка, а параметр «warid»: две ссылки с одним и тем же «warid» считаются одинаковыми.<br><br>
+
+          На мобильном телефоне тоже работает: я проверял на Mozilla Firefox Mobile. Но я установил расширение «View Page Source» из магазина расширений Firefox.<br><br>
+
+          Отправка боёв занимает несколько секунд. Не закрывайте вкладку сразу: дождитесь сообщения, что всё готово.<br><br>
+
+          <strong>Другие ивенты</strong><br>
+          Пока что первоначальная настройка нового ивента работает вручную. Я должен сбрасывать базу данных и выставлять маркеры боёв ивента (например, «Цель контракта») в начале каждого нового ивента. Но на ивентах, где нет номеров волн, уже сейчас враги группируются не по номерам волн, а по фракциям соперников. Например, «Враги: Механики», или «Враги: Разбойники» вместо «Цель контракта (10-1)» и «Цель контракта (40-2)».
+        </p>
+        <div style="text-align: center; margin-top: 20px;">
+          <button class="instruction-btn ok" id="instructionOk">Понял</button>
+          <button class="instruction-btn noShow" id="instructionNoShow">Больше не показывать</button>
+        </div>
+      `;
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      document.getElementById('instructionOk').addEventListener('click', () => {
+        document.body.removeChild(overlay);
+      });
+      document.getElementById('instructionNoShow').addEventListener('click', () => {
+        localStorage.setItem('dontShowInstructions', 'true');
+        document.body.removeChild(overlay);
+      });
+    }
+
+    function checkAndShowInstructions() {
+      if (!localStorage.getItem('dontShowInstructions')) {
+        showInstructionModal();
+      }
+    }
+
+    // Добавляем обработчик для кнопки инструкции в статус-баре
+    document.addEventListener('DOMContentLoaded', () => {
+      checkAndShowInstructions();
+      const instructionToggleBtn = document.getElementById('instructionToggleBtn');
+      instructionToggleBtn.addEventListener('click', showInstructionModal);
+    });
+  </script>
+</body>
+</html>
