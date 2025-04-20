@@ -578,7 +578,6 @@
           });
         });
 
-      const content = document.querySelector('.content');
       const battleInput = document.getElementById('battleInput');
       const markersInput = document.getElementById('markersInput');
       const sendButton = document.getElementById('sendButton');
@@ -602,27 +601,6 @@
         console.log("stopStatusUpdate вызвана в " + new Date().toLocaleTimeString());
         statusBar.classList.remove('status-update');
       }
-
-      /* Сворачивание/разворачивание блока отправки боёв */
-      collapsible.addEventListener('click', function() {
-        this.classList.toggle("active");
-        if (content.style.display === "block") {
-          content.style.display = "none";
-        } else {
-          content.style.display = "block";
-          content.scrollIntoView({behavior:"smooth", block:"start"});
-        }
-      });
-      
-      // Сворачивание/разворачивание контейнера выбора ивента
-    eventSelectorHeader.addEventListener('click', function() {
-      this.classList.toggle("active");
-      if (eventSelectorContainer.style.display === "block") {
-        eventSelectorContainer.style.display = "none";
-      } else {
-        eventSelectorContainer.style.display = "block";
-      }
-    });
 
       clearButton.addEventListener('click', function() {
         battleInput.value = '';
