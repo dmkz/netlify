@@ -22,12 +22,12 @@
       background-color: #333;
       color: #fff;
       cursor: pointer;
-      padding: 18px;
+      padding: 10px;
       width: 100%;
       border: none;
       text-align: left;
       outline: none;
-      font-size: 20px;
+      font-size: 16px;
       border-radius: 4px;
       margin-bottom: 5px;
       position: sticky;
@@ -45,8 +45,8 @@
     .collapsible::after {
       content: "\25B6"; /* стрелка вправо */
       position: absolute;
-      right: 20px;
-      font-size: 20px;
+      right: 10px;
+      font-size: 16px;
     }
     .collapsible.active::after {
       content: "\25BC"; /* стрелка вниз */
@@ -54,7 +54,7 @@
     /* Контент блока отправки боёв – обычное положение, но с небольшим отступом сверху */
     .content {
       position: sticky;
-      top: 60px; /* ниже заголовка */
+      top: 44px; /* ниже заголовка */
       padding: 0 18px;
       display: none;
       overflow: hidden;
@@ -100,7 +100,7 @@
     }
     .filter-container {
       position: sticky;
-      top: 60px; /* ниже блока отправки */
+      top: 44px; /* ниже блока отправки */
       z-index: 990;
       background: rgba(240, 230, 210, 0.9);
       border: 2px solid #8b4513;
@@ -410,7 +410,7 @@
   <div class="container">
     <!-- Контейнер выбора ивента -->
     <button type="button" class="collapsible" id="eventSelectorHeader">
-      Выбран ивент:
+      Текущий ивент
     </button>
     <div class="content" id="eventSelectorContainer">
       <div style="margin:10px 0;">
@@ -1387,7 +1387,7 @@ ${failedBattles.map(b => b.link).join('\n')}
           const ev = allEvents.find(e => e.eventId === currentEventId);
 
           // Обновляем весь контейнер
-          eventSelectorHeader.textContent = `Выбран ивент: ${ev.title}`;
+          eventSelectorHeader.textContent = `${ev.title}`;
           eventAnnouncement.href    = ev.announcement || '#';
           eventAnnouncement.textContent = ev.announcement ? 'Перейти' : '—';
           eventReward.href          = ev.reward       || '#';
@@ -1481,7 +1481,7 @@ ${failedBattles.map(b => b.link).join('\n')}
 
           // Заполняем шапку и содержимое контейнера выбора ивента
           const chosen = allEvents.find(e => e.eventId === currentEventId);
-          eventSelectorHeader.textContent  = `Выбран ивент: ${chosen.title}`;
+          eventSelectorHeader.textContent  = `${chosen.title}`;
           eventAnnouncement.href           = chosen.announcement || '#';
           eventAnnouncement.textContent    = chosen.announcement ? 'Перейти' : '—';
           eventReward.href                 = chosen.reward || '#';
