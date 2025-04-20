@@ -172,7 +172,7 @@
     }
     .filter-group .group-content {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 8px;
     }
     .filter-group label {
@@ -497,7 +497,6 @@
 
               <!-- 3) Домен -->
               <label class="inline-opt">
-                Домен&nbsp;
                 <select id="domainSelect" data-option="domain">
                   <option>www.heroeswm.ru</option>
                   <option>mirror.heroeswm.ru</option>
@@ -1093,7 +1092,7 @@ ${failedBattles.map(b => b.link).join('\n')}
       function updateFilteredOutput() {
           /* --- правка ссылок -------------------------------------------------- */
           const needBeg   = !!filterOptions.startFromBeg;
-          const newDomain = filterOptions.domain;
+          const newDomain = filterOptions.domain || "www.heroeswm.ru";
 
           document.querySelectorAll(".battle-link a").forEach(a => {
             try {
