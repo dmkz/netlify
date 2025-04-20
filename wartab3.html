@@ -430,7 +430,7 @@
     </div>
     <!-- /Контейнер выбора ивента -->
     <!-- Блок отправки боёв -->
-    <button type="button" class="collapsible">Отправка боёв</button>
+    <button type="button" class="collapsible" id="battleToggle">Отправка боёв</button>
     <div class="content">
       <textarea id="battleInput" placeholder="Вставьте сюда любой текст, содержащий бои ивента...
 Например, вы можете вставить рассылку по ивенту с примерами боёв, или вставить HTML код страницы протокола боёв. Можно вставить сразу несколько HTML страниц. 
@@ -565,6 +565,7 @@
     document.addEventListener('DOMContentLoaded', async () => {
       // Общие переменные и элементы
       const statusBar = document.getElementById('statusBar');
+      const battleToggle = document.getElementById('battleToggle');
       document.querySelectorAll('.collapsible').forEach(button => {
           // здесь button — это и «Выбран ивент», и «Отправка боёв»
           const content = button.nextElementSibling;
@@ -610,6 +611,14 @@
       /* Основной обработчик кнопки "Отправить" */
       sendButton.addEventListener('click', async function() {
         document.getElementById('statusText').textContent = 'Статус: обработка ввода...';
+        // 1) Свернуть блок "Отправка боёв", если он открыт
+        if (battleToggle.classList.contains('active')) {
+          battleToggle.classList.remove('active');
+          battleToggle.nextElementSibling.style.display = 'none';
+        }
+
+        // 2) Прокрутить к статус-бару (чтобы пользователь увидел ход выполнения)
+        statusBar.scrollIntoView({ behavior: 'smooth' });
         const inputText = battleInput.value;
         if (!inputText.trim()) {
           document.getElementById('statusText').textContent = 'Статус: пустой ввод';
@@ -736,80 +745,82 @@
 
       /* Функция анализа боёв (оставляем существующую реализацию) */
       async function analyzeBattles(battles) {
-          // Список тех, у кого ещё нет результата
           const toAnalyze = battles.filter(b => !b.result);
-          const BATCH_SIZE = 200;   // размер порции
-          const MAX_ATTEMPTS = 5;  // сколько раз пытаем каждый чанк
+          const total     = toAnalyze.length;
+          const BATCH_SIZE   = 50;
+          const MAX_ATTEMPTS = 5;
 
           let permanentlyFailed = [];
+          let processed = 0;
+          const t0 = performance.now();
 
-          // Обрабатываем чанки по BATCH_SIZE
-          for (let i = 0; i < toAnalyze.length; i += BATCH_SIZE) {
+          for (let i = 0; i < total; i += BATCH_SIZE) {
             const chunk = toAnalyze.slice(i, i + BATCH_SIZE);
-
-            let attempt = 1;
-            let success = false;
+            let attempt = 1,
+                success = false;
 
             while (attempt <= MAX_ATTEMPTS && !success) {
+              // обновляем статус перед каждой попыткой
+              const elapsed = ((performance.now() - t0) / 1000).toFixed(3);
+              statusText.textContent = 
+                `Статус: ${processed}/${total} боёв. ` +
+                `Отправлено ${chunk.length} ссылок, попытка ${attempt}/${MAX_ATTEMPTS}. ` +
+                `Время: ${elapsed} сек`;
+
               try {
-                // Запрос анализатора
-                const response = await fetch(
-                  '/.netlify/functions/analyzeBattles',
+                const res = await fetch(
+                  'https://heroeswm.netlify.app/.netlify/functions/analyzeBattles',
                   {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ links: chunk.map(b => b.link) })
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ links: chunk.map(b=>b.link) })
                   }
                 );
-
-                if (!response.ok) {
-                  console.warn(`Чанк ${i/BATCH_SIZE + 1}, попытка ${attempt} — статус ${response.status}`);
+                if (!res.ok) {
                   attempt++;
-                  await new Promise(r => setTimeout(r, 1000)); // пауза перед retry
+                  await new Promise(r=>setTimeout(r,1000));
                   continue;
                 }
-
-                // Если ок, парсим JSON
-                const data = await response.json();
+                const data = await res.json();
                 if (!Array.isArray(data.results)) {
-                  console.warn(`Чанк ${i/BATCH_SIZE + 1}, unexpected format, попытка ${attempt}`);
                   attempt++;
-                  await new Promise(r => setTimeout(r, 1000));
+                  await new Promise(r=>setTimeout(r,1000));
                   continue;
                 }
 
-                // Наконец, записываем результаты
-                data.results.forEach(res => {
-                  const b = battles.find(x => x.link === res.link);
-                  if (b && res.status === 'success' && res.result) {
-                    b.result = res.result;
+                // Пометить результаты как готовые
+                data.results.forEach(r => {
+                  const b = battles.find(x => x.link === r.link);
+                  if (b && r.status === 'success' && r.result) {
+                    b.result = r.result;
+                    processed++;
                   }
                 });
-
-                success = true; // чанк успешно проанализирован
+                success = true;
               } catch (err) {
-                console.error(`Ошибка чанка ${i/BATCH_SIZE + 1}, попытка ${attempt}:`, err);
                 attempt++;
-                await new Promise(r => setTimeout(r, 1000));
+                await new Promise(r=>setTimeout(r,1000));
               }
             }
 
             if (!success) {
-              // После MAX_ATTEMPTS помечаем эти бои как окончательно неудачные
               permanentlyFailed.push(...chunk);
             }
           }
 
-          // Если есть окончательно не проанализированные — показываем их
+          // Финальное обновление статуса
+          const totalElapsed = ((performance.now() - t0) / 1000).toFixed(3);
+          statusText.textContent = 
+            `Анализ завершён: ${processed}/${total} боёв за ${totalElapsed} сек`;
+
           if (permanentlyFailed.length) {
             showAnalysisErrorModal(permanentlyFailed);
-            // Удаляем не проанализированные бои из общего списка
             battles = battles.filter(b => b.result !== null);
           }
 
-          // Возвращаем все бои (у некоторых результат может остаться null)
           return battles;
         }
+
 
     function showAnalysisErrorModal(failedBattles) {
   let modalOverlay = document.createElement('div');
