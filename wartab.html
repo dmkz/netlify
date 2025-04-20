@@ -55,7 +55,7 @@
     .content {
       position: sticky;
       top: 44px; /* ниже заголовка */
-      padding: 0 18px;
+      padding: 10px;
       display: none;
       overflow: hidden;
       background-color: #fff;
@@ -66,13 +66,13 @@
       z-index: 1000;
     }
     textarea {
-      width: 100%;
+      width: calc(100% - 20px);
       height: 150px;
       font-size: 16px;
       padding: 10px;
-      margin-bottom: 10px;
       border: 1px solid #ccc;
       border-radius: 4px;
+      overflow-y: scroll;
     }
     input[type="text"] {
       width: calc(100% - 20px);
