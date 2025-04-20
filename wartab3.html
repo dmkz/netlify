@@ -34,18 +34,6 @@
     .collapsible:hover {
       background-color: #27AE60;
     }
-    .sticky-section {
-      position: sticky;
-      /* отступ от верха страницы — 
-         подберите так, чтобы не перекрывать статус‑бар */
-      top: 60px;
-      /* обеспечиваем правильный порядок наложения */
-      z-index: 995;
-      background: #fff;           /* чтобы перекрывать подложку */
-      border-radius: 4px;         /* по вашему вкусу */
-      border: 1px solid #ccc;     /* по вашему вкусу */
-      margin-bottom: 20px;        /* чтобы отливалось от контента */
-    }
     /* Специально для контейнера выбора ивента */
     #eventSelectorHeader,
     #battleToggle {
@@ -409,26 +397,33 @@
     .error-btn.close:hover {
       background-color: #c82333;
     }
-    /* === Sticky body для "Выбора ивента" и "Отправки боёв" === */
-    #eventSelectorContainer,
-    #battleToggle + .content {
+    /* убираем у заголовков позиционирование */
+    .collapsible {
+      position: static;
+      margin-bottom: 0;    /* чтобы не было двойных отступов */
+    }
+
+    /* единый «липучий» контейнер */
+    .sticky-section {
       position: sticky;
-      /* Сколько пикселей вниз «отсалютироваться» от самого верха окна.
-         Подберите так, чтобы блок появлялся сразу под статус‐баром и шапкой .collapsible */
-      top: 60px; 
-      z-index: 995;          /* чуть выше фона страниц, но ниже самого фильтра */
-      max-height: calc(100vh - 60px);
-      overflow-y: auto;      /* если тело развёрнуто и большое — внутри скролл */
-      background: #fff;      /* перекрывает контент под ним */
-      border: 1px solid #ccc;/* чтобы визуально отделялось */
-      border-radius: 4px;    
+      top: 60px;                   /* под статус‑баром */
+      background: #fff;            /* чтобы закрывать контент под ним */
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 20px;         
+      z-index: 995;                /* базовый уровень */
     }
-    /* Правим порядок наложения sticky‑блоков */
-    #eventSelectorContainer {
-      z-index: 997;  /* самую большую цифру — ивент всегда поверх */
-    }
-    #battleToggle + .content {
-      z-index: 996;  /* чуть ниже — боёв не перекрывает ивент */
+
+    /* индивидуальный порядок секций: */
+    #eventSection { z-index: 997; }
+    #battleSection{ z-index: 996; }
+
+    /* прокручиваемое тело внутри, если развернуто */
+    .sticky-section .content {
+      max-height: calc(100vh - 60px);  /* умещается под статус‑бар */
+      overflow-y: auto;
+      margin-top: 0;                   /* сбрасываем автогенерацию отступов */
+      padding: 10px 18px;              /* подганяем под ваш дизайн */
     }
   </style>
 </head>
