@@ -1628,20 +1628,21 @@ ${failedBattles.map(b => b.link).join('\n')}
                   };
                   // простая вставка строки
                   const addLine = txt => lines.push(txt);
+                  // 3.2) добавляем заголовок фракции (с разделителем, если нужно)
+                  addSection(factionTextSpan.textContent.trim());
 
-                  // 3.1) сам контейнер боёв — следующий sibling
-                  const fracContent = factionHeader.nextElementSibling;
-                  if (!isVisible(fracContent)) return;
-
-                  // 3.2) заголовок фракции
-                  addLine(factionTextSpan.textContent.trim());
-
-                  // 3.3) все прямые дочерние .battle этой фракции
-                  Array.from(fracContent.children).forEach(node => {
-                    if (node.classList.contains('battle') && isVisible(node)) {
-                      addLine(node.innerText.trim());
+                  // начинаем со следующего sibling
+                    let sib = factionHeader.nextElementSibling;
+                    while (sib && !sib.classList.contains('group-title')) {
+                      // только реальные бои, и только если они видимы
+                      if (
+                        sib.classList.contains('battle') &&
+                        sib.offsetParent !== null  // безопасная проверка «видимости»
+                      ) {
+                        addLine(sib.innerText.trim());
+                      }
+                      sib = sib.nextElementSibling;
                     }
-                  });
 
                   // 3.4) копируем, если есть хотя бы один бой
                   if (lines.length > 1) {
@@ -1653,6 +1654,7 @@ ${failedBattles.map(b => b.link).join('\n')}
 
                 // 4) Вставляем заголовок фракции в DOM
                 levelContent.appendChild(factionHeader);
+                
               factionGroups[factionKey].sort((a, b) => {
                 return extractSurvivalPercent(b.result, markers) - extractSurvivalPercent(a.result, markers);
               });
