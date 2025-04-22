@@ -1530,59 +1530,67 @@ ${failedBattles.map(b => b.link).join('\n')}
             levelCopy.textContent = '📋';
             levelHeader.appendChild(levelCopy);
 
-            // 5) Навешиваем обработчик на кнопку (как обсуждали выше)
-            levelCopy.addEventListener('click', function(event) {
-              event.stopPropagation();
-              event.preventDefault();
+             levelCopy.addEventListener('click', function(event) {
+               event.stopPropagation();
+               event.preventDefault();
 
-              // helper проверки видимости
-              const isVisible = el => el && getComputedStyle(el).display !== 'none';
+               const isVisible = el => el && getComputedStyle(el).display !== 'none';
 
-              // собираем строки
-              const lines = [];
-              const addSection = txt => {
-                if (lines.length && lines[lines.length-1] !== '') lines.push('');
-                lines.push(txt);
-              };
-              const addLine = txt => lines.push(txt);
+               const lines = [];
+               const addSection = txt => {
+                 if (lines.length && lines[lines.length-1] !== '') lines.push('');
+                 lines.push(txt);
+               };
+               const addLine = txt => lines.push(txt);
 
-              // 3.1) если уровень свернут — выходим
-              const lvlContent = levelHeader.nextElementSibling;
-              if (!isVisible(lvlContent)) return;
+               // 3.1) если уровень свернут — выходим
+               const lvlContent = levelHeader.nextElementSibling;
+               if (!isVisible(lvlContent)) return;
 
-              // 3.2) заголовок уровня
-              addLine(levelText.textContent.trim());
+               // 3.2) заголовок уровня
+               addLine(levelText.textContent.trim());
 
-              // 3.3) перебираем фракции и бои внутри lvlContent
-              let lastFaction = null;
-              Array.from(lvlContent.children).forEach(node => {
-                if (node.classList.contains('group-title')) {
-                  lastFaction = null;
-                  node._factionText = node.textContent.trim();
-                }
-                if (node.classList.contains('battle') && isVisible(node)) {
-                  // ищем соответствующую фракцию
-                  const siblings = Array.from(lvlContent.children);
-                  const idx = siblings.indexOf(node);
-                  const frNode = siblings.slice(0, idx).reverse()
-                                    .find(n => n.classList.contains('group-title'));
-                  const factionText = frNode ? frNode.textContent.trim() : null;
+               // 3.3) перебираем фракции и бои внутри lvlContent
+               let lastFaction = null;
+               Array.from(lvlContent.children).forEach(node => {
+                 if (node.classList.contains('group-title')) {
+                   lastFaction = null;
+                   // вместо node.textContent: сохраняем только текст span.header-text
+                   const hdr = node.querySelector('.header-text');
+                   node._factionText = hdr
+                   ? hdr.textContent.trim()
+                   : ''; 
 
-                  if (factionText && factionText !== lastFaction) {
-                    addSection(factionText);
-                    lastFaction = factionText;
-                  }
-                  addLine(node.innerText.trim());
-                }
-              });
+                 }
+                 if (node.classList.contains('battle') && isVisible(node)) {
+                   const siblings = Array.from(lvlContent.children);
+                   const idx = siblings.indexOf(node);
+                   const frNode = siblings.slice(0, idx).reverse()
+                                     .find(n => n.classList.contains('group-title'));
+                   // снова читаем только из span.header-text, а не из контейнера
+                   let factionText = null;
+                   if (frNode) {
+                   const hdr = frNode.querySelector('.header-text');
+                   factionText = hdr
+                       ? hdr.textContent.trim()
+                       : frNode._factionText;
+                   }
 
-              // 3.4) копируем, если нашлось что копировать
-              if (lines.length > 1) {
-                navigator.clipboard.writeText(lines.join('\n'))
-                  .then(() => alert('Уровень скопирован вместе с видимыми боями'))
-                  .catch(err => console.error(err));
-              }
-            });
+                   if (factionText && factionText !== lastFaction) {
+                     addSection(factionText);
+                     lastFaction = factionText;
+                   }
+                   addLine(node.innerText.trim());
+                 }
+               });
+
+               // 3.4) копируем, если нашлось что копировать
+               if (lines.length > 1) {
+                 navigator.clipboard.writeText(lines.join('\n'))
+                   .then(() => alert('Уровень скопирован вместе с видимыми боями'))
+                   .catch(err => console.error(err));
+               }
+             });
             
             
             levelDiv.appendChild(levelHeader);
