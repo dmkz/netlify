@@ -19,25 +19,50 @@
     }
     /* Заставляем только заголовки быть sticky, а не содержимое блока */
     .collapsible {
-      background-color: #333;
-      color: #fff;
-      cursor: pointer;
-      padding: 18px;
+      cursor: pointer;              /* всегда pointer */
+      transition: background 0.2s ease, color 0.2s ease;
+      color: black;
+      padding: 8px;
       width: 100%;
       border: none;
       text-align: left;
       outline: none;
-      font-size: 20px;
+      font-size: 16px;
       border-radius: 4px;
       margin-bottom: 5px;
       position: sticky;
-      top: 0;
-      z-index: 1000;
+      top: 0px;
+      border: 2px solid #8b4513;
+      border-radius: 8px;
+      background: #deb887;
+      font-weight: bold;
     }
-    /* Специально для контейнера выбора ивента */
+    .collapsible:hover {
+        background: #d2a679;
+    }
     #eventSelectorHeader {
-      background-color: #444;       /* чуть другой фон, чтобы отличался */
+        top: 0px;
+        z-index: 1000;
     }
+    #eventSelectorContainer {
+        z-index: 1000;
+    }
+    #eventSelectorContainer, #battleToggle {
+        top: 44px;
+    }
+    #battleToggle {
+        z-index: 999;
+    }
+    #battleToggleContainer {
+        z-index: 999;
+    }
+    #battleToggleContainer, #filterContainer {
+        top: 88px;
+    }
+    #filterContainer {
+        z-index: 998;
+    }
+    
     #eventSelectorContainer {
       /* чтобы при скролле он оставался под заголовком */
       margin-bottom: 20px;
@@ -45,15 +70,16 @@
     .collapsible::after {
       content: "\25B6"; /* стрелка вправо */
       position: absolute;
-      right: 20px;
-      font-size: 20px;
+      right: 8px;
+      font-size: 16px;
     }
     .collapsible.active::after {
       content: "\25BC"; /* стрелка вниз */
     }
     /* Контент блока отправки боёв – обычное положение, но с небольшим отступом сверху */
     .content {
-      padding: 0 18px;
+      position: sticky;
+      padding: 10px;
       display: none;
       overflow: hidden;
       background-color: #fff;
@@ -63,13 +89,19 @@
       margin-top: 5px;
     }
     textarea {
-      width: 100%;
+      width: calc(100% - 20px);
       height: 150px;
       font-size: 16px;
       padding: 10px;
-      margin-bottom: 10px;
       border: 1px solid #ccc;
       border-radius: 4px;
+      overflow-y: scroll;
+    }
+    @media only screen and (max-width: 768px) and (orientation: portrait) {
+      textarea {
+        height: 350px;
+        min-height: 350px;
+      }
     }
     input[type="text"] {
       width: calc(100% - 20px);
@@ -95,10 +127,8 @@
       background-color: #dc3545;
       color: #fff;
     }
-    /* Фильтр – контейнер после блока отправки, sticky (только заголовок) */
     .filter-container {
       position: sticky;
-      top: 70px; /* ниже блока отправки */
       z-index: 990;
       background: rgba(240, 230, 210, 0.9);
       border: 2px solid #8b4513;
@@ -140,10 +170,11 @@
       margin-bottom: 4px;
       text-align: center;
     }
-    .filter-group .group-content {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+    .filter-group .group-content{
+      display:grid;
+      /* берём столько колонок, сколько влезет, 120 px – минимальная ширина ячейки */
+      grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+      gap:8px;
     }
     .filter-group label {
       font-size: 14px;
@@ -197,7 +228,7 @@
       font-weight: bold;
       margin-bottom: 5px;
       padding: 5px;
-      background: #f0f0f0;
+      background: #deb887;
       border-radius: 4px;
     }
     /* Отображение боёв */
@@ -240,9 +271,8 @@
       background-color: #e9ecef;  /* светло-серый фон */
       border: 2px solid #ced4da;
       border-radius: 8px;
-      padding: 10px 20px;
+      padding: 10px;
       font-size: 18px;
-      margin: 20px auto;
       max-width: 960px;
       text-align: center;
       color: #495057;
@@ -396,6 +426,30 @@
     .error-btn.close:hover {
       background-color: #c82333;
     }
+    
+    .common-row { display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+    .inline-opt { display:flex; align-items:center; gap:4px; font-size:14px; }
+    
+    .copy-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9em;
+      margin-left: 8px;
+      color: #444;
+      transition: color 0.2s;
+    }
+    .copy-btn:hover {
+      color: #000;
+    }
+    .collapsible-group {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .collapsible-group .header-text {
+      flex: 1;
+    }
   </style>
 </head>
 <body>
@@ -408,7 +462,7 @@
   <div class="container">
     <!-- Контейнер выбора ивента -->
     <button type="button" class="collapsible" id="eventSelectorHeader">
-      Выбран ивент:
+      Текущий ивент
     </button>
     <div class="content" id="eventSelectorContainer">
       <div style="margin:10px 0;">
@@ -431,7 +485,7 @@
     <!-- /Контейнер выбора ивента -->
     <!-- Блок отправки боёв -->
     <button type="button" class="collapsible" id="battleToggle">Отправка боёв</button>
-    <div class="content">
+    <div class="content" id="battleToggleContainer">
       <textarea id="battleInput" placeholder="Вставьте сюда любой текст, содержащий бои ивента...
 Например, вы можете вставить рассылку по ивенту с примерами боёв, или вставить HTML код страницы протокола боёв. Можно вставить сразу несколько HTML страниц. 
 Проще всего: откройте протокол боёв на нужной странице, нажмите CTRL+U, затем CTRL+A, CTRL+C и вставьте сюда (CTRL+V).
@@ -445,17 +499,34 @@
     <!-- Блок фильтров -->
     <div class="filter-container" id="filterContainer">
       <div class="filter-header" id="filterToggle">
-        Фильтры <span id="filterToggleIcon">&#9654;</span>
+        Фильтр информации о боях <span id="filterToggleIcon">&#9654;</span>
       </div>
       <div class="filter-content collapsed" id="filterContent">
         <div class="filter-group common-options">
           <div class="group-title">Общие опции</div>
-          <div class="group-content">
-            <div>
-              <input type="checkbox" id="shortenMarkers" data-option="shortenMarkers">
-              <label for="shortenMarkers">Сокращать маркеры</label>
+          <div class="group-content common-row">
+              <!-- 1) Сокращать маркеры -->
+              <label class="inline-opt">
+                <input type="checkbox" id="shortenMarkers" data-option="shortenMarkers">
+                Сокращать маркеры
+              </label>
+
+              <!-- 2) Начало боя -->
+              <label class="inline-opt">
+                <input type="checkbox" id="startFromBeg" data-option="startFromBeg">
+                Начало боя
+              </label>
+
+              <!-- 3) Домен -->
+              <label class="inline-opt">
+                <select id="domainSelect" data-option="domain">
+                  <option>www.heroeswm.ru</option>
+                  <option>mirror.heroeswm.ru</option>
+                  <option>my.lordswm.com</option>
+                  <option>www.lordswm.com</option>
+                </select>
+              </label>
             </div>
-          </div>
         </div>
         <div class="two-columns">
           <div class="column">
@@ -669,24 +740,19 @@
         newBattles.forEach(b => {
           if (!battlesMap[b.warid]) battlesMap[b.warid] = b;
         });
-        console.log(`Боев в dbBattles после: ${dbBattles.length}`);
-        console.log(`Боев в newBattles после: ${dbBattles.length}`);
+        
         let allBattles = Object.values(battlesMap);
 
         document.getElementById('statusText').textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
 
         // Анализируем те бои, у которых ещё нет результата
-        console.log(`Боев до анализа: ${allBattles.length}`);
         allBattles = await analyzeBattles(allBattles);
-        console.log(`Боев после анализа: ${allBattles.length}`);
         // Если заданы маркеры ивента – фильтруем
         const markers = markersInput.value.split(',')
                               .map(m => m.trim())
                               .filter(m => m);
         if (markers.length > 0) {
-          console.log(`Боев до фильтрации: ${allBattles.length}`);
           const filtered = allBattles.filter(b => battleHasMarkers(b.result, markers));
-          console.log(`Боев после фильтрации: ${filtered.length}`);
           allBattles = filtered;
         }
 
@@ -798,7 +864,7 @@
 
               try {
                 const res = await fetch(
-                  'https://heroeswm.netlify.app/.netlify/functions/analyzeBattles',
+                  '/.netlify/functions/analyzeBattles',
                   {
                     method: 'POST',
                     headers: {'Content-Type':'application/json'},
@@ -904,6 +970,8 @@ ${failedBattles.map(b => b.link).join('\n')}
       
       const defaultFilterOptions = {
           shortenMarkers: true,
+          startFromBeg: false,
+          domain: "www.heroeswm.ru",
           showWinningSideName: true,
           showLosingSideName: true,
           showWinningHP: false,
@@ -950,6 +1018,23 @@ ${failedBattles.map(b => b.link).join('\n')}
         saveFilterOptions(filterOptions);
         updateFilteredOutput();
       });
+    });
+    // селект домена
+    const domainSel = document.getElementById("domainSelect");
+    domainSel.value = filterOptions.domain;
+    domainSel.addEventListener("change", () => {
+      filterOptions.domain = domainSel.value;
+      saveFilterOptions(filterOptions);
+      updateFilteredOutput();
+    });
+
+    // чекбокс «Начало боя»
+    const begChk = document.getElementById("startFromBeg");
+    begChk.checked = !!filterOptions.startFromBeg;
+    begChk.addEventListener("change", () => {
+      filterOptions.startFromBeg = begChk.checked;
+      saveFilterOptions(filterOptions);
+      updateFilteredOutput();
     });
       /* Функции для дополнительной группировки и фильтрации */
       function extractWinningLevel(resultText, markers) {
@@ -1022,6 +1107,28 @@ ${failedBattles.map(b => b.link).join('\n')}
 
 
       function updateFilteredOutput() {
+          /* --- правка ссылок -------------------------------------------------- */
+          const needBeg   = !!filterOptions.startFromBeg;
+          const newDomain = filterOptions.domain || "www.heroeswm.ru";
+
+          document.querySelectorAll(".battle-link a").forEach(a => {
+            try {
+              const url = new URL(a.href);
+
+              /* домен */
+              url.hostname = newDomain;
+
+              /* lt параметр */
+              if (needBeg) {
+                url.searchParams.set("lt", "-1");     // просто “&lt” — LWM / HWM понимают
+              } else {
+                url.searchParams.delete("lt");
+              }
+
+              a.href = url.toString();
+              a.textContent = a.href;
+            } catch (_) {}
+          });
         document.querySelectorAll('.battle-result').forEach(resultDiv => {
           let original = resultDiv.parentNode.dataset.originalResult;
           if (!original) return;
@@ -1261,13 +1368,40 @@ ${failedBattles.map(b => b.link).join('\n')}
         let overallKeys = Object.keys(overallGroups);
         overallKeys.sort(compareGroupHeaders);
         overallKeys.forEach((overallKey) => {
-        //for (let overallKey in overallGroups) {
           let overallDiv = document.createElement('div');
           overallDiv.className = 'result-group';
           let overallHeader = document.createElement('div');
           overallHeader.className = 'collapsible-group';
-          overallHeader.textContent = overallKey;
-          overallDiv.appendChild(overallHeader);
+          
+          // обёртка для текста (чтобы кнопка не мешала wrap)
+            let overallText = document.createElement('span');
+            overallText.className = 'header-text';
+            overallText.textContent = overallKey;
+            overallHeader.appendChild(overallText);
+
+            // кнопка копирования
+            let overallCopy = document.createElement('button');
+            overallCopy.className = 'copy-btn';
+            overallCopy.title = 'Скопировать группу';
+            overallCopy.textContent = '📋';
+            overallHeader.appendChild(overallCopy);
+
+            overallDiv.appendChild(overallHeader);
+            overallCopy.addEventListener('click', () => {
+              // 1) заголовок
+              let lines = [ overallText.textContent ];
+              // 2) весь внутренний текст группы (levels → factions → бои)
+              let content = overallDiv.querySelector('.group-content');
+              // Возьмём только читаемый текст, уберём лишние пробелы
+              let txt = content.innerText.trim();
+              if (txt) lines.push(txt);
+              // 3) склеиваем
+              let toCopy = lines.join('\n\n');
+              navigator.clipboard.writeText(toCopy)
+                .then(() => alert('Группа скопирована в буфер'))
+                .catch(err => console.error('Ошибка копирования', err));
+            });
+          
           let overallContent = document.createElement('div');
           overallContent.className = 'group-content';
 
@@ -1292,14 +1426,15 @@ ${failedBattles.map(b => b.link).join('\n')}
             let levelDiv = document.createElement('div');
             let levelHeader = document.createElement('div');
             levelHeader.className = 'collapsible-group';
+            
             levelHeader.textContent = `${levelKey} [выжило ${bestSurvival.toFixed(2)}% у лучшего игрока]`;
             // Извлекаем числовое значение уровня из строки "[Уровень: N]"
-            //let levelNum = parseInt(levelKey.replace(/\D/g, ''));
             let levelNum = extractLevelNumber(levelKey);
             // Применяем градиентный фон, вычисленный по уровню
             levelHeader.style.background = getLevelGradient(levelNum);
             levelHeader.style.color = '#fff';
             levelDiv.appendChild(levelHeader);
+            
             let levelContent = document.createElement('div');
             levelContent.className = 'group-content';
 
@@ -1332,9 +1467,19 @@ ${failedBattles.map(b => b.link).join('\n')}
                 let linkDiv = document.createElement('div');
                 linkDiv.className = 'battle-link';
                 let linkA = document.createElement('a');
-                linkA.href = battle.link;
+                let battleLink = `https://www.heroeswm.ru/war.php?warid=${battle.warid}`;
+
+                if (battle.enemy) {
+                  // оба параметра — showt и show_enemy
+                  battleLink += `&showt=${battle.show}&show_enemy=${battle.enemy}`;
+                } else if (battle.show) {
+                  battleLink += `&show=${battle.show}`;
+                }
+
+                //console.log("battleLink:", battleLink);
+                linkA.href = battleLink;
                 linkA.target = '_blank';
-                linkA.textContent = battle.link;
+                linkA.textContent = battleLink;
                 linkDiv.appendChild(linkA);
                 battleDiv.appendChild(linkDiv);
                 let resultDiv = document.createElement('div');
@@ -1385,7 +1530,7 @@ ${failedBattles.map(b => b.link).join('\n')}
           const ev = allEvents.find(e => e.eventId === currentEventId);
 
           // Обновляем весь контейнер
-          eventSelectorHeader.textContent = `Выбран ивент: ${ev.title}`;
+          eventSelectorHeader.textContent = `${ev.title}`;
           eventAnnouncement.href    = ev.announcement || '#';
           eventAnnouncement.textContent = ev.announcement ? 'Перейти' : '—';
           eventReward.href          = ev.reward       || '#';
@@ -1479,7 +1624,7 @@ ${failedBattles.map(b => b.link).join('\n')}
 
           // Заполняем шапку и содержимое контейнера выбора ивента
           const chosen = allEvents.find(e => e.eventId === currentEventId);
-          eventSelectorHeader.textContent  = `Выбран ивент: ${chosen.title}`;
+          eventSelectorHeader.textContent  = `${chosen.title}`;
           eventAnnouncement.href           = chosen.announcement || '#';
           eventAnnouncement.textContent    = chosen.announcement ? 'Перейти' : '—';
           eventReward.href                 = chosen.reward || '#';
