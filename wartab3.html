@@ -1500,12 +1500,80 @@ ${failedBattles.map(b => b.link).join('\n')}
             let levelHeader = document.createElement('div');
             levelHeader.className = 'collapsible-group';
             
-            levelHeader.textContent = `${levelKey} [выжило ${bestSurvival.toFixed(2)}% у лучшего игрока]`;
-            // Извлекаем числовое значение уровня из строки "[Уровень: N]"
+            // 2) Устанавливаем текст иконку градиента
+            const levelText = document.createElement('span');
+            levelText.className = 'header-text';
+            levelText.textContent = `${levelKey} [выжило ${bestSurvival.toFixed(2)}% у лучшего игрока]`;
+            levelHeader.appendChild(levelText);
+
+            // 3) Параметры вашего градиента (как раньше)
             let levelNum = extractLevelNumber(levelKey);
-            // Применяем градиентный фон, вычисленный по уровню
             levelHeader.style.background = getLevelGradient(levelNum);
-            levelHeader.style.color = '#fff';
+            levelHeader.style.color      = '#fff';
+
+            // 4) Кнопка копирования уровня
+            const levelCopy = document.createElement('button');
+            levelCopy.type        = 'button';
+            levelCopy.className   = 'copy-btn';
+            levelCopy.title       = 'Скопировать уровень';
+            levelCopy.textContent = '📋';
+            levelHeader.appendChild(levelCopy);
+
+            // 5) Навешиваем обработчик на кнопку (как обсуждали выше)
+            levelCopy.addEventListener('click', function(event) {
+              event.stopPropagation();
+              event.preventDefault();
+
+              // helper проверки видимости
+              const isVisible = el => el && getComputedStyle(el).display !== 'none';
+
+              // собираем строки
+              const lines = [];
+              const addSection = txt => {
+                if (lines.length && lines[lines.length-1] !== '') lines.push('');
+                lines.push(txt);
+              };
+              const addLine = txt => lines.push(txt);
+
+              // 3.1) если уровень свернут — выходим
+              const lvlContent = levelHeader.nextElementSibling;
+              if (!isVisible(lvlContent)) return;
+
+              // 3.2) заголовок уровня
+              addLine(levelText.textContent.trim());
+
+              // 3.3) перебираем фракции и бои внутри lvlContent
+              let lastFaction = null;
+              Array.from(lvlContent.children).forEach(node => {
+                if (node.classList.contains('group-title')) {
+                  lastFaction = null;
+                  node._factionText = node.textContent.trim();
+                }
+                if (node.classList.contains('battle') && isVisible(node)) {
+                  // ищем соответствующую фракцию
+                  const siblings = Array.from(lvlContent.children);
+                  const idx = siblings.indexOf(node);
+                  const frNode = siblings.slice(0, idx).reverse()
+                                    .find(n => n.classList.contains('group-title'));
+                  const factionText = frNode ? frNode.textContent.trim() : null;
+
+                  if (factionText && factionText !== lastFaction) {
+                    addSection(factionText);
+                    lastFaction = factionText;
+                  }
+                  addLine(node.innerText.trim());
+                }
+              });
+
+              // 3.4) копируем, если нашлось что копировать
+              if (lines.length > 1) {
+                navigator.clipboard.writeText(lines.join('\n'))
+                  .then(() => alert('Уровень скопирован вместе с видимыми боями'))
+                  .catch(err => console.error(err));
+              }
+            });
+            
+            
             levelDiv.appendChild(levelHeader);
             
             let levelContent = document.createElement('div');
