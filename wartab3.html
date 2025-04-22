@@ -1394,72 +1394,61 @@ ${failedBattles.map(b => b.link).join('\n')}
             }
 
             overallCopy.addEventListener('click', function(event) {
+              // 1) Отключаем сворачивание
               event.stopPropagation();
               event.preventDefault();
 
-              const lines = [];
+              // 2) Если сама общая группа свернута — выходим
+              const overallContent = overallDiv.querySelector('.group-content');
+              if (!overallContent || overallContent.offsetParent === null) return;
 
-              // 1) Заголовок общей группы
+              const lines = [];
+              // 3) Заголовок общей группы
               lines.push(overallText.textContent.trim());
 
-              // 2) Контейнер уровней этой группы
-              const overallContent = overallDiv.querySelector('.group-content');
-              // Если группа свернута — ничего не копируем
-              if (getComputedStyle(overallContent).display === 'none') {
-                return;
-              }
+              // 4) Идём по всем заголовкам уровней внутри этой группы
+              const levelHeaders = overallDiv.querySelectorAll('.collapsible-group');
+              levelHeaders.forEach(levelHeader => {
+                const lvlContent = levelHeader.nextElementSibling;
+                // фильтруем только развёрнутые
+                if (!lvlContent || lvlContent.offsetParent === null) return;
 
-              // 3) Находим все открытые уровни
-              const levelHeaders = Array.from(
-                overallContent.querySelectorAll('.collapsible-group')
-              ).filter(h => {
-                const lvlContent = h.nextElementSibling;
-                return lvlContent && getComputedStyle(lvlContent).display !== 'none';
-              });
-
-              levelHeaders.forEach(lvlHeader => {
-                const lvlText = lvlHeader.querySelector('.header-text').textContent.trim();
+                // 5) Вставляем заголовок уровня
+                const lvlText = levelHeader.querySelector('.header-text').textContent.trim();
                 lines.push('', lvlText);
 
-                const lvlContent = lvlHeader.nextElementSibling;
+                // 6) Собираем все видимые бои в этом уровне
+                const battles = Array.from(lvlContent.querySelectorAll('.battle'))
+                                     .filter(b => b.offsetParent !== null);
+                let lastFaction = null;
 
-                // 4) В каждом открытом уровне перебираем фракции
-                const children = Array.from(lvlContent.children);
-                for (let i = 0; i < children.length; ) {
-                  const node = children[i];
-                  if (node.classList.contains('group-title')) {
-                    const factionText = node.textContent.trim();
-                    // собираем все видимые бои до следующей group-title
-                    const factionBattles = [];
-                    let j = i + 1;
-                    while (j < children.length && !children[j].classList.contains('group-title')) {
-                      const sib = children[j];
-                      if (sib.classList.contains('battle') && isVisible(sib)) {
-                        factionBattles.push(sib);
-                      }
-                      j++;
-                    }
-                    // если у этой фракции есть видимые бои — добавляем в копию
-                    if (factionBattles.length) {
-                      lines.push('', factionText);
-                      factionBattles.forEach(b => {
-                        lines.push(b.innerText.trim());
-                      });
-                    }
-                    i = j;
-                  } else {
-                    i++;
+                battles.forEach(battle => {
+                  // 7) Находим ближайший вверх заголовок-фракцию
+                  let prev = battle.previousElementSibling;
+                  while (prev && !prev.classList.contains('group-title')) {
+                    prev = prev.previousElementSibling;
                   }
-                }
+                  const factionText = prev ? prev.textContent.trim() : null;
+
+                  // 8) Если эта фракция ещё не добавлена — вставляем её заголовок
+                  if (factionText && factionText !== lastFaction) {
+                    lines.push('', factionText);
+                    lastFaction = factionText;
+                  }
+
+                  // 9) Вставляем сам бой
+                  lines.push(battle.innerText.trim());
+                });
               });
 
-              // 5) Копируем всё, что набрали
+              // 10) Наконец, копируем всё, что набрали
               if (lines.length > 1) {
-                navigator.clipboard.writeText(lines.join('\n'))
+                navigator.clipboard.writeText(lines.join('\n\n'))
                   .then(() => alert('Скопировано только то, что раскрыто'))
-                  .catch(err => console.error(err));
+                  .catch(err => console.error('Ошибка копирования:', err));
               }
             });
+
           
           let overallContent = document.createElement('div');
           overallContent.className = 'group-content';
