@@ -1388,6 +1388,7 @@ ${failedBattles.map(b => b.link).join('\n')}
 
             overallDiv.appendChild(overallHeader);
             overallCopy.addEventListener('click', () => {
+              event.stopPropagation();
               // 1) заголовок
               let lines = [ overallText.textContent ];
               // 2) весь внутренний текст группы (levels → factions → бои)
