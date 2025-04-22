@@ -1394,60 +1394,62 @@ ${failedBattles.map(b => b.link).join('\n')}
             }
 
             overallCopy.addEventListener('click', function(event) {
-              // 1) Отключаем сворачивание
               event.stopPropagation();
               event.preventDefault();
 
-              // 2) Если сама общая группа свернута — выходим
-              const overallContent = overallDiv.querySelector('.group-content');
-              if (!overallContent || overallContent.offsetParent === null) return;
+              // 1) контейнер с уровнями
+              const content = overallHeader.nextElementSibling;
+              if (!content || content.style.display === 'none') return;
 
               const lines = [];
-              // 3) Заголовок общей группы
+              // 2) заголовок группы
               lines.push(overallText.textContent.trim());
 
-              // 4) Идём по всем заголовкам уровней внутри этой группы
-              const levelHeaders = overallDiv.querySelectorAll('.collapsible-group');
+              // 3) все заголовки уровней внутри этой группы
+              const levelHeaders = Array.from(content.querySelectorAll('.collapsible-group'));
               levelHeaders.forEach(levelHeader => {
                 const lvlContent = levelHeader.nextElementSibling;
-                // фильтруем только развёрнутые
-                if (!lvlContent || lvlContent.offsetParent === null) return;
+                if (!lvlContent || lvlContent.style.display === 'none') return;
 
-                // 5) Вставляем заголовок уровня
-                const lvlText = levelHeader.querySelector('.header-text').textContent.trim();
+                // 4) берем текст уровня, с защитой на случай null
+                let lvlTextElem = levelHeader.querySelector('.header-text');
+                let lvlText = lvlTextElem
+                  ? lvlTextElem.textContent.trim()
+                  : // fallback: удаляем текст кнопки из полного текста
+                    levelHeader.textContent.replace('📋','').trim();
                 lines.push('', lvlText);
 
-                // 6) Собираем все видимые бои в этом уровне
-                const battles = Array.from(lvlContent.querySelectorAll('.battle'))
-                                     .filter(b => b.offsetParent !== null);
+                // 5) собираем только открытые бои в этом уровне
+                const battles = Array.from(lvlContent.querySelectorAll('.battle'));
                 let lastFaction = null;
-
                 battles.forEach(battle => {
-                  // 7) Находим ближайший вверх заголовок-фракцию
+                  if (battle.style.display === 'none') return;  // скрытые не берём
+
+                  // 6) ищем родительский заголовок-фракцию
                   let prev = battle.previousElementSibling;
                   while (prev && !prev.classList.contains('group-title')) {
                     prev = prev.previousElementSibling;
                   }
-                  const factionText = prev ? prev.textContent.trim() : null;
+                  const factionText = prev && prev.textContent.trim();
 
-                  // 8) Если эта фракция ещё не добавлена — вставляем её заголовок
+                  // 7) если фракция новая — вставляем её
                   if (factionText && factionText !== lastFaction) {
                     lines.push('', factionText);
                     lastFaction = factionText;
                   }
-
-                  // 9) Вставляем сам бой
+                  // 8) сам бой
                   lines.push(battle.innerText.trim());
                 });
               });
 
-              // 10) Наконец, копируем всё, что набрали
+              // 9) копируем, если есть что копировать
               if (lines.length > 1) {
                 navigator.clipboard.writeText(lines.join('\n\n'))
-                  .then(() => alert('Скопировано только то, что раскрыто'))
-                  .catch(err => console.error('Ошибка копирования:', err));
+                  .then(() => alert('Скопировано только видимое'))
+                  .catch(err => console.error(err));
               }
             });
+
 
           
           let overallContent = document.createElement('div');
