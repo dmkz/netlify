@@ -1596,8 +1596,63 @@ ${failedBattles.map(b => b.link).join('\n')}
               let best = Math.max(...factionGroups[factionKey].map(battle => extractSurvivalPercent(battle.result, markers)));
               let factionHeader = document.createElement('div');
               factionHeader.className = 'group-title';
-              factionHeader.textContent = factionKey + " [выжило " + best.toFixed(2) + "% у лучшего игрока]";
-              levelContent.appendChild(factionHeader);
+                // 1) Убираем прямую установку textContent
+                //    и оборачиваем текст в <span>
+                const factionTextSpan = document.createElement('span');
+                factionTextSpan.className = 'header-text';
+                factionTextSpan.textContent = `${factionKey} [выжило ${best.toFixed(2)}% у лучшего игрока]`;
+                factionHeader.textContent = '';
+                factionHeader.appendChild(factionTextSpan);
+
+                // 2) Кнопка копирования фракции
+                const factionCopy = document.createElement('button');
+                factionCopy.type        = 'button';
+                factionCopy.className   = 'copy-btn';
+                factionCopy.title       = 'Скопировать фракцию';
+                factionCopy.textContent = '📋';
+                factionHeader.appendChild(factionCopy);
+
+                // 3) Слушатель для копирования
+                factionCopy.addEventListener('click', function(event) {
+                  event.stopPropagation();
+                  event.preventDefault();
+
+                  // вспомогатель: проверка отображения
+                  const isVisible = el => el && getComputedStyle(el).display === 'block';
+
+                  const lines = [];
+                  // вставляет заголовок (с пустой строкой перед ним, если нужно)
+                  const addSection = txt => {
+                    if (lines.length && lines[lines.length - 1] !== '') lines.push('');
+                    lines.push(txt);
+                  };
+                  // простая вставка строки
+                  const addLine = txt => lines.push(txt);
+
+                  // 3.1) сам контейнер боёв — следующий sibling
+                  const fracContent = factionHeader.nextElementSibling;
+                  if (!isVisible(fracContent)) return;
+
+                  // 3.2) заголовок фракции
+                  addLine(factionTextSpan.textContent.trim());
+
+                  // 3.3) все прямые дочерние .battle этой фракции
+                  Array.from(fracContent.children).forEach(node => {
+                    if (node.classList.contains('battle') && isVisible(node)) {
+                      addLine(node.innerText.trim());
+                    }
+                  });
+
+                  // 3.4) копируем, если есть хотя бы один бой
+                  if (lines.length > 1) {
+                    navigator.clipboard.writeText(lines.join('\n'))
+                      .then(() => alert('Фракция скопирована вместе с видимыми боями'))
+                      .catch(err => console.error(err));
+                  }
+                });
+
+                // 4) Вставляем заголовок фракции в DOM
+                levelContent.appendChild(factionHeader);
               factionGroups[factionKey].sort((a, b) => {
                 return extractSurvivalPercent(b.result, markers) - extractSurvivalPercent(a.result, markers);
               });
