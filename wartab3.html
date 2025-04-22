@@ -1387,6 +1387,12 @@ ${failedBattles.map(b => b.link).join('\n')}
             overallHeader.appendChild(overallCopy);
 
             overallDiv.appendChild(overallHeader);
+            // вспомогательная функция
+            function isVisible(el) {
+              return el.offsetParent !== null &&
+                     getComputedStyle(el).visibility !== 'hidden';
+            }
+
             overallCopy.addEventListener('click', function(event) {
               event.stopPropagation();
               event.preventDefault();
@@ -1396,59 +1402,63 @@ ${failedBattles.map(b => b.link).join('\n')}
               // 1) Заголовок общей группы
               lines.push(overallText.textContent.trim());
 
-              // 2) Перебираем все дивы уровней внутри этой общей группы
-              const levelDivs = overallDiv.querySelectorAll('> .group-content > div');
-              levelDivs.forEach(levelDiv => {
-                // Текст заголовка уровня
-                const lvlHeaderEl = levelDiv.querySelector('.collapsible-group .header-text');
-                const lvlText = lvlHeaderEl.textContent.trim();
+              // 2) Контейнер уровней этой группы
+              const overallContent = overallDiv.querySelector('.group-content');
+              // Если группа свернута — ничего не копируем
+              if (getComputedStyle(overallContent).display === 'none') {
+                return;
+              }
 
-                // Контейнер с фракциями и боями
-                const lvlContent = levelDiv.querySelector('.group-content');
-                // Все бои в этом уровне
-                const allBattles = Array.from(lvlContent.querySelectorAll('.battle'));
-                // Оставляем только видимые
-                const visBattles = allBattles.filter(b => b.offsetParent !== null);
-
-                // Если в уровне нет видимых боёв — пропускаем
-                if (visBattles.length === 0) return;
-
-                // Вставляем заголовок уровня
-                lines.push('');
-                lines.push(lvlText);
-
-                // 3) Перебираем фракции в этом уровне
-                const children = Array.from(lvlContent.children);
-                children.forEach(node => {
-                  if (!node.classList.contains('group-title')) return;
-
-                  const factionHeaderText = node.textContent.trim();
-                  // Собираем все видимые бои до следующей фракции
-                  const factionBattles = [];
-                  let sib = node.nextElementSibling;
-                  while (sib && !sib.classList.contains('group-title')) {
-                    if (sib.classList.contains('battle') && sib.offsetParent !== null) {
-                      factionBattles.push(sib);
-                    }
-                    sib = sib.nextElementSibling;
-                  }
-
-                  // Если для этой фракции есть видимые бои — вставляем
-                  if (factionBattles.length) {
-                    lines.push('');
-                    lines.push(factionHeaderText);
-                    factionBattles.forEach(b => {
-                      lines.push(b.innerText.trim());
-                    });
-                  }
-                });
+              // 3) Находим все открытые уровни
+              const levelHeaders = Array.from(
+                overallContent.querySelectorAll('.collapsible-group')
+              ).filter(h => {
+                const lvlContent = h.nextElementSibling;
+                return lvlContent && getComputedStyle(lvlContent).display !== 'none';
               });
 
-              // 4) Копируем результат
-              const toCopy = lines.join('\n');
-              navigator.clipboard.writeText(toCopy)
-                .then(() => alert('Скопировано: заголовки уровней и фракций с видимыми боями'))
-                .catch(err => console.error('Ошибка копирования:', err));
+              levelHeaders.forEach(lvlHeader => {
+                const lvlText = lvlHeader.querySelector('.header-text').textContent.trim();
+                lines.push('', lvlText);
+
+                const lvlContent = lvlHeader.nextElementSibling;
+
+                // 4) В каждом открытом уровне перебираем фракции
+                const children = Array.from(lvlContent.children);
+                for (let i = 0; i < children.length; ) {
+                  const node = children[i];
+                  if (node.classList.contains('group-title')) {
+                    const factionText = node.textContent.trim();
+                    // собираем все видимые бои до следующей group-title
+                    const factionBattles = [];
+                    let j = i + 1;
+                    while (j < children.length && !children[j].classList.contains('group-title')) {
+                      const sib = children[j];
+                      if (sib.classList.contains('battle') && isVisible(sib)) {
+                        factionBattles.push(sib);
+                      }
+                      j++;
+                    }
+                    // если у этой фракции есть видимые бои — добавляем в копию
+                    if (factionBattles.length) {
+                      lines.push('', factionText);
+                      factionBattles.forEach(b => {
+                        lines.push(b.innerText.trim());
+                      });
+                    }
+                    i = j;
+                  } else {
+                    i++;
+                  }
+                }
+              });
+
+              // 5) Копируем всё, что набрали
+              if (lines.length > 1) {
+                navigator.clipboard.writeText(lines.join('\n'))
+                  .then(() => alert('Скопировано только то, что раскрыто'))
+                  .catch(err => console.error(err));
+              }
             });
           
           let overallContent = document.createElement('div');
