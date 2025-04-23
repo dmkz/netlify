@@ -1481,6 +1481,8 @@ ${failedBattles.map(b => b.link).join('\n')}
                 navigator.clipboard.writeText(lines.join('\n'))
                   .then(() => alert('Скопировано только то, что раскрыто'))
                   .catch(err => console.error(err));
+              } else {
+                alert('Нечего копировать: вы не развернули ни один список боёв');
               }
             });
 
@@ -1589,6 +1591,8 @@ ${failedBattles.map(b => b.link).join('\n')}
                  navigator.clipboard.writeText(lines.join('\n'))
                    .then(() => alert('Уровень скопирован вместе с видимыми боями'))
                    .catch(err => console.error(err));
+               } else {
+                alert('Нечего копировать: вы не развернули ни один список боёв');
                }
              });
             
@@ -1668,6 +1672,8 @@ ${failedBattles.map(b => b.link).join('\n')}
                     navigator.clipboard.writeText(lines.join('\n'))
                       .then(() => alert('Фракция скопирована вместе с видимыми боями'))
                       .catch(err => console.error(err));
+                  } else {
+                    alert('Нечего копировать: вы не развернули ни один список боёв');
                   }
                 });
 
