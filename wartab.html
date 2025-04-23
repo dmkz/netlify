@@ -429,6 +429,27 @@
     
     .common-row { display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
     .inline-opt { display:flex; align-items:center; gap:4px; font-size:14px; }
+    
+    .copy-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9em;
+      margin-left: 8px;
+      color: #444;
+      transition: color 0.2s;
+    }
+    .copy-btn:hover {
+      color: #000;
+    }
+    .collapsible-group {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .collapsible-group .header-text {
+      flex: 1;
+    }
   </style>
 </head>
 <body>
@@ -719,24 +740,19 @@
         newBattles.forEach(b => {
           if (!battlesMap[b.warid]) battlesMap[b.warid] = b;
         });
-        console.log(`Боев в dbBattles после: ${dbBattles.length}`);
-        console.log(`Боев в newBattles после: ${dbBattles.length}`);
+        
         let allBattles = Object.values(battlesMap);
 
         document.getElementById('statusText').textContent = `Статус: ${allBattles.length} боёв, ожидание анализа...`;
 
         // Анализируем те бои, у которых ещё нет результата
-        console.log(`Боев до анализа: ${allBattles.length}`);
         allBattles = await analyzeBattles(allBattles);
-        console.log(`Боев после анализа: ${allBattles.length}`);
         // Если заданы маркеры ивента – фильтруем
         const markers = markersInput.value.split(',')
                               .map(m => m.trim())
                               .filter(m => m);
         if (markers.length > 0) {
-          console.log(`Боев до фильтрации: ${allBattles.length}`);
           const filtered = allBattles.filter(b => battleHasMarkers(b.result, markers));
-          console.log(`Боев после фильтрации: ${filtered.length}`);
           allBattles = filtered;
         }
 
@@ -1352,13 +1368,124 @@ ${failedBattles.map(b => b.link).join('\n')}
         let overallKeys = Object.keys(overallGroups);
         overallKeys.sort(compareGroupHeaders);
         overallKeys.forEach((overallKey) => {
-        //for (let overallKey in overallGroups) {
           let overallDiv = document.createElement('div');
           overallDiv.className = 'result-group';
           let overallHeader = document.createElement('div');
           overallHeader.className = 'collapsible-group';
-          overallHeader.textContent = overallKey;
-          overallDiv.appendChild(overallHeader);
+          
+          // обёртка для текста (чтобы кнопка не мешала wrap)
+            let overallText = document.createElement('span');
+            overallText.className = 'header-text';
+            overallText.textContent = overallKey;
+            overallHeader.appendChild(overallText);
+
+            // кнопка копирования
+            let overallCopy = document.createElement('button');
+            overallCopy.className = 'copy-btn';
+            overallCopy.title = 'Скопировать группу';
+            overallCopy.textContent = '📋';
+            overallHeader.appendChild(overallCopy);
+
+            overallDiv.appendChild(overallHeader);
+            // вспомогательная функция
+            function isVisible(el) {
+              return el.offsetParent !== null &&
+                     getComputedStyle(el).visibility !== 'hidden';
+            }
+
+            overallCopy.addEventListener('click', function(event) {
+              event.stopPropagation();
+              event.preventDefault();
+
+              const overallContent = overallHeader.nextElementSibling;
+              if (!isVisible(overallContent)) return;
+
+              const lines = [];
+              // --- helper для вставки секций с максимум одной пустой строкой ---
+              function addSection(text) {
+                if (lines.length && lines[lines.length - 1] !== '') {
+                  lines.push('');
+                }
+                lines.push(text);
+              }
+              // простой добавитель строки без пустой строки перед ней
+              function addLine(text) {
+                lines.push(text);
+              }
+
+              // 1) заголовок группы
+              addLine(overallText.textContent.trim());
+
+              // 2) контейнеры уровней
+              const levelDivs = Array.from(overallContent.children)
+                .filter(div => div.querySelector('.collapsible-group'));
+
+              levelDivs.forEach(levelDiv => {
+                const levelHeader = levelDiv.querySelector('.collapsible-group');
+                const lvlContent  = levelHeader.nextElementSibling;
+
+                // 3) пропускаем скрытые уровни
+                if (!isVisible(lvlContent)) return;
+
+                // 4) добавляем заголовок уровня (одноразово)
+                const lvlTextEl = levelHeader.querySelector('.header-text');
+                const lvlText = lvlTextEl
+                  ? lvlTextEl.textContent.trim()
+                  : levelHeader.textContent.replace('📋','').trim();
+                addSection(lvlText);
+
+                // 5) итерируем сразу по всем узлам внутри lvlContent
+                let lastFaction = null;
+                Array.from(lvlContent.children).forEach(node => {
+                  // 5.1) встречаем заголовок-фракцию — сбрасываем lastFaction
+                  if (node.classList.contains('group-title')) {
+                    lastFaction = null;
+                    // вместо всего текста контейнера берём только span.header-text
+                    const hdr = node.querySelector('.header-text');
+                    node._factionText = hdr
+                      ? hdr.textContent.trim()
+                      : '';
+                  }
+                  // 5.2) встречаем бой
+                  if (node.classList.contains('battle') && isVisible(node)) {
+                    // 6) находим текст фракции
+                    const siblings = Array.from(lvlContent.children);
+                    const idx = siblings.indexOf(node);
+                    const frNode = siblings
+                      .slice(0, idx)
+                      .reverse()
+                      .find(n => n.classList.contains('group-title'));
+                    // опять: берём только span.header-text
+                    let factionText = null;
+                    if (frNode) {
+                    const hdr = frNode.querySelector('.header-text');
+                    factionText = hdr
+                        ? hdr.textContent.trim()
+                        : frNode._factionText;  // fallback, хотя выше мы прописали _factionText тоже из span
+                    }
+
+                    // 7) если новая фракция — вставляем её заголовок
+                    if (factionText && factionText !== lastFaction) {
+                      addSection(factionText);
+                      lastFaction = factionText;
+                    }
+
+                    // 8) и сам бой
+                    addLine(node.innerText.trim());
+                  }
+                });
+              });
+
+              // 9) копируем, если что-то набралось
+              if (lines.length > 1) {
+                navigator.clipboard.writeText(lines.join('\n'))
+                  .then(() => alert('Скопировано только то, что раскрыто'))
+                  .catch(err => console.error(err));
+              }
+            });
+
+
+          
           let overallContent = document.createElement('div');
           overallContent.className = 'group-content';
 
@@ -1383,14 +1510,91 @@ ${failedBattles.map(b => b.link).join('\n')}
             let levelDiv = document.createElement('div');
             let levelHeader = document.createElement('div');
             levelHeader.className = 'collapsible-group';
-            levelHeader.textContent = `${levelKey} [выжило ${bestSurvival.toFixed(2)}% у лучшего игрока]`;
-            // Извлекаем числовое значение уровня из строки "[Уровень: N]"
-            //let levelNum = parseInt(levelKey.replace(/\D/g, ''));
+            
+            // 2) Устанавливаем текст иконку градиента
+            const levelText = document.createElement('span');
+            levelText.className = 'header-text';
+            levelText.textContent = `${levelKey} [выжило ${bestSurvival.toFixed(2)}% у лучшего игрока]`;
+            levelHeader.appendChild(levelText);
+
+            // 3) Параметры вашего градиента (как раньше)
             let levelNum = extractLevelNumber(levelKey);
-            // Применяем градиентный фон, вычисленный по уровню
             levelHeader.style.background = getLevelGradient(levelNum);
-            levelHeader.style.color = '#fff';
+            levelHeader.style.color      = '#fff';
+
+            // 4) Кнопка копирования уровня
+            const levelCopy = document.createElement('button');
+            levelCopy.type        = 'button';
+            levelCopy.className   = 'copy-btn';
+            levelCopy.title       = 'Скопировать уровень';
+            levelCopy.textContent = '📋';
+            levelHeader.appendChild(levelCopy);
+
+             levelCopy.addEventListener('click', function(event) {
+               event.stopPropagation();
+               event.preventDefault();
+
+               const isVisible = el => el && getComputedStyle(el).display !== 'none';
+
+               const lines = [];
+               const addSection = txt => {
+                 if (lines.length && lines[lines.length-1] !== '') lines.push('');
+                 lines.push(txt);
+               };
+               const addLine = txt => lines.push(txt);
+
+               // 3.1) если уровень свернут — выходим
+               const lvlContent = levelHeader.nextElementSibling;
+               if (!isVisible(lvlContent)) return;
+
+               // 3.2) заголовок уровня
+               addLine(levelText.textContent.trim());
+
+               // 3.3) перебираем фракции и бои внутри lvlContent
+               let lastFaction = null;
+               Array.from(lvlContent.children).forEach(node => {
+                 if (node.classList.contains('group-title')) {
+                   lastFaction = null;
+                   // вместо node.textContent: сохраняем только текст span.header-text
+                   const hdr = node.querySelector('.header-text');
+                   node._factionText = hdr
+                   ? hdr.textContent.trim()
+                   : ''; 
+
+                 }
+                 if (node.classList.contains('battle') && isVisible(node)) {
+                   const siblings = Array.from(lvlContent.children);
+                   const idx = siblings.indexOf(node);
+                   const frNode = siblings.slice(0, idx).reverse()
+                                     .find(n => n.classList.contains('group-title'));
+                   // снова читаем только из span.header-text, а не из контейнера
+                   let factionText = null;
+                   if (frNode) {
+                   const hdr = frNode.querySelector('.header-text');
+                   factionText = hdr
+                       ? hdr.textContent.trim()
+                       : frNode._factionText;
+                   }
+
+                   if (factionText && factionText !== lastFaction) {
+                     addSection(factionText);
+                     lastFaction = factionText;
+                   }
+                   addLine(node.innerText.trim());
+                 }
+               });
+
+               // 3.4) копируем, если нашлось что копировать
+               if (lines.length > 1) {
+                 navigator.clipboard.writeText(lines.join('\n'))
+                   .then(() => alert('Уровень скопирован вместе с видимыми боями'))
+                   .catch(err => console.error(err));
+               }
+             });
+            
+            
             levelDiv.appendChild(levelHeader);
+            
             let levelContent = document.createElement('div');
             levelContent.className = 'group-content';
 
@@ -1411,8 +1615,65 @@ ${failedBattles.map(b => b.link).join('\n')}
               let best = Math.max(...factionGroups[factionKey].map(battle => extractSurvivalPercent(battle.result, markers)));
               let factionHeader = document.createElement('div');
               factionHeader.className = 'group-title';
-              factionHeader.textContent = factionKey + " [выжило " + best.toFixed(2) + "% у лучшего игрока]";
-              levelContent.appendChild(factionHeader);
+                // 1) Убираем прямую установку textContent
+                //    и оборачиваем текст в <span>
+                const factionTextSpan = document.createElement('span');
+                factionTextSpan.className = 'header-text';
+                factionTextSpan.textContent = `${factionKey} [выжило ${best.toFixed(2)}% у лучшего игрока]`;
+                factionHeader.textContent = '';
+                factionHeader.appendChild(factionTextSpan);
+
+                // 2) Кнопка копирования фракции
+                const factionCopy = document.createElement('button');
+                factionCopy.type        = 'button';
+                factionCopy.className   = 'copy-btn';
+                factionCopy.title       = 'Скопировать фракцию';
+                factionCopy.textContent = '📋';
+                factionHeader.appendChild(factionCopy);
+
+                // 3) Слушатель для копирования
+                factionCopy.addEventListener('click', function(event) {
+                  event.stopPropagation();
+                  event.preventDefault();
+
+                  // вспомогатель: проверка отображения
+                  const isVisible = el => el && getComputedStyle(el).display === 'block';
+
+                  const lines = [];
+                  // вставляет заголовок (с пустой строкой перед ним, если нужно)
+                  const addSection = txt => {
+                    if (lines.length && lines[lines.length - 1] !== '') lines.push('');
+                    lines.push(txt);
+                  };
+                  // простая вставка строки
+                  const addLine = txt => lines.push(txt);
+                  // 3.2) добавляем заголовок фракции (с разделителем, если нужно)
+                  addSection(factionTextSpan.textContent.trim());
+
+                  // начинаем со следующего sibling
+                    let sib = factionHeader.nextElementSibling;
+                    while (sib && !sib.classList.contains('group-title')) {
+                      // только реальные бои, и только если они видимы
+                      if (
+                        sib.classList.contains('battle') &&
+                        sib.offsetParent !== null  // безопасная проверка «видимости»
+                      ) {
+                        addLine(sib.innerText.trim());
+                      }
+                      sib = sib.nextElementSibling;
+                    }
+
+                  // 3.4) копируем, если есть хотя бы один бой
+                  if (lines.length > 1) {
+                    navigator.clipboard.writeText(lines.join('\n'))
+                      .then(() => alert('Фракция скопирована вместе с видимыми боями'))
+                      .catch(err => console.error(err));
+                  }
+                });
+
+                // 4) Вставляем заголовок фракции в DOM
+                levelContent.appendChild(factionHeader);
+                
               factionGroups[factionKey].sort((a, b) => {
                 return extractSurvivalPercent(b.result, markers) - extractSurvivalPercent(a.result, markers);
               });
