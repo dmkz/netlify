@@ -461,61 +461,96 @@ function insertAnalysisResults(inputText, analysisMap) {
     }
     
     function transformLine(line, opts) {
-  let trimmed = line.trim();
-  if (!trimmed.startsWith("[")) return line;
-  let inner = trimmed.substring(1, trimmed.length - 1);
-  let blocks = inner.split("] [");
-  let marker = blocks[0];
-  let isWinner = (marker.toLowerCase().includes("win") || marker.indexOf("+") !== -1);
-  let isLoser = (marker.toLowerCase().includes("lose") || marker.indexOf("-") !== -1);
+      let trimmed = line.trim();
+      if (!trimmed.startsWith("[")) return line;
+      line = trimmed;
+      // 1) Разбиваем на сегменты: текст и блоки "[...]" с учётом баланса скобок
+      const segments = [];
+      let depth = 0;
+      let buf = '';
+      for (let ch of line) {
+        if (ch === '[') {
+          if (depth === 0 && buf) {
+            segments.push({ type: 'text', content: buf });
+            buf = '';
+          }
+          depth++;
+          buf += ch;
+        } else if (ch === ']') {
+          buf += ch;
+          depth--;
+          if (depth === 0) {
+            segments.push({ type: 'block', content: buf });
+            buf = '';
+          }
+        } else {
+          buf += ch;
+        }
+      }
+      if (buf) {
+        segments.push({ type: depth > 0 ? 'block' : 'text', content: buf });
+      }
 
-  if (isWinner || isLoser) {
-    if (opts.shortenMarkers) {
-      blocks[0] = replacePrefix(blocks[0], "win!", "+");
-      blocks[0] = replacePrefix(blocks[0], "lose", "-");
-    }
-  }
-  if ((isWinner && !opts.showWinningSideName) || (!isWinner && !opts.showLosingSideName)) {
-    blocks[1] = "";
-  }
-  if ((isWinner && !opts.showWinningHP) || (!isWinner && !opts.showLosingHP)) {
-    blocks[2] = "";
-  }
-  if ((isWinner && !opts.showWinningPercent) || (!isWinner && !opts.showLosingPercent)) {
-    blocks[3] = "";
-  }
-  if ((isWinner && !opts.showWinningFaction) || (!isWinner && !opts.showLosingFaction)) {
-    blocks[4] = "";
-  }
+      // 2) Извлекаем содержимое всех блоков (без внешних "[ ]")
+      const rawBlocks = segments
+        .filter(s => s.type === 'block')
+        .map(s => s.content.slice(1, -1));
 
-  // --- Новая логика определения блока с информацией о героях ---
-  // Предполагается, что блок с героями должен содержать подстроку "Уровень:".
-  // Если в блоке 5 её нет, то информации о героях нет, и следующие блоки сдвигаются на один влево.
-  let heroBlockExists = false;
-  let heroIdx = 5; // изначально предполагаем, что блок 5 содержит героев
-  if (blocks.length > heroIdx && blocks[heroIdx].includes("Уровень:")) {
-    heroBlockExists = true;
-    blocks[heroIdx] = transformHeroBlock(blocks[heroIdx], isWinner, opts);
-  }
-  
-  // Если блока с героями нет, сдвигаем индексацию:
-  let armyIdx = heroBlockExists ? 6 : 5;
-  if (blocks.length > armyIdx) {
-    if ((isWinner && !opts.showWinningArmy) || (!isWinner && !opts.showLosingArmy)) {
-      blocks[armyIdx] = "";
-    }
-  }
-  let bonusIdx = heroBlockExists ? 7 : 6;
-  if (blocks.length > bonusIdx) {
-    if ((isWinner && !opts.showWinningBonuses) || (!isWinner && !opts.showLosingBonuses)) {
-      blocks[bonusIdx] = "";
-    }
-  }
-  // -----------------------------------------------------------------
+      // 3) Обрабатываем массив блоков по вашей логике
+      const blocks = rawBlocks.slice(); // копия
+      const marker = blocks[0] || '';
+      const isWinner = marker.toLowerCase().includes('win') || marker.includes('+');
+      const isLoser  = marker.toLowerCase().includes('lose')|| marker.includes('-');
 
-  let newLine = blocks.filter(b => b !== "").map(b => "[" + b + "]").join(" ");
-  return newLine;
-}
+      if (isWinner || isLoser) {
+        if (opts.shortenMarkers) {
+          blocks[0] = replacePrefix(blocks[0], 'win!', '+');
+          blocks[0] = replacePrefix(blocks[0], 'lose', '-');
+        }
+      }
+      if ((isWinner && !opts.showWinningSideName) || (!isWinner && !opts.showLosingSideName)) {
+        blocks[1] = '';
+      }
+      if ((isWinner && !opts.showWinningHP)       || (!isWinner && !opts.showLosingHP)) {
+        blocks[2] = '';
+      }
+      if ((isWinner && !opts.showWinningPercent)  || (!isWinner && !opts.showLosingPercent)) {
+        blocks[3] = '';
+      }
+      if ((isWinner && !opts.showWinningFaction)  || (!isWinner && !opts.showLosingFaction)) {
+        blocks[4] = '';
+      }
+
+      // поиск и обработка блока с героями
+      let heroIdx = 5;
+      let heroBlockExists = blocks[heroIdx] && blocks[heroIdx].includes('Уровень:');
+      if (heroBlockExists) {
+        blocks[heroIdx] = transformHeroBlock(blocks[heroIdx], isWinner, opts);
+      }
+
+      // армия и бонусы смещаются, если нет героев
+      const armyIdx = heroBlockExists ? 6 : 5;
+      if (blocks[armyIdx] && ((isWinner && !opts.showWinningArmy) || (!isWinner && !opts.showLosingArmy))) {
+        blocks[armyIdx] = '';
+      }
+      const bonusIdx = heroBlockExists ? 7 : 6;
+      if (blocks[bonusIdx] && ((isWinner && !opts.showWinningBonuses) || (!isWinner && !opts.showLosingBonuses))) {
+        blocks[bonusIdx] = '';
+      }
+
+      // фильтруем пустые и оборачиваем обратно в "[…]"
+      const processedBlocks = blocks.filter(b => b !== '').map(b => `[${b}]`);
+
+      // 4) Собираем итоговую строку, подставляя вместо каждого блок-сегмента следующий processedBlock
+      let bi = 0;
+      const result = segments.map(s => {
+        if (s.type === 'text') return s.content;
+        return processedBlocks[bi++] || ''; 
+      }).join('');
+
+      return result;
+    }
+
 
     
     function transformTokensText(inputText, opts) {
