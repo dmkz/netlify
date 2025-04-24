@@ -426,8 +426,8 @@ function createFakeTokenLinesForUnmatchedArmies(winTokensByLine, loseTokensByLin
       if (!found1 && !found2 && sideIndex > 0) {
         sideAggregate.faction = determineFaction(sideAggregate);
         let fakeLine = {
-          originalLine: `<b><font color="${sideColors[sideIndex]}">Сторона конфликта ${sideIndex}</font></b>`,
-          tokens: [`<b><font color="${sideColors[sideIndex]}">Сторона конфликта ${sideIndex}</font></b>`],
+          originalLine: `<b><font color="${sideColors[sideIndex]}">Фанаты админа #${sideIndex}</font></b>`,
+          tokens: [`<b><font color="${sideColors[sideIndex]}">Фанаты админа #${sideIndex}</font></b>`],
           sideAggregate: sideAggregate
         };
         // основываясь на чётности sideIndex, нужно добавить в правильный список
