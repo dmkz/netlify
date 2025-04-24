@@ -463,7 +463,7 @@ function insertAnalysisResults(inputText, analysisMap) {
     function transformLine(line, opts) {
       let trimmed = line.trim();
       if (!trimmed.startsWith("[")) return line;
-      line = trimmed.
+      line = trimmed;
       // 1) Разбиваем на сегменты: текст и блоки "[...]" с учётом баланса скобок
       const segments = [];
       let depth = 0;
