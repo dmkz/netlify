@@ -1398,7 +1398,10 @@ ${failedBattles.map(b => b.link).join('\n')}
               event.preventDefault();
 
               const overallContent = overallHeader.nextElementSibling;
-              if (!isVisible(overallContent)) return;
+              if (!isVisible(overallContent)) {
+                alert('Нечего копировать: вы не развернули ни один список боёв');
+                return;
+              }
 
               const lines = [];
               // --- helper для вставки секций с максимум одной пустой строкой ---
@@ -1547,7 +1550,10 @@ ${failedBattles.map(b => b.link).join('\n')}
 
                // 3.1) если уровень свернут — выходим
                const lvlContent = levelHeader.nextElementSibling;
-               if (!isVisible(lvlContent)) return;
+               if (!isVisible(lvlContent)) {
+                    alert('Нечего копировать: вы не развернули ни один список боёв');
+                    return;
+               }
 
                // 3.2) заголовок уровня
                addLine(levelText.textContent.trim());
