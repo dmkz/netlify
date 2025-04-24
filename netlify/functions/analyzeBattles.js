@@ -394,6 +394,31 @@ function createFakeTokenLinesForUnmatchedArmies(winTokensByLine, loseTokensByLin
     8: "#A337AE"
   };
   if (!moments || !moments[0] || !moments[0].sides) return;
+  let where = [0, 0];
+  moments[0].sides.forEach((sideAggregate, sideIndex) => {
+    if (sideAggregate) {
+      let found1 = winTokensByLine.some(tokenLine => tokenLine.sideAggregate === sideAggregate);
+      if (found1 && sideIndex > 0) {
+        where[sideIndex % 2] = 1;
+        return;
+      }
+      let found2 = loseTokensByLine.some(tokenLine => tokenLine.sideAggregate === sideAggregate);
+      if (found2 && sideIndex > 0) {
+        where[sideIndex % 2] = 2;
+        return;
+      }
+    }
+  });
+  if (where[0] == 0 && where[1] > 0) {
+    where[0] = 3 - where[1];
+  }
+  if (where[1] == 0 && where[0] > 0) {
+    where[1] = 3 - where[0];
+  }
+  if (where[0] == 0 && where[1] == 0) {
+    where[0] = 1;
+    where[1] = 2;
+  }
   moments[0].sides.forEach((sideAggregate, sideIndex) => {
     if (sideAggregate) {
       let found1 = winTokensByLine.some(tokenLine => tokenLine.sideAggregate === sideAggregate);
@@ -401,11 +426,16 @@ function createFakeTokenLinesForUnmatchedArmies(winTokensByLine, loseTokensByLin
       if (!found1 && !found2 && sideIndex > 0) {
         sideAggregate.faction = determineFaction(sideAggregate);
         let fakeLine = {
-          originalLine: `<b><font color="${sideColors[sideIndex]}">Анонимная армия ${sideIndex}</font></b>`,
-          tokens: [`<b><font color="${sideColors[sideIndex]}">Анонимная армия ${sideIndex}</font></b>`],
+          originalLine: `<b><font color="${sideColors[sideIndex]}">Сторона конфликта ${sideIndex}</font></b>`,
+          tokens: [`<b><font color="${sideColors[sideIndex]}">Сторона конфликта ${sideIndex}</font></b>`],
           sideAggregate: sideAggregate
         };
-        winTokensByLine.push(fakeLine);
+        // основываясь на чётности sideIndex, нужно добавить в правильный список
+        if (where[sideIndex % 2] == 1) {
+            winTokensByLine.push(fakeLine);
+        } else {
+            loseTokensByLine.push(fakeLine);
+        }
       }
     }
   });
