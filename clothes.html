@@ -2,14 +2,107 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Просмотр гардероба</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 1rem; }
-    .field { margin-bottom: 1rem; }
-    .container { border: 1px solid #ccc; border-radius: 4px; margin-bottom: 1rem; padding: .5rem; }
-    .header { font-weight: bold; }
-    .entry { margin-left: 1rem; }
-    .eye-btn { margin-left: .5rem; }
+    /* Сброс и базовая типографика */
+    body {
+      font-family: Arial, sans-serif;
+      padding: 1rem;
+      max-width: 800px;
+      margin: 0 auto;
+      background: #f4f4f4;
+      color: #333;
+      line-height: 1.5;
+    }
+    h1 {
+      font-size: 2rem;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Поле ввода + кнопки */
+    .field {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .field label {
+      flex-shrink: 0;
+      font-size: 1rem;
+    }
+    .field input {
+      flex: 1;
+      font-size: 1rem;
+      padding: 0.75rem 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .field button {
+      flex-shrink: 0;
+      font-size: 1rem;
+      padding: 0.75rem 1rem;
+      border: none;
+      border-radius: 4px;
+      background: #007acc;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .field button:hover {
+      background: #005fa3;
+    }
+    .field button.eye-btn {
+      background: transparent;
+      color: #007acc;
+      padding: 0.5rem;
+    }
+
+    /* Результаты */
+    #results {
+      margin-top: 1rem;
+    }
+    .container {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .header {
+      font-size: 1.25rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+    .entry {
+      font-size: 1rem;
+      margin-left: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    /* Адаптив для узких экранов */
+    @media (max-width: 600px) {
+      body {
+        padding: 0.5rem;
+        font-size: 1.1rem;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      .field {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .field label {
+        margin-bottom: 0.25rem;
+      }
+      .field button {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -27,21 +120,21 @@
   <script>
     const endpoint = 'https://dmkz.netlify.app/.netlify/functions/query';
 
-    // Умная маска: переключаем тип поля
+    // Маскировка/показ пароля
     document.getElementById('toggleMask').addEventListener('click', () => {
       const inp = document.getElementById('clothes');
       inp.type = inp.type === 'password' ? 'text' : 'password';
     });
 
-    // Запрос и рендер
+    // Загрузка и рендер
     document.getElementById('load').addEventListener('click', async () => {
       const val = document.getElementById('clothes').value.trim();
-      if (!val) return alert('Введите clothes');
-
-      // Помним последнее введённое
+      if (!val) {
+        alert('Введите clothes');
+        return;
+      }
       localStorage.setItem('lastClothes', val);
 
-      // Чистим старые результаты
       const out = document.getElementById('results');
       out.innerHTML = '<p>Загружаю…</p>';
 
@@ -50,42 +143,41 @@
         if (!res.ok) throw new Error(`Status ${res.status}`);
         const rows = await res.json();
 
-        // Группируем по col1
         const groups = {};
         for (const r of rows) {
-          const key = r.col1;
-          groups[key] = groups[key] || [];
-          groups[key].push(r);
+          (groups[r.col1] = groups[r.col1] || []).push(r);
         }
 
-        // Сортируем ключи desc
-        const keys = Object.keys(groups).sort((a,b) => b.localeCompare(a, undefined, {numeric:true}));
+        const keys = Object.keys(groups)
+          .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
 
-        // Рендер
         out.innerHTML = '';
         for (const key of keys) {
           const div = document.createElement('div');
           div.className = 'container';
           div.innerHTML = `<div class="header">${key}</div>`;
-          // сортировка внутри по col2 (числовой)
+
           groups[key]
-            .sort((a,b) => a.col2 - b.col2)
+            .sort((a, b) => a.col2 - b.col2)
             .forEach(r => {
               const e = document.createElement('div');
               e.className = 'entry';
               e.textContent = `${r.col2}. ${r.col3}: ${r.col4}`;
               div.appendChild(e);
             });
+
           out.appendChild(div);
         }
-        if (!keys.length) out.innerHTML = '<p>Ничего не найдено</p>';
+        if (!keys.length) {
+          out.innerHTML = '<p>Ничего не найдено</p>';
+        }
       } catch (err) {
         out.innerHTML = `<p style="color:red">Ошибка: ${err.message}</p>`;
         console.error(err);
       }
     });
 
-    // Восстанавливаем последнее значение
+    // Восстановление последнего ввода
     window.addEventListener('load', () => {
       const last = localStorage.getItem('lastClothes');
       if (last) document.getElementById('clothes').value = last;
