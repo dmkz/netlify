@@ -18,41 +18,87 @@ const supabase = createClient(
 );
 
 exports.handler = async (event) => {
+  console.log('--- New invocation of collect.js ---');
+  console.log('HTTP Method:', event.httpMethod);
+
+  // Preflight
   if (event.httpMethod === 'OPTIONS') {
+    console.log('Handling CORS preflight (OPTIONS)');
     return {
       statusCode: 204,
       headers: CORS_HEADERS
     };
   }
-  if(event.httpMethod !== 'POST'){
-    return { statusCode: 405, headers: CORS_HEADERS, body: 'Method Not Allowed' };
+
+  // Only POST
+  if (event.httpMethod !== 'POST') {
+    console.warn('Rejected non-POST request');
+    return {
+      statusCode: 405,
+      headers: CORS_HEADERS,
+      body: 'Method Not Allowed'
+    };
   }
 
+  // Parse JSON
   let payload;
   try {
     payload = JSON.parse(event.body);
-  } catch {
-    return { statusCode: 400, headers: CORS_HEADERS, body: 'Bad Request' };
+    console.log('Parsed payload:', payload);
+  } catch (err) {
+    console.error('JSON parse error:', err);
+    return {
+      statusCode: 400,
+      headers: CORS_HEADERS,
+      body: 'Bad Request: invalid JSON'
+    };
   }
 
+  // Validate rows array
   const rows = payload.data;
-  if(!Array.isArray(rows)){
-    return { statusCode: 400, headers: CORS_HEADERS, body: 'Bad Request' };
+  console.log('Rows received:', Array.isArray(rows) ? rows.length : rows);
+  if (!Array.isArray(rows)) {
+    console.error('Bad payload: data is not array');
+    return {
+      statusCode: 400,
+      headers: CORS_HEADERS,
+      body: 'Bad Request: data must be array'
+    };
   }
 
-  // 1) проверим токены пользователя
-  const { data: clothes, error: tErr } = 
-          await supabase.from('face_control').select('clothes');
-  if(tErr) {
-    return { statusCode: 500, headers: CORS_HEADERS, body: 'Clothes lookup failed' };
+  // 1) Проверяем токены
+  let clothes, tErr;
+  try {
+    ({ data: clothes, error: tErr } = await supabase.from('face_control').select('clothes'));
+    console.log('face_control lookup result:', clothes);
+  } catch (err) {
+    console.error('Supabase query exception:', err);
+    tErr = err;
   }
+  if (tErr) {
+    console.error('Clothes lookup error:', tErr);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: 'Clothes lookup failed'
+    };
+  }
+
   const valid = new Set(clothes.map(r => r.clothes));
-  for(const r of rows){
-    if(!valid.has(r[4])){
-      return { statusCode: 401, headers: CORS_HEADERS, body: 'Unauthorized' };
+  console.log('Valid tokens set:', valid);
+
+  for (const r of rows) {
+    if (!valid.has(r[4])) {
+      console.warn('Unauthorized token in row:', r);
+      return {
+        statusCode: 401,
+        headers: CORS_HEADERS,
+        body: 'Unauthorized'
+      };
     }
   }
 
+  // 2) Подготовка к вставке
   const toInsert = rows.map(r => ({
     col1: r[0],
     col2: r[1],
@@ -60,14 +106,33 @@ exports.handler = async (event) => {
     col4: r[3],
     col5: r[4]
   }));
+  console.log('Prepared records for insert:', toInsert);
 
-  const { error: iErr } = await supabase
-    .from('collection')
-    .insert(toInsert);
-
-  if(iErr){
-    return { statusCode: 500, headers: CORS_HEADERS, body: 'Insert failed' };
+  // 3) Вставка
+  let inserted, iErr;
+  try {
+    ({ data: inserted, error: iErr } = await supabase
+      .from('collection')
+      .insert(toInsert));
+    console.log('Insert response data:', inserted);
+  } catch (err) {
+    console.error('Supabase insert exception:', err);
+    iErr = err;
   }
 
-  return { statusCode: 200, headers: CORS_HEADERS, body: 'OK' };
+  if (iErr) {
+    console.error('Insert failed:', iErr);
+    return {
+      statusCode: 500,
+      headers: CORS_HEADERS,
+      body: 'Insert failed'
+    };
+  }
+
+  console.log('Insert succeeded, rows inserted:', inserted.length);
+  return {
+    statusCode: 200,
+    headers: CORS_HEADERS,
+    body: 'OK'
+  };
 };
