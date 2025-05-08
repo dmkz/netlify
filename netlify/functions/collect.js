@@ -46,7 +46,7 @@ exports.handler = async (event) => {
   if(tErr) {
     return { statusCode: 500, headers: CORS_HEADERS, body: 'Clothes lookup failed' };
   }
-  const valid = new Set(clothes.map(r => r.jacket));
+  const valid = new Set(clothes.map(r => r.clothes));
   for(const r of rows){
     if(!valid.has(r[4])){
       return { statusCode: 401, headers: CORS_HEADERS, body: 'Unauthorized' };
