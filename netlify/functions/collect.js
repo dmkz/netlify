@@ -2,38 +2,54 @@
 
 const { createClient } = require('@supabase/supabase-js');
 
+// Разрешённый Origin
+const ALLOWED_ORIGIN = 'https://www.heroeswm.ru';
+
+// Общие заголовки CORS
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 exports.handler = async (event) => {
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 204,
+      headers: CORS_HEADERS
+    };
+  }
   if(event.httpMethod !== 'POST'){
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { statusCode: 405, headers: CORS_HEADERS, body: 'Method Not Allowed' };
   }
 
   let payload;
   try {
     payload = JSON.parse(event.body);
   } catch {
-    return { statusCode: 400, body: 'Bad Request' };
+    return { statusCode: 400, headers: CORS_HEADERS, body: 'Bad Request' };
   }
 
   const rows = payload.data;
   if(!Array.isArray(rows)){
-    return { statusCode: 400, body: 'Bad Request' };
+    return { statusCode: 400, headers: CORS_HEADERS, body: 'Bad Request' };
   }
 
   // 1) проверим токены пользователя
   const { data: clothes, error: tErr } = 
           await supabase.from('face_control').select('clothes');
   if(tErr) {
-    return { statusCode: 500, body: 'Clothes lookup failed' };
+    return { statusCode: 500, headers: CORS_HEADERS, body: 'Clothes lookup failed' };
   }
   const valid = new Set(clothes.map(r => r.jacket));
   for(const r of rows){
     if(!valid.has(r[4])){
-      return { statusCode: 401, body: 'Unauthorized' };
+      return { statusCode: 401, headers: CORS_HEADERS, body: 'Unauthorized' };
     }
   }
 
@@ -50,8 +66,8 @@ exports.handler = async (event) => {
     .insert(toInsert);
 
   if(iErr){
-    return { statusCode: 500, body: 'Insert failed' };
+    return { statusCode: 500, headers: CORS_HEADERS, body: 'Insert failed' };
   }
 
-  return { statusCode: 200, body: 'OK' };
+  return { statusCode: 200, headers: CORS_HEADERS, body: 'OK' };
 };
