@@ -763,9 +763,12 @@
         if (newInDB.length > 0) {
           try {
             // Формируем объект с полями: battles и markers
+            const selectedEventId = Number(eventSelector.value);
+            console.log(`selectedEventId: ${selectedEventId}`);
             const payload = {
-              battles: newInDB,
-              markers: markersInput.value // текущее значение из поля ввода
+              battles: newInDB, 
+              markers: markersInput.value,
+              eventId: selectedEventId 
             };
             const updateRes = await fetch('/.netlify/functions/updateBattles', {
               method: 'POST',
