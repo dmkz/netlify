@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { URL } = require('url');
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY; // service_role
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 exports.handler = async (event) => {
@@ -18,28 +18,53 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) };
   }
 
-  const { markers, battles } = payload;
+  const { markers, battles, eventId: userEventId } = payload;
 
-  // 1. Ищем eventId по eventMarkers
-  const { data: evData, error: evErr } = await supabase
-    .from('events')
-    .select('eventId')
-    .eq('eventMarkers', markers)
-    .maybeSingle();
+  let eventId;
 
-  if (evErr) {
-    console.error('Ошибка поиска события:', evErr);
-    return { statusCode: 500, body: JSON.stringify({ error: 'Internal Server Error' }) };
+  // 1. Если передан eventId, используем его
+  if (userEventId) {
+    const { data: evData, error: evErr } = await supabase
+      .from('events')
+      .select('eventId')
+      .eq('eventId', userEventId)
+      .maybeSingle();
+
+    if (evErr) {
+      console.error('Ошибка поиска события по eventId:', evErr);
+      return { statusCode: 500, body: JSON.stringify({ error: 'Internal Server Error' }) };
+    }
+    if (!evData) {
+      return {
+        statusCode: 403,
+        body: JSON.stringify({ error: 'Неверный eventId. Доступ запрещён.' })
+      };
+    }
+    eventId = evData.eventId;
+  } else {
+    // 2. Если eventId не передан, ищем по markers с выбором самого свежего
+    const { data: evData, error: evErr } = await supabase
+      .from('events')
+      .select('eventId')
+      .eq('eventMarkers', markers)
+      .order('eventId', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (evErr) {
+      console.error('Ошибка поиска события по markers:', evErr);
+      return { statusCode: 500, body: JSON.stringify({ error: 'Internal Server Error' }) };
+    }
+    if (!evData) {
+      return {
+        statusCode: 403,
+        body: JSON.stringify({ error: 'Неверный маркер. Доступ запрещён.' })
+      };
+    }
+    eventId = evData.eventId;
   }
-  if (!evData) {
-    return {
-      statusCode: 403,
-      body: JSON.stringify({ error: 'Неверный маркер. Доступ запрещён.' })
-    };
-  }
-  const eventId = evData.eventId;
 
-  // 2. Проверяем формат battles
+  // 3. Проверяем формат battles
   if (!Array.isArray(battles)) {
     return {
       statusCode: 400,
@@ -47,7 +72,7 @@ exports.handler = async (event) => {
     };
   }
 
-  // 3. Трансформируем входные бои в записи для examples
+  // 4. Трансформируем входные бои в записи для examples
   const records = battles.map(b => {
     let show = null;
     let enemy = null;
@@ -55,7 +80,6 @@ exports.handler = async (event) => {
     try {
       const url = new URL(b.link);
       const p = url.searchParams;
-      // варианты названия параметра "show"
       show = p.get('show') || p.get('showt') || p.get('show_for_all');
       enemy = p.get('show_enemy');
     } catch (_) {
@@ -68,11 +92,10 @@ exports.handler = async (event) => {
       result: b.result,
       eventId,
       enemy
-      // date пропускаем — будет default NOW()
     };
   });
 
-  // 4. Вставка/обновление в examples
+  // 5. Вставка/обновление в examples
   try {
     const { data, error } = await supabase
       .from('examples')
