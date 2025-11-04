@@ -633,6 +633,70 @@
   </div>
 
   <script>
+  
+  // ============ ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ ============
+  async function loadAllBattlesParallel() {
+    try {
+      console.log('🔄 Начало загрузки данных...');
+      const startTime = Date.now();
+      
+      const firstResponse = await fetch('/.netlify/functions/getBattles?page=0&pageSize=1000');
+      if (!firstResponse.ok) {
+        throw new Error(`HTTP error! status: ${firstResponse.status}`);
+      }
+      
+      const firstData = await firstResponse.json();
+      console.log(`📊 Первая страница: ${firstData.recordsInPage} из ${firstData.totalRecords} записей`);
+      console.log(`📄 Всего страниц: ${firstData.totalPages}`);
+      
+      const allEvents = firstData.events;
+      let allExamples = [...firstData.examples];
+      
+      if (firstData.totalPages <= 1) {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log(`✅ Загрузка завершена за ${elapsed}с`);
+        return { events: allEvents, examples: allExamples };
+      }
+      
+      // Parallel loading with error handling
+      const pagePromises = [];
+      for (let page = 1; page < firstData.totalPages; page++) {
+        pagePromises.push(
+          fetch(`/.netlify/functions/getBattles?page=${page}&pageSize=1000`)
+            .then(res => {
+              if (!res.ok) throw new Error(`HTTP error on page ${page}! status: ${res.status}`);
+              return res.json();
+            })
+            .then(data => {
+              console.log(`✓ Страница ${page + 1}/${firstData.totalPages}: ${data.recordsInPage} записей`);
+              return data.examples;
+            })
+            .catch(err => {
+              console.error(`❌ Ошибка страницы ${page}:`, err);
+              return []; // Return empty array instead of failing entire load
+            })
+        );
+      }
+      
+      console.log(`⏳ Загружаем ${pagePromises.length} страниц параллельно...`);
+      const results = await Promise.all(pagePromises);
+      
+      results.forEach(pageExamples => {
+        allExamples.push(...pageExamples);
+      });
+      
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`✅ Загрузка завершена за ${elapsed}с! Всего примеров: ${allExamples.length}`);
+      
+      return { events: allEvents, examples: allExamples };
+      
+    } catch (error) {
+      console.error('❌ Ошибка при загрузке данных:', error);
+      throw error;
+    }
+  }
+// ============ КОНЕЦ ФУНКЦИИ ЗАГРУЗКИ ============
+
     document.addEventListener('DOMContentLoaded', async () => {
       // Общие переменные и элементы
       const statusBar = document.getElementById('statusBar');
@@ -656,11 +720,11 @@
       const clearButton = document.getElementById('clearButton');
       const resultsContainer = document.getElementById('resultsContainer');
       const eventSelectorHeader    = document.getElementById('eventSelectorHeader');
-    const eventSelectorContainer = document.getElementById('eventSelectorContainer');
-    const eventSelector          = document.getElementById('eventSelector');
-    const eventAnnouncement      = document.getElementById('eventAnnouncement');
-    const eventReward            = document.getElementById('eventReward');
-    const eventMarkersDisplay    = document.getElementById('eventMarkersDisplay');
+      const eventSelectorContainer = document.getElementById('eventSelectorContainer');
+      const eventSelector          = document.getElementById('eventSelector');
+      const eventAnnouncement      = document.getElementById('eventAnnouncement');
+      const eventReward            = document.getElementById('eventReward');
+      const eventMarkersDisplay    = document.getElementById('eventMarkersDisplay');
 
       /* Функция для начала "активного" состояния статус-бара */
       function startStatusUpdate() {
@@ -712,25 +776,6 @@
 
         // Получаем уже сохранённые в базе бои
         let dbBattles = allExamples.slice();
-        //try {
-        //    const res = await fetch('/.netlify/functions/getBattles');
-        //    if (!res.ok) throw new Error('Ошибка загрузки данных');
-        //    
-        //    const data = await res.json();
-        //    // Ожидаем { events: [...], examples: [...] }
-        //    allEvents   = data.events   || [];
-        //    allExamples = data.examples || [];
-        //  const res = await fetch('/.netlify/functions/getBattles');
-        //  if (res.ok) {
-        //    const data = await res.json();
-        //    // Извлекаем массив боёв из поля battles
-        //    dbBattles = data.battles || [];
-        //  } else {
-        //    console.error("Ошибка получения боёв из базы");
-        //  }
-        //} catch (error) {
-        //  console.error("Ошибка при запросе к базе:", error);
-        //}
 
         // Объединяем: если бой с таким warid уже существует – оставляем его (с результатом анализа)
         let battlesMap = {};
@@ -783,17 +828,15 @@
           }
         }
 
-        // Отображаем объединённый результат (группировка без изменений)
+        // Reload data after submitting battles
         try {
-            const res = await fetch('/.netlify/functions/getBattles');
-            if (!res.ok) throw new Error('Ошибка загрузки данных');
-            
-            const data = await res.json();
-            // Ожидаем { events: [...], examples: [...] }
+            statusText.textContent = 'Перезагружаем данные...';
+            const data = await loadAllBattlesParallel();
             allEvents   = data.events   || [];
             allExamples = data.examples || [];
         } catch (error) {
           console.error("Ошибка при запросе к базе:", error);
+          statusText.textContent = 'Ошибка перезагрузки данных';
         }
         //allExamples = allBattles;
         handleEventChange();
@@ -1829,11 +1872,7 @@ ${failedBattles.map(b => b.link).join('\n')}
           statusText.textContent = 'Загружаем ивенты и примеры...';
           const t0 = performance.now();
 
-          const res = await fetch('/.netlify/functions/getBattles');
-          if (!res.ok) throw new Error('Ошибка загрузки данных');
-
-          const data = await res.json();
-          // Ожидаем { events: [...], examples: [...] }
+          const data = await loadAllBattlesParallel();
           allEvents   = data.events   || [];
           allExamples = data.examples || [];
 

@@ -11,50 +11,53 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // ===== 1. Считываем все примеры (examples) чанками =====
-    const chunkSize = 1000;
-    let allExamples = [];
-    let offset = 0;
+    const params = event.queryStringParameters || {};
+    const page = parseInt(params.page || '0');
+    const pageSize = parseInt(params.pageSize || '1000');
+    
+    const startRange = page * pageSize;
+    const endRange = startRange + pageSize - 1;
 
-    while (true) {
-      const { data: examplesChunk, error: examplesError } = await supabase
-        .from('examples')
-        .select('*')
-        .range(offset, offset + chunkSize - 1);
+    console.log(`Запрос страницы ${page}: записи от ${startRange} до ${endRange}`);
 
-      if (examplesError) {
-        throw examplesError;
-      }
-      if (!examplesChunk || examplesChunk.length === 0) {
-        break;
-      }
+    // ВАЖНО: используем .range() для явного указания диапазона
+    const { data: examplesChunk, error: examplesError, count } = await supabase
+      .from('examples')
+      .select('*', { count: 'exact' })
+      .range(startRange, endRange);
 
-      allExamples.push(...examplesChunk);
-
-      if (examplesChunk.length < chunkSize) {
-        break;
-      }
-      offset += chunkSize;
+    if (examplesError) {
+      console.error('Ошибка получения examples:', examplesError);
+      throw examplesError;
     }
 
-    console.log(`Получено примеров: ${allExamples.length}`);
+    console.log(`Получено ${examplesChunk?.length || 0} записей из ${count} всего`);
 
-    // ===== 2. Считываем все события (events) одним запросом =====
-    const { data: allEvents, error: eventsError } = await supabase
-      .from('events')
-      .select('*');
+    // События загружаем только на первой странице
+    let allEvents = null;
+    if (page === 0) {
+      const { data: events, error: eventsError } = await supabase
+        .from('events')
+        .select('*');
 
-    if (eventsError) {
-      throw eventsError;
+      if (eventsError) {
+        console.error('Ошибка получения events:', eventsError);
+        throw eventsError;
+      }
+      allEvents = events;
+      console.log(`Получено ${events?.length || 0} событий`);
     }
-    console.log(`Получено событий: ${allEvents.length}`);
 
-    // ===== 3. Отдаём оба массива в ответе =====
     return {
       statusCode: 200,
       body: JSON.stringify({
         events: allEvents,
-        examples: allExamples
+        examples: examplesChunk || [],
+        page: page,
+        pageSize: pageSize,
+        totalRecords: count,
+        totalPages: Math.ceil(count / pageSize),
+        recordsInPage: examplesChunk?.length || 0
       }),
     };
 
