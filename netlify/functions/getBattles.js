@@ -12,7 +12,7 @@ exports.handler = async (event, context) => {
 
   try {
     // ===== 1. Считываем все примеры (examples) чанками =====
-    const chunkSize = 5000;
+    const chunkSize = 1000;
     let allExamples = [];
     let offset = 0;
 
